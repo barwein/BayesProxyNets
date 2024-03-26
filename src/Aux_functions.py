@@ -29,42 +29,69 @@ rng = np.random.default_rng(RANDOM_SEED)
 # Data generation
 
 class DataGeneration:
-    def __init__(self, n, theta, gamma, eta, sig_y):
+    def __init__(self, n, theta, eta, sig_y):
         self.n = n
         self.theta = theta
-        self.gamma = gamma
         self.eta = eta
         self.sig_y = sig_y
-        self.generate_X()
-        self.generate_Z()
-        self.X_diff()
-        self.generate_network()
+        self.X = self.generate_X()
+        self.Z = self.generate_Z()
+        self.X_diff = self.x_diff()
+        self.triu_dim = int(self.n*(self.n-1)/2)
+        self.triu = self.generate_triu()
+        self.adj_mat = self.generate_adj_matrix()
+        self.exposures = self.generate_exposures()
+        self.Y = self.generate_outcome()
 
     def generate_X(self, loc=0, scale=3):
-        self.X = rng.normal(loc=loc,scale=scale,size=self.n)
+        return rng.normal(loc=loc,scale=scale,size=self.n)
 
     def generate_Z(self, p=0.5):
-        self.Z = rng.binomial(n=1,p=p,size=self.n)
+        return rng.binomial(n=1,p=p,size=self.n)
 
-    def X_diff(self):
+    def x_diff(self):
         x_d = []
         for i in range(self.n):
             for j in range(i + 1, self.n):
                 x_d.append(np.abs(self.X[i] - self.X[j]))
-        self.X_diff = np.array(x_d)
+        return np.array(x_d)
 
-    def generate_network(self):
+    def generate_triu(self):
         probs = expit(self.theta[0] + self.theta[1] * self.X_diff)
+        return rng.binomial(n=1, p=probs, size=self.triu_dim)
+
+    def generate_adj_matrix(self):
         mat = np.zeros((self.n, self.n))
-        triu_dim = int(self.n*(self.n-1)/2)
-        idx_upper_tri = np.triu_indices(n=self.n, k=1))
-        edges = rng.binomial(n=1, p=probs, size=triu_dim)
-        mat[idx_upper_tri] = edges
-        mat = mat + mat.T
-        self.adj_mat = mat
-        self.triu = edges
+        idx_upper_tri = np.triu_indices(n=self.n, k=1)
+        mat[idx_upper_tri] = self.triu
+        return mat + mat.T
 
     def generate_exposures(self):
-        self.exposures = np.dot(self.adj_mat, self.Z)
+        return np.dot(self.adj_mat, self.Z)
+
+    def generate_outcome(self):
+        mu_y = self.eta[0] + self.eta[1]*self.Z + self.eta[2]*self.exposures + self.eta[3]*self.X
+        return mu_y + rng.normal(loc=0,scale=self.sig_y,size=self.n)
+
+    def get_data(self):
+        return {"Z" : self.Z, "X" : self.X, "Y" : self.Y,
+                "triu" : self.triu, "exposures" : self.exposures,
+                "adj_mat" : self.adj_mat, "X_diff" : self.X_diff}
+
+
+df1 = DataGeneration(n=10,theta=[0.5,0.5],eta=[-1,1.5,0.5,-0.25],sig_y=1).get_data()
+df2 = DataGeneration(n=10,theta=[0.5,0.5],eta=[-1,1.5,0.5,-0.25],sig_y=1).get_data()
+print(df1)
+print(df2)
+print("X equal?", np.array_equal(df1["X"], df2["X"]))
+print("exposures equal? ", np.array_equal(df1["exposures"], df2["exposures"]))
+print("triu equal? ", np.array_equal(df1["triu"], df2["triu"]))
+
+
+
+
+
+
+
 
 
