@@ -339,5 +339,3 @@ class Bayes_Modular:
             return self.cut_posterior_summarized()
         if self.type in ["plugin"]:
             return self.plugin_posterior_summarized()
-
-

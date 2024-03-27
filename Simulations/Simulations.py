@@ -84,7 +84,7 @@ if __name__ == "__main__":
     SIG_Y = 1
     PZ = 0.3
     BM_TYPES = ["cut-2S", "cut-3S", "plugin"]
-    N = 300
+    N = 50
     N_SIM = 30
 
     start = time.time()
