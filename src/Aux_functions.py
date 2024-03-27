@@ -1,34 +1,24 @@
 # Load libraries
 import time
-import arviz as az
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pymc as pm
-import pymc_experimental as pmx
-import pytensor as pt
-import networkx as nx
-import seaborn as sns
 import multiprocessing
 import os
-import jax
+# import jax
 import jax.numpy as jnp
 from jax import random
 from jax.scipy.special import expit
 import numpyro.distributions as dist
 import numpyro
 from numpyro.contrib.funsor import config_enumerate
-from numpyro.contrib.control_flow import scan
-from tqdm import tqdm
+# from tqdm import tqdm
 from joblib import Parallel, delayed
-from numpyro.infer import MCMC, HMC, NUTS, DiscreteHMCGibbs, MixedHMC, Predictive
+from numpyro.infer import MCMC, NUTS, Predictive
 
 N_CORES = multiprocessing.cpu_count()
 os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
 RANDOM_SEED = 892357143
 rng = np.random.default_rng(RANDOM_SEED)
-
-# Data generation
 
 class DataGeneration:
     def __init__(self, n, theta, eta, sig_y, pz):
@@ -208,6 +198,10 @@ class Outcome_MCMC:
             self.outcome_m.run(self.rng_key, Y=self.Y,Z=self.Z,X=self.X,expos=self.exposures,n=self.n)
 
     def get_summary_outcome_model(self):
+        """
+
+        :rtype: object
+        """
         posterior_samples = self.outcome_m.get_samples()
         mean_posterior = np.mean(posterior_samples["eta"],axis=0)[2]
         median_posterior = np.median(posterior_samples["eta"],axis=0)[2]
@@ -360,14 +354,14 @@ if __name__ == "__main__":
     df_obs["triu"] = obs_network["triu_obs"]
 
     # Run MCMC with true network (as given)
-    true_outcome_mcmc = Outcome_MCMC(data=df_true, n=N, type = "oracle", rng_key=rng_key, iter = 1)
-    true_outcome_mcmc.run_outcome_model()
-    true_results = true_outcome_mcmc.get_summary_outcome_model()
+    oracle_outcome_mcmc = Outcome_MCMC(data=df_true, n=N, type = "oracle", rng_key=rng_key, iter = 1)
+    oracle_outcome_mcmc.run_outcome_model()
+    oracle_results = oracle_outcome_mcmc.get_summary_outcome_model()
     # Run MCMC with observed network (as given)
     obs_outcome_mcmc = Outcome_MCMC(data=df_obs, n=N, type = "observed", rng_key=rng_key, iter = 1)
     obs_outcome_mcmc.run_outcome_model()
     obs_results = obs_outcome_mcmc.get_summary_outcome_model()
-    print(pd.concat([true_results, obs_results]))
+    print(pd.concat([oracle_results, obs_results]))
 
     print("Running network model")
     # Run network module
@@ -398,7 +392,7 @@ if __name__ == "__main__":
     plugin_results = plugin_mcmc.get_results()
     print(pd.concat([cut_2S_results, cut_3S_results,plugin_results]))
     print("ALL together:")
-    results_all = pd.concat([true_results,obs_results,cut_2S_results,cut_3S_results,plugin_results])
+    results_all = pd.concat([oracle_results,obs_results,cut_2S_results,cut_3S_results,plugin_results])
     results_all['iter'] = 1
     print(results_all)
     print(results_all.to_string())
