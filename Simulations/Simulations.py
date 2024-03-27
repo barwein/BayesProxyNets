@@ -89,14 +89,14 @@ if __name__ == "__main__":
 
 
     print(os.getcwd())
-    # twosims = pd.DataFrame()
-    # for iter in range(2):
-    #     curr_result = One_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA,
-    #                                      sig_y=SIG_Y, pz=PZ, iter=iter)
-    #     curr_result.to_csv("Bayes_incorrect_network/Simulations/linear_dgp_noisy_network_N300.csv",
-    #                        mode='a',
-    #                        index=False, header=True)
-    #     twosims = pd.concat([twosims,curr_result])
-    #     print("Done iteration {}".format(iter))
-    #
-    # print(twosims.to_string())
+    twosims = pd.DataFrame()
+    for iter in range(2):
+        curr_result = One_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA,
+                                         sig_y=SIG_Y, pz=PZ, iter=iter)
+        curr_result.to_csv("linear_dgp_noisy_network_N300.csv",
+                           mode='a',
+                           index=False, header=True)
+        twosims = pd.concat([twosims,curr_result])
+        print("Done iteration {}".format(iter))
+
+    print(twosims.to_string())
