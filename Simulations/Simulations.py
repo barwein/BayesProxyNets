@@ -2,23 +2,24 @@
 import time
 import numpy as np
 import pandas as pd
-import multiprocessing
-import os
+# import multiprocessing
+# import os
 # import jax
-import jax.numpy as jnp
+# import jax.numpy as jnp
 from jax import random
-from jax.scipy.special import expit
-import numpyro.distributions as dist
-import numpyro
-from numpyro.contrib.funsor import config_enumerate
-# from tqdm import tqdm
-from joblib import Parallel, delayed
-from numpyro.infer import MCMC, NUTS, Predictive
+# from jax.scipy.special import expit
+# import numpyro.distributions as dist
+# import numpyro
+# from numpyro.contrib.funsor import config_enumerate
+# # from tqdm import tqdm
+# from joblib import Parallel, delayed
+# from numpyro.infer import MCMC, NUTS, Predictive
 
 from src.Aux_functions import DataGeneration, Outcome_MCMC, Network_MCMC, Bayes_Modular, create_noisy_network
 
-def One_simuation_iter(n, theta, gamma, eta, sig_y, pz, iter):
-    rng_key = random.PRNGKey(iter)
+
+def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i):
+    rng_key = random.PRNGKey(i)
     rng_key, rng_key_ = random.split(rng_key)
     # Get data
     df_oracle = DataGeneration(n=n, theta=theta, eta=eta, sig_y=sig_y, pz=pz).get_data()
@@ -31,11 +32,11 @@ def One_simuation_iter(n, theta, gamma, eta, sig_y, pz, iter):
 
     print("Running outcomes models with A as given")
     # Run MCMC with true network (as given)
-    oracle_outcome_mcmc = Outcome_MCMC(data=df_oracle, n=n, type="oracle", rng_key=rng_key, iter=iter)
+    oracle_outcome_mcmc = Outcome_MCMC(data=df_oracle, n=n, type="oracle", rng_key=rng_key, iter=i)
     oracle_outcome_mcmc.run_outcome_model()
     oracle_results = oracle_outcome_mcmc.get_summary_outcome_model()
     # Run MCMC with observed network (as given)
-    obs_outcome_mcmc = Outcome_MCMC(data=df_obs, n=n, type="observed", rng_key=rng_key, iter=iter)
+    obs_outcome_mcmc = Outcome_MCMC(data=df_obs, n=n, type="observed", rng_key=rng_key, iter=i)
     obs_outcome_mcmc.run_outcome_model()
     obs_results = obs_outcome_mcmc.get_summary_outcome_model()
 
@@ -52,52 +53,52 @@ def One_simuation_iter(n, theta, gamma, eta, sig_y, pz, iter):
     # with 2S we need the `network_pred_mean_post`, and with the others the `network_pred` object
     # 2S
     cut_2S_mcmc = Bayes_Modular(data=df_obs, n=n, bm_type="cut-2S",
-                                post_predictive=network_pred_mean_post, n_rep=20, iter=iter)
+                                post_predictive=network_pred_mean_post, n_rep=1000, iter=i)
     cut_2S_mcmc.run_inference()
     cut_2S_results = cut_2S_mcmc.get_results()
     # 3S
     cut_3S_mcmc = Bayes_Modular(data=df_obs, n=n, bm_type="cut-3S",
-                                post_predictive=network_pred, n_rep=20, iter=iter)
+                                post_predictive=network_pred, n_rep=1000, iter=i)
     cut_3S_mcmc.run_inference()
     cut_3S_results = cut_3S_mcmc.get_results()
     # plugin
     plugin_mcmc = Bayes_Modular(data=df_obs, n=n, bm_type="plugin",
-                                post_predictive=network_pred, iter=iter)
+                                post_predictive=network_pred, iter=i)
     plugin_mcmc.run_inference()
     plugin_results = plugin_mcmc.get_results()
+
+    # Combine all
     results_all = pd.concat([oracle_results, obs_results, cut_2S_results, cut_3S_results, plugin_results])
-    results_all['iter'] = iter
+    results_all['iter'] = i
     return results_all
 
+
 if __name__ == "__main__":
-    os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
-    RANDOM_SEED = 892357143
+    # os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
+    # RANDOM_SEED = 892357143
+    RANDOM_SEED = 5415020
     rng = np.random.default_rng(RANDOM_SEED)
 
-
-    N = 30
     THETA = [-2, -0.5]
     GAMMA = [0.05, 0.25]
     ETA = [-1, -3, 0.5, -0.25]
     SIG_Y = 1
     PZ = 0.3
     BM_TYPES = ["cut-2S", "cut-3S", "plugin"]
+    N = 300
     N_SIM = 200
 
-    rng_key = random.PRNGKey(0)
-    rng_key, rng_key_ = random.split(rng_key)
-
-
-    print(os.getcwd())
-    twosims = pd.DataFrame()
-    for iter in range(2):
-        curr_result = One_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA,
-                                         sig_y=SIG_Y, pz=PZ, iter=iter)
-        with_header = iter == 0
+    start = time.time()
+    df_sim_results = pd.DataFrame()
+    # for i in range(N_SIM):
+    for i in range(48, N_SIM):
+        curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA,
+                                         sig_y=SIG_Y, pz=PZ, i=i)
+        with_header = i == 0
         curr_result.to_csv("linear_dgp_noisy_network_N300.csv",
                            mode='a',
                            index=False, header=with_header)
-        twosims = pd.concat([twosims,curr_result])
-        print("Done iteration {}".format(iter))
+        df_sim_results = pd.concat([df_sim_results, curr_result])
+        print("Done iteration {}".format(i))
 
-    print(twosims.to_string())
+    print("Elapsed time: ", time.time()-start)
