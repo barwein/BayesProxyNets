@@ -2,9 +2,9 @@
 import time
 import numpy as np
 import pandas as pd
-# import multiprocessing
+import multiprocessing
 # import os
-# import jax
+import jax
 # import jax.numpy as jnp
 from jax import random
 # from jax.scipy.special import expit
@@ -53,12 +53,12 @@ def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i):
     # with 2S we need the `network_pred_mean_post`, and with the others the `network_pred` object
     # 2S
     cut_2S_mcmc = Bayes_Modular(data=df_obs, n=n, bm_type="cut-2S",
-                                post_predictive=network_pred_mean_post, n_rep=1000, iter=i)
+                                post_predictive=network_pred_mean_post, n_rep=100, iter=i)
     cut_2S_mcmc.run_inference()
     cut_2S_results = cut_2S_mcmc.get_results()
     # 3S
     cut_3S_mcmc = Bayes_Modular(data=df_obs, n=n, bm_type="cut-3S",
-                                post_predictive=network_pred, n_rep=1000, iter=i)
+                                post_predictive=network_pred, n_rep=100, iter=i)
     cut_3S_mcmc.run_inference()
     cut_3S_results = cut_3S_mcmc.get_results()
     # plugin
@@ -76,6 +76,11 @@ def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i):
 if __name__ == "__main__":
     # os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
     # RANDOM_SEED = 892357143
+
+    print("### Starting simulation ###")
+    print("N_CORES: ", multiprocessing.cpu_count()-1)
+    print("N jax cpu devices: ", jax.devices())
+
     RANDOM_SEED = 5415020
     rng = np.random.default_rng(RANDOM_SEED)
 
@@ -85,20 +90,23 @@ if __name__ == "__main__":
     SIG_Y = 1
     PZ = 0.3
     BM_TYPES = ["cut-2S", "cut-3S", "plugin"]
+    # N = 300
     N = 300
     N_SIM = 200
 
     start = time.time()
     df_sim_results = pd.DataFrame()
     # for i in range(N_SIM):
-    for i in range(48, N_SIM):
-        curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA,
-                                         sig_y=SIG_Y, pz=PZ, i=i)
+    # for i in range(48, N_SIM):
+    for i in range(48, 50):
+        curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA, sig_y=SIG_Y, pz=PZ, i=i)
         with_header = i == 0
-        curr_result.to_csv("linear_dgp_noisy_network_N300.csv",
-                           mode='a',
-                           index=False, header=with_header)
+        # curr_result.to_csv("linear_dgp_noisy_network_N300.csv",
+        #                    mode='a',
+        #                    index=False, header=with_header)
         df_sim_results = pd.concat([df_sim_results, curr_result])
         print("Done iteration {}".format(i))
 
     print("Elapsed time: ", time.time()-start)
+    print(df_sim_results)
+    print(df_sim_results.columns.tolist())
