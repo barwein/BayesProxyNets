@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import multiprocessing
 import os
-# import jax
+from functools import partial
 import jax.numpy as jnp
-from jax import random
+from jax import random, jit
 from jax.scipy.special import expit
 import numpyro.distributions as dist
 import numpyro
@@ -15,10 +15,15 @@ from numpyro.contrib.funsor import config_enumerate
 from joblib import Parallel, delayed
 from numpyro.infer import MCMC, NUTS, Predictive
 
-N_CORES = multiprocessing.cpu_count()-1
-os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=14"
+N_CORES = multiprocessing.cpu_count()
+os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 RANDOM_SEED = 892357143
 rng = np.random.default_rng(RANDOM_SEED)
+
+###
+# General N variable to enable @jax.jit fast compilations of 2S and 3S cut posterior estimation
+N = 300
+###
 
 
 class DataGeneration:
@@ -88,10 +93,10 @@ def create_noisy_network(adj_mat, gamma, n):
             "triu_obs" : triu_obs}
 
 
-def triu_to_mat(TRIU, n):
-    AM = np.zeros((n,n))
-    AM[np.triu_indices(n=n,k=1)] = TRIU
-    return AM + AM.T
+def triu_to_mat(triu_v, n):
+    adj_mat = np.zeros((n,n))
+    adj_mat[np.triu_indices(n=n,k=1)] = triu_v
+    return adj_mat + adj_mat.T
 
 
 def q025(x):
@@ -149,6 +154,16 @@ def outcome_stat_model(Y, Z, X, expos, n):
     mu_y = eta[0] + eta[1]*Z + eta[2]*expos + eta[3]*X
     with numpyro.plate("n", n):
         numpyro.sample("Y", dist.Normal(loc=mu_y, scale=sig), obs=Y)
+
+
+@jit
+def get_mcmc_samples(key, Y, Z, X, A):
+    kernel_outcome = NUTS(outcome_model)
+    mcmc = MCMC(kernel_outcome, num_warmup=500, num_samples=250,
+                num_chains=2, progress_bar=False)
+    mcmc.run(key, Y=Y, Z=Z, X=X, A=A, n=N)
+    return mcmc.get_samples()
+
 
 
 class Network_MCMC:
@@ -222,18 +237,18 @@ class Outcome_MCMC:
         mean_posterior = np.mean(posterior_samples["eta"],axis=0)[2]
         median_posterior = np.median(posterior_samples["eta"],axis=0)[2]
         std_posterior = np.std(posterior_samples["eta"],axis=0)[2]
-        # q025_posterior = np.quantile(posterior_samples["eta"],q=0.025,axis=0)[2]
         q005_posterior = np.quantile(posterior_samples["eta"],q=0.005,axis=0)[2]
+        q025_posterior = np.quantile(posterior_samples["eta"],q=0.025,axis=0)[2]
+        q975_posterior = np.quantile(posterior_samples["eta"],q=0.975,axis=0)[2]
         q995_posterior = np.quantile(posterior_samples["eta"],q=0.995,axis=0)[2]
-        # q975_posterior = np.quantile(posterior_samples["eta"],q=0.975,axis=0)[2]
         min_posterior = np.min(posterior_samples["eta"],axis=0)[2]
         max_posterior = np.max(posterior_samples["eta"],axis=0)[2]
         return pd.DataFrame({'mean' : mean_posterior,
                              'median' : median_posterior,
                              'std' : std_posterior,
-                             # 'q025' : q025_posterior,
                              'q005' : q005_posterior,
-                             # 'q975' : q975_posterior,
+                             'q025' : q025_posterior,
+                             'q975' : q975_posterior,
                              'q995' : q995_posterior,
                              'min' : min_posterior,
                              'max' : max_posterior,
@@ -242,8 +257,8 @@ class Outcome_MCMC:
 
 
 class Bayes_Modular:
-    def __init__(self, data, n, bm_type, post_predictive, n_rep = 1000, n_warmup = 500,
-                 n_samples=250, iter=0, n_cores=N_CORES):
+    def __init__(self, data, n, bm_type, post_predictive, n_rep=1000, n_warmup=500,
+                 n_samples=250, n_chains=2, iter=0, n_cores=N_CORES):
         self.X = data["X"]
         self.Z = data["Z"]
         self.Y = data["Y"]
@@ -257,26 +272,28 @@ class Bayes_Modular:
         self.n_rep = n_rep
         self.n_warmup = n_warmup
         self.n_samples = n_samples
+        self.n_chains = n_chains
         self.iter = iter
         self.n_cores = n_cores
-        self.Y_mcmc = self.MCMC_obj()
+        # self.Y_mcmc = self.MCMC_obj()
         self.results = None
 
-    def MCMC_obj(self):
-        return MCMC(NUTS(outcome_model), num_warmup=self.n_warmup, num_samples=self.n_samples,
-                    num_chains=2, progress_bar=False)
+    # def MCMC_obj(self):
+    #     return MCMC(NUTS(outcome_model), num_warmup=self.n_warmup, num_samples=self.n_samples,
+    #                 num_chains=2, progress_bar=False)
 
     def stage_aux(self, i):
         # sample network
         if self.type == "cut-2S":
-            curr_mat = self.post_predictive(random.PRNGKey(i**2), X_diff=self.X_diff,
+            curr_mat = self.post_predictive(random.PRNGKey(i), X_diff=self.X_diff,
                                             TriU=self.triu, n=self.n)
             curr_mat = triu_to_mat(curr_mat["triu_star"], self.n)
-        if self.type == "cut-3S":
+        else: # self.type == "cut-3S":
             curr_mat = triu_to_mat(self.post_predictive[i,], self.n)
         # Run MCMC
-        self.Y_mcmc.run(random.PRNGKey(i**2), Y=self.Y, Z=self.Z, X=self.X, A=curr_mat, n=self.n)
-        curr_posterior_samples = self.Y_mcmc.get_samples()
+        # self.Y_mcmc.run(random.PRNGKey(i**2), Y=self.Y, Z=self.Z, X=self.X, A=curr_mat, n=self.n)
+        # curr_posterior_samples = self.Y_mcmc.get_samples()
+        curr_posterior_samples = get_mcmc_samples(key=random.PRNGKey(i), Y=self.Y, Z=self.Z, X=self.X, A=curr_mat)
         # save results
         alpha_shape = curr_posterior_samples["eta"].shape
         converted_post_samp = {"iter": i, "sig": curr_posterior_samples["sig"]}
@@ -285,14 +302,24 @@ class Bayes_Modular:
         return pd.DataFrame(converted_post_samp)
 
     def twostage_inferene(self):
-        twostage_post_samp = Parallel(n_jobs=self.n_cores)(delayed(self.stage_aux)(i) for i in range(self.n_rep))
-        return pd.concat(twostage_post_samp, axis=0)
+        # twostage_post_samp = Parallel(n_jobs=self.n_cores)(delayed(self.stage_aux)(i) for i in range(self.n_rep))
+        # return pd.concat(twostage_post_samp, axis=0)
+        twostage_post_samp = pd.DataFrame()
+        for i in range(self.n_rep):
+            cur_res = self.stage_aux(i)
+            twostage_post_samp = pd.concat([twostage_post_samp, cur_res])
+        return twostage_post_samp
 
     def threestage_inference(self):
         i_range = np.random.choice(a=range(self.post_predictive.shape[0]),
                                    size=self.n_rep, replace=False)
-        threestage_post_samp = Parallel(n_jobs=self.n_cores)(delayed(self.stage_aux)(i) for i in i_range)
-        return pd.concat(threestage_post_samp, axis=0)
+        # threestage_post_samp = Parallel(n_jobs=self.n_cores)(delayed(self.stage_aux)(i) for i in i_range)
+        # return pd.concat(threestage_post_samp, axis=0)
+        threestage_post_samp = pd.DataFrame()
+        for i in i_range:
+            cur_res = self.stage_aux(i)
+            threestage_post_samp = pd.concat([threestage_post_samp, cur_res])
+        return threestage_post_samp
 
     def plugin_aux(self, i_range):
         # deg_list = []
@@ -319,7 +346,7 @@ class Bayes_Modular:
 
     def cut_posterior_summarized(self):
         # agg_results = self.results.agg(['mean','median',q025, q975,'min','max'])
-        agg_results = self.results.agg(['mean','median',q005, q995,'min','max'])
+        agg_results = self.results.agg(['mean','median',q005, q025, q975, q995,'min','max'])
         mean_eta2 = agg_results["eta_2"]["mean"]
         # eta2_agg_by_iter = agg_results[["iter", "eta_2"]].groupby("iter").agg(["mean", "var"])
         eta2_agg_by_iter = self.results[["iter", "eta_2"]].groupby("iter").agg(["mean", "var"])
@@ -333,7 +360,8 @@ class Bayes_Modular:
         eta2_results_dict["std"] = eta2_std_MI
         eta2_results_dict["type"] = self.type
         # eta2_results_dict = {k : eta2_results_dict[k] for k in ["mean","median","std","q025","q975","min","max","type"]}
-        eta2_results_dict = {k : eta2_results_dict[k] for k in ["mean","median","std","q005","q995","min","max","type"]}
+        eta2_results_dict = {k : eta2_results_dict[k] for k in ["mean","median","std","q005","q025","q975",
+                                                                "q995","min","max","type"]}
         return pd.DataFrame(eta2_results_dict, index=[self.iter])
 
     def plugin_posterior_summarized(self):
@@ -343,14 +371,14 @@ class Bayes_Modular:
         plugin_outcome_m = Outcome_MCMC(data=cur_data,
                                         n=self.n,
                                         type=self.type,
-                                        rng_key=random.split(random.PRNGKey(0))[0],
+                                        rng_key=random.split(random.PRNGKey(self.iter))[0],
                                         iter=self.iter,
                                         suff_stat=True)
         plugin_outcome_m.run_outcome_model()
         return plugin_outcome_m.get_summary_outcome_model()
 
     def get_results(self):
-        if self.type in ["cut-2S","cut-3S"]:
+        if self.type in ["cut-2S", "cut-3S"]:
             return self.cut_posterior_summarized()
         if self.type in ["plugin"]:
             return self.plugin_posterior_summarized()

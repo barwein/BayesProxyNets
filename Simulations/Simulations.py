@@ -18,7 +18,7 @@ from jax import random
 from src.Aux_functions import DataGeneration, Outcome_MCMC, Network_MCMC, Bayes_Modular, create_noisy_network
 
 
-def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i):
+def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i, n_rep):
     rng_key = random.PRNGKey(i)
     rng_key, rng_key_ = random.split(rng_key)
     # Get data
@@ -52,15 +52,18 @@ def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i):
     # Cut-posterior and plugin estimates
     # with 2S we need the `network_pred_mean_post`, and with the others the `network_pred` object
     # 2S
+    # print("2S")
     cut_2S_mcmc = Bayes_Modular(data=df_obs, n=n, bm_type="cut-2S",
-                                post_predictive=network_pred_mean_post, n_rep=100, iter=i)
+                                post_predictive=network_pred_mean_post, n_rep=n_rep, iter=i)
     cut_2S_mcmc.run_inference()
     cut_2S_results = cut_2S_mcmc.get_results()
+    # print("3S")
     # 3S
     cut_3S_mcmc = Bayes_Modular(data=df_obs, n=n, bm_type="cut-3S",
-                                post_predictive=network_pred, n_rep=100, iter=i)
+                                post_predictive=network_pred, n_rep=n_rep, iter=i)
     cut_3S_mcmc.run_inference()
     cut_3S_results = cut_3S_mcmc.get_results()
+    # print("plugin")
     # plugin
     plugin_mcmc = Bayes_Modular(data=df_obs, n=n, bm_type="plugin",
                                 post_predictive=network_pred, iter=i)
@@ -78,8 +81,8 @@ if __name__ == "__main__":
     # RANDOM_SEED = 892357143
 
     print("### Starting simulation ###")
-    print("N_CORES: ", multiprocessing.cpu_count()-1)
-    print("N jax cpu devices: ", jax.devices())
+    print("N_CORES: ", multiprocessing.cpu_count())
+    print("N jax cpu devices: ", jax.local_device_count())
 
     RANDOM_SEED = 5415020
     rng = np.random.default_rng(RANDOM_SEED)
@@ -92,21 +95,20 @@ if __name__ == "__main__":
     BM_TYPES = ["cut-2S", "cut-3S", "plugin"]
     # N = 300
     N = 300
-    N_SIM = 200
+    N_SIM = 300
+    N_REP = 2000
 
     start = time.time()
     df_sim_results = pd.DataFrame()
     # for i in range(N_SIM):
-    # for i in range(48, N_SIM):
-    for i in range(48, 50):
-        curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA, sig_y=SIG_Y, pz=PZ, i=i)
+    for i in range(1):
+        curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA, sig_y=SIG_Y, pz=PZ, i=i, n_rep=N_REP)
         with_header = i == 0
-        # curr_result.to_csv("linear_dgp_noisy_network_N300.csv",
-        #                    mode='a',
-        #                    index=False, header=with_header)
+        curr_result.to_csv("linear_dgp_noisy_network_N300.csv",
+                           mode='a',
+                           index=False, header=with_header)
         df_sim_results = pd.concat([df_sim_results, curr_result])
         print("Done iteration {}".format(i))
 
     print("Elapsed time: ", time.time()-start)
     print(df_sim_results)
-    print(df_sim_results.columns.tolist())
