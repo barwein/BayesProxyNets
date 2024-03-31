@@ -100,15 +100,14 @@ if __name__ == "__main__":
 
     start = time.time()
     df_sim_results = pd.DataFrame()
-    # for i in range(N_SIM):
-    for i in range(1):
+
+    for i in range(N_SIM):
         curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA, sig_y=SIG_Y, pz=PZ, i=i, n_rep=N_REP)
         with_header = i == 0
         curr_result.to_csv("linear_dgp_noisy_network_N300.csv",
                            mode='a',
                            index=False, header=with_header)
         df_sim_results = pd.concat([df_sim_results, curr_result])
-        print("Done iteration {}".format(i))
+        print("Finished iteration {}".format(i))
 
     print("Elapsed time: ", time.time()-start)
-    print(df_sim_results)

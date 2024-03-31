@@ -167,8 +167,8 @@ def get_mcmc_samples(key, Y, Z, X, A):
 
 
 class Network_MCMC:
-    # def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=3000, n_chains=4):
-    def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=2000, n_chains=6):
+    def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=3000, n_chains=4):
+    # def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=2000, n_chains=6):
         self.X_diff = data["X_diff"]
         self.triu = data["triu"]
         self.adj_mat = data["adj_mat"]
@@ -178,6 +178,7 @@ class Network_MCMC:
         self.n_samples = n_samples
         self.n_chains = n_chains
         self.network_m = self.network()
+
     def network(self):
         kernel = NUTS(network_model)
         return MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples,
