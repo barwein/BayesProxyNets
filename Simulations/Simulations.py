@@ -75,7 +75,8 @@ def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i):
 
 if __name__ == "__main__":
     # os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
-    RANDOM_SEED = 892357143
+    # RANDOM_SEED = 892357143
+    RANDOM_SEED = 5415020
     rng = np.random.default_rng(RANDOM_SEED)
 
     THETA = [-2, -0.5]
@@ -89,7 +90,8 @@ if __name__ == "__main__":
 
     start = time.time()
     df_sim_results = pd.DataFrame()
-    for i in range(N_SIM):
+    # for i in range(N_SIM):
+    for i in range(48, N_SIM):
         curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA,
                                          sig_y=SIG_Y, pz=PZ, i=i)
         with_header = i == 0
