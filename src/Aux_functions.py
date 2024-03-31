@@ -16,7 +16,7 @@ from joblib import Parallel, delayed
 from numpyro.infer import MCMC, NUTS, Predictive
 
 N_CORES = multiprocessing.cpu_count()-1
-os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
+os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=14"
 RANDOM_SEED = 892357143
 rng = np.random.default_rng(RANDOM_SEED)
 
@@ -60,7 +60,7 @@ class DataGeneration:
         return mat + mat.T
 
     def generate_exposures(self):
-        return np.dot(self.adj_mat, self.Z)
+        return jnp.dot(self.adj_mat, self.Z)
 
     def generate_outcome(self):
         mu_y = self.eta[0] + self.eta[1]*self.Z + self.eta[2]*self.exposures + self.eta[3]*self.X
@@ -291,7 +291,7 @@ class Bayes_Modular:
             curr_mat = triu_to_mat(self.post_predictive[i,], self.n)
             # save statistics
             # deg_list.append([np.sum(curr_mat, 1)])
-            expos_list.append([np.dot(curr_mat, self.Z)])
+            expos_list.append([jnp.dot(curr_mat, self.Z)])
         return {'expos': expos_list}
         # return {'deg': deg_list, 'expos': expos_list}
 
