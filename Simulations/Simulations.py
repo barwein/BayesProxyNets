@@ -77,7 +77,7 @@ def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i, n_rep):
 
 
 if __name__ == "__main__":
-    # os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
+    # os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=14"
     # RANDOM_SEED = 892357143
 
     print("### Starting simulation ###")
