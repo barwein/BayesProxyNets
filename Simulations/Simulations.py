@@ -84,7 +84,8 @@ if __name__ == "__main__":
     print("N_CORES: ", multiprocessing.cpu_count())
     print("N jax cpu devices: ", jax.local_device_count())
 
-    RANDOM_SEED = 5415020
+    # RANDOM_SEED = 5415020
+    RANDOM_SEED = 6262523
     rng = np.random.default_rng(RANDOM_SEED)
 
     THETA = [-2, -0.5]
@@ -101,7 +102,8 @@ if __name__ == "__main__":
     start = time.time()
     df_sim_results = pd.DataFrame()
 
-    for i in range(N_SIM):
+    # for i in range(N_SIM):
+    for i in range(184, N_SIM):
         curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA, sig_y=SIG_Y, pz=PZ, i=i, n_rep=N_REP)
         with_header = i == 0
         curr_result.to_csv("linear_dgp_noisy_network_N300.csv",
