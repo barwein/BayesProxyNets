@@ -27,7 +27,7 @@ def eigenindices(m: list[int] | int, dim: int) -> ArrayImpl:
         .reshape(-1, dim)
         .T
     )
-
+    # return m
 
 def sqrt_eigenvalues(
     ell: int | float | list[int | float], m: list[int] | int, dim: int
@@ -125,5 +125,8 @@ def _convert_ell(
     elif isinstance(ell, jax.Array):
         ell_ = ell
     # if ell_.shape != (dim, 1):
-    #     raise ValueError("ell must be a scalar or a list of length `dim`.")
+    #     raise ValueError("ell must be a scalar or a list of length `dim`.",
+    #                      "Current ell shape is, ", ell_.shape,
+    #                      "current dim is ", dim)
+
     return ell_
