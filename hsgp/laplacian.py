@@ -124,6 +124,6 @@ def _convert_ell(
         ell_ = jnp.array(ell)[..., None]  # dim x 1 array
     elif isinstance(ell, jax.Array):
         ell_ = ell
-    if ell_.shape != (dim, 1):
-        raise ValueError("ell must be a scalar or a list of length `dim`.")
+    # if ell_.shape != (dim, 1):
+    #     raise ValueError("ell must be a scalar or a list of length `dim`.")
     return ell_
