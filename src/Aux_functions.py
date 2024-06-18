@@ -27,11 +27,12 @@ N = 300
 
 
 class DataGeneration:
-    def __init__(self, n, theta, eta, sig_y, pz):
+    def __init__(self, n, theta, eta, sig_y, pz, lin):
         self.n = n
         self.theta = theta
         self.eta = eta
         self.sig_y = sig_y
+        self.lin = lin
         self.X = self.generate_X()
         self.Z = self.generate_Z(p=pz)
         self.X_diff = self.x_diff()
