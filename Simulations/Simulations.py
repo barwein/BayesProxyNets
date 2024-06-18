@@ -18,13 +18,19 @@ from jax import random
 from src.Aux_functions import DataGeneration, Outcome_MCMC, Network_MCMC, Bayes_Modular, create_noisy_network
 
 
-def one_simuation_iter(n, theta, gamma, eta, sig_y, pz, i, n_rep):
-    rng_key = random.PRNGKey(i)
+# parameters guides:
+# theta: p(A* | X, theta)
+# gamma: p(A | A*, X, gamma)
+# eta, sig_y: p(Y | Z, X, A*, eta, sig_y)
+# alpha: pi_alpha(z) ---> stochastic intervention
+
+def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
+    rng_key = random.PRNGKey(idx)
     rng_key, rng_key_ = random.split(rng_key)
     # Get data
-    df_oracle = DataGeneration(n=n, theta=theta, eta=eta, sig_y=sig_y, pz=pz).get_data()
+    df_oracle = DataGeneration(theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alpha=alpha).get_data()
     # Generate noisy network measurement
-    obs_network = create_noisy_network(df_oracle["adj_mat"], gamma, n)
+    obs_network = create_noisy_network(df_oracle["adj_mat"], gamma)
     # save observed df and update A* and triu
     df_obs = df_oracle.copy()
     df_obs["adj_mat"] = obs_network["obs_mat"]
@@ -90,18 +96,20 @@ if __name__ == "__main__":
 
     THETA = [-2, -0.5]
     GAMMA = [0.05, 0.25]
-    ETA = [-1, -3, 0.5, -0.25]
-    SIG_Y = 1
+    ETA = [-1, -3, -0.5, 2.5]
+    SIG_Y = .5
     PZ = 0.3
     BM_TYPES = ["cut-2S", "cut-3S", "plugin"]
     # N = 300
     N = 300
-    N_SIM = 300
-    N_REP = 2000
+    N_SIM = 500
+    N_REP = 1000
 
     start = time.time()
     df_sim_results = pd.DataFrame()
 
+
+    # TODO: change the `for-loop' for jax.vmap
     # for i in range(N_SIM):
     for i in range(184, N_SIM):
         curr_result = one_simuation_iter(n=N, theta=THETA, gamma=GAMMA, eta=ETA, sig_y=SIG_Y, pz=PZ, i=i, n_rep=N_REP)
