@@ -27,7 +27,8 @@ from src.Aux_functions import DataGeneration, Outcome_MCMC, Network_MCMC, Bayes_
 def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
     rng_key = random.PRNGKey(idx)
     rng_key, rng_key_ = random.split(rng_key)
-    # Get data
+
+    # --- Get data ---
     df_oracle = DataGeneration(theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alpha=alpha).get_data()
     # Generate noisy network measurement
     obs_network = create_noisy_network(df_oracle["adj_mat"], gamma)
@@ -36,25 +37,24 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
     df_obs["adj_mat"] = obs_network["obs_mat"]
     df_obs["triu"] = obs_network["triu_obs"]
 
-    print("Running outcomes models with A as given")
-    # Run MCMC with true network (as given)
-    oracle_outcome_mcmc = Outcome_MCMC(data=df_oracle, n=n, type="oracle", rng_key=rng_key, iter=i)
-    oracle_outcome_mcmc.run_outcome_model()
-    oracle_results = oracle_outcome_mcmc.get_summary_outcome_model()
-    # Run MCMC with observed network (as given)
-    obs_outcome_mcmc = Outcome_MCMC(data=df_obs, n=n, type="observed", rng_key=rng_key, iter=i)
-    obs_outcome_mcmc.run_outcome_model()
-    obs_results = obs_outcome_mcmc.get_summary_outcome_model()
+    # --- network module ---
+    network_mcmc = Network_MCMC(data=df_obs, rng_key=rng_key)
+    # get posterior samples and predictive distributions
+    network_post = network_mcmc.get_posterior_samples()
+    network_mean_post = network_mcmc.mean_posterior()
+    network_pred_samples = network_mcmc.predictive_samples()
 
-    print("Running network model")
-    # Run network module
-    network_mcmc = Network_MCMC(data=df_obs, n=n, rng_key=rng_key)
-    network_mcmc.run_network_model()
-    # get predictive distributions
-    network_pred = network_mcmc.get_network_predictive(mean_posterior=False)
-    network_pred_mean_post = network_mcmc.get_network_predictive(mean_posterior=True)
+    # --- Outcome module (linear & GP) ---
+    # with true network
+    oracle_outcome_mcmc = Outcome_MCMC(data=df_oracle, type="oracle", rng_key=rng_key, iter=i)
+    oracle_results = oracle_outcome_mcmc.get_results()
+    # with observed network
+    obs_outcome_mcmc = Outcome_MCMC(data=df_obs, type="observed", rng_key=rng_key, iter=i)
+    obs_results = obs_outcome_mcmc.get_results()
 
-    print("Running estimation with cut-posterior and plugin")
+    #  --- cut-posterior ---
+    # TODO: finish the implemenation of three, two, and one stage as written in `test' file.
+
     # Cut-posterior and plugin estimates
     # with 2S we need the `network_pred_mean_post`, and with the others the `network_pred` object
     # 2S

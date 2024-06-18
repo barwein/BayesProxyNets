@@ -19,7 +19,8 @@ from hsgp.approximation import hsgp_squared_exponential
 
 
 # --- Set cores and seed ---
-N_CORES = multiprocessing.cpu_count()
+N_CORES = 4
+# N_CORES = 20
 os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 RANDOM_SEED = 892357143
 rng = np.random.default_rng(RANDOM_SEED)
@@ -27,7 +28,7 @@ rng = np.random.default_rng(RANDOM_SEED)
 # --- Set global variables and values ---
 N = 300
 M = 20
-
+C = 3.5
 
 # --- data generation for each iteration ---
 class DataGeneration:
@@ -73,6 +74,7 @@ class DataGeneration:
         idx_upper_tri = np.triu_indices(n=self.n, k=1)
         mat[idx_upper_tri] = self.triu
         return mat + mat.T
+
     def gen_outcome(self, z, zeig):
         df_lin = np.transpose(np.array([[1]*self.n, z, self.X]))
         epsi = rng.normal(loc=0, scale=self.sig_y, size=N)
@@ -107,16 +109,10 @@ class DataGeneration:
             y, epsi = self.gen_outcome(df, zeigen_new)
             return np.mean(y - epsi)
 
-    # def generate_exposures(self):
-    #     return jnp.dot(self.adj_mat, self.Z)
-
-    # def generate_outcome(self):
-    #     mu_y = self.eta[0] + self.eta[1]*self.Z + self.eta[2]*self.exposures + self.eta[3]*self.X
-    #     return mu_y + rng.normal(loc=0, scale=self.sig_y, size=self.n)
-
     def get_data(self):
         return {"Z" : self.Z, "X" : self.X, "Y" : self.Y,
                 "triu" : self.triu, "Zeigen" : self.zeigen,
+                "eig_cen" : self.eig_cen,
                 "adj_mat" : self.adj_mat, "X_diff" : self.X_diff,
                 "Z_h" : self.Z_h, "Z_stoch" : self.Z_stoch,
                 "estimand_h" : self.estimand_h,
@@ -170,7 +166,7 @@ def between_var(x, mean_all):
     n_rep = len(x)
     return (1/(n_rep - 1))*np.sum(np.square(x-mean_all))
 
-def compute_error_stats(esti_post_draws, true_estimand, method="TEST", idx=None):
+def compute_error_stats(esti_post_draws, true_estimand, method="TEST", estimand = "h", idx=None):
     mean = np.round(np.mean(esti_post_draws),3)
     medi = np.round(np.median(esti_post_draws),3)
     std = np.round(np.std(esti_post_draws),3)
@@ -178,7 +174,7 @@ def compute_error_stats(esti_post_draws, true_estimand, method="TEST", idx=None)
     q025 = np.quantile(esti_post_draws, 0.025)
     q975 = np.quantile(esti_post_draws, 0.975)
     cover = q025 <= true_estimand <= q975
-    return pd.DataFrame([{"idx" : idx, "method" : method,
+    return pd.DataFrame([{"idx" : idx, "method" : method, "estimand" : estimand,
             "mean" : mean, "median" : medi, "true" : np.round(true_estimand,3),
             "bias" : np.round(mean - true_estimand,3), "std" : std, "RMSE" : RMSE,
             "q025" : np.round(q025,3), "q975" : np.round(q975,3), "covering" : cover}])
@@ -227,11 +223,6 @@ def HSGP_model(Xlin, Xgp, ell, m, Y=None, non_centered=True):
 
 
 # --- MCMC aux functions ---
-@jit
-def Astar_pred(key, post_samples, Xd, triu):
-    pred_func = Predictive(model=network_model, posterior_samples=post_samples, infer_discrete=True,num_samples=1)
-    return pred_func(key, X=Xd, TriU=triu)
-
 # @jit
 def linear_model_samples_parallel(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
@@ -305,6 +296,16 @@ def hsgp_pred(z, zeigen, post_samples, x, ell):
 
 
 @jit
+def Astar_pred(i, post_samples, Xd, triu):
+    pred_func = Predictive(model=network_model, posterior_samples=post_samples, infer_discrete=True, num_samples=1)
+    sampled_net = pred_func(random.PRNGKey(i), X=Xd, TriU=triu)["triu_star"]
+    return jnp.squeeze(sampled_net, axis=0)
+
+vectorized_astar_pred = vmap(Astar_pred, in_axes=(0, None, None, None))
+
+
+
+@jit
 def get_mcmc_samples(key, Y, Z, X, A):
     kernel_outcome = NUTS(outcome_model)
     mcmc = MCMC(kernel_outcome, num_warmup=500, num_samples=250,
@@ -313,96 +314,88 @@ def get_mcmc_samples(key, Y, Z, X, A):
     return mcmc.get_samples()
 
 
-
 class Network_MCMC:
-    def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=3000, n_chains=4):
+    def __init__(self, data, rng_key, n_warmup=1000, n_samples=3000, n_chains=4):
     # def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=2000, n_chains=6):
         self.X_diff = data["X_diff"]
         self.triu = data["triu"]
         self.adj_mat = data["adj_mat"]
-        self.n = n
         self.rng_key = rng_key
         self.n_warmup = n_warmup
         self.n_samples = n_samples
         self.n_chains = n_chains
         self.network_m = self.network()
+        self.post_samples = None
 
     def network(self):
         kernel = NUTS(network_model)
         return MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples,
                     num_chains=self.n_chains, progress_bar=False)
 
-    def run_network_model(self):
-        self.network_m.run(self.rng_key, X_diff=self.X_diff, TriU=self.triu, n=self.n)
+    def get_posterior_samples(self):
+        self.network_m.run(self.rng_key, X_diff=self.X_diff, TriU=self.triu)
+        self.post_samples = self.network_m.get_samples()
+        return self.post_samples
 
-    def get_network_predictive(self, mean_posterior = False):
-        posterior_samples = self.network_m.get_samples()
-        if mean_posterior:
-            posterior_mean = {"theta": np.expand_dims(np.mean(posterior_samples["theta"], axis=0), -2),
-                              "gamma0": np.expand_dims(np.mean(posterior_samples["gamma0"]), -1),
-                              "gamma1": np.expand_dims(np.mean(posterior_samples["gamma1"]), -1)}
-            return Predictive(model=network_model, posterior_samples=posterior_mean,
-                              infer_discrete=True, num_samples=1)
-        else:
-            posterior_predictive = Predictive(model=network_model, posterior_samples=posterior_samples,
-                                              infer_discrete=True)
-            return posterior_predictive(self.rng_key, X_diff=self.X_diff, TriU=self.triu, n=self.n)["triu_star"]
+    def mean_posterior(self):
+        return {"theta": np.expand_dims(np.mean(self.post_samples["theta"], axis=0), -2),
+                              "gamma0": np.expand_dims(np.mean(self.post_samples["gamma0"]), -1),
+                              "gamma1": np.expand_dims(np.mean(self.post_samples["gamma1"]), -1)}
+
+    def predictive_samples(self):
+        posterior_predictive = Predictive(model=network_model, posterior_samples=self.post_samples,
+                                          infer_discrete=True)
+        return posterior_predictive(self.rng_key, X_diff=self.X_diff, TriU=self.triu)["triu_star"]
 
 
 class Outcome_MCMC:
-    def __init__(self, data, n, type, rng_key, iter, suff_stat=False, n_warmup=1000, n_samples=3000, n_chains=4):
+    def __init__(self, data, type, rng_key, iter):
         self.X = data["X"]
         self.Z = data["Z"]
-        self.Y = data["Y"]
-        self.exposures = data["exposures"]
+        self.Y = jnp.array(data["Y"])
+        self.zeigen = data["Zeigen"]
+        self.ell = jnp.array(C*jnp.max(jnp.abs(self.zeigen))).reshape(1,1)
+        self.df = self.get_df()
         self.adj_mat = data["adj_mat"]
-        self.n = n
+        self.eig_cen = data['eig_cen']
+        self.Z_h = data["Z_h"]
+        self.Z_stoch = data["Z_stoch"]
+        self.estimand_h = data["estimand_h"]
+        self.estimand_stoch = data["estimand_stoch"]
+        self.n = N
         self.type = type
         self.rng_key = rng_key
         self.iter = iter
-        self.suff_stat = suff_stat
-        self.n_warmup = n_warmup
-        self.n_samples = n_samples
-        self.n_chains = n_chains
-        self.outcome_m = self.outcome()
+        self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, Y=self.Y, df=self.df)
+        self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y, Xgp=self.zeigen,
+                                                             Xlin=self.df[:,0:3], ell=self.ell)
 
-    def outcome(self):
-        if not self.suff_stat:
-            kernel = NUTS(outcome_model)
-        else:
-            kernel = NUTS(outcome_stat_model)
+    def get_df(self):
+        return jnp.transpose(jnp.array([[1]*self.n, self.Z, self.X, self.zeigen]))
 
-        return MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples,
-                    num_chains=self.n_chains, progress_bar=False)
+    def get_results(self):
+        # dynamic (h) intervention
+        h_zeigen = zeigen_value(self.Z_h, self.eig_cen, self.adj_mat)
+        linear_h_pred = linear_pred(self.Z_h, h_zeigen, self.linear_post_samples, self.X)
+        linear_h_stats = compute_error_stats(jnp.mean(linear_h_pred, axis=0),
+                                                  self.estimand_h, method="Linear_" + self.type,
+                                                  estimand = "dynamic", idx=self.iter)
+        hsgp_h_pred = hsgp_pred(self.Z_h, h_zeigen, self.hsgp_post_samples, self.X, self.ell)
+        hsgp_h_stats = compute_error_stats(jnp.mean(hsgp_h_pred, axis=0),
+                                                  self.estimand_h, method="HSGP_" + self.type,
+                                                  estimand = "dynamic", idx=self.iter)
+        # stochastic intervention
+        stoch_zeigen = zeigen_value(self.Z_stoch, self.eig_cen, self.adj_mat)
+        linear_stoch_pred = linear_pred(self.Z_stoch, stoch_zeigen, self.linear_post_samples, self.X)
+        linear_stoch_stats = compute_error_stats(jnp.mean(linear_stoch_pred, axis=0),
+                                             self.estimand_h, method="Linear_" + self.type,
+                                             estimand="stoch", idx=self.iter)
+        hsgp_stoch_pred = hsgp_pred(self.Z_stoch, stoch_zeigen, self.hsgp_post_samples, self.X, self.ell)
+        hsgp_stoch_stats = compute_error_stats(jnp.mean(hsgp_stoch_pred, axis=0),
+                                           self.estimand_h, method="HSGP_" + self.type,
+                                           estimand="stoch", idx=self.iter)
 
-    def run_outcome_model(self):
-        if not self.suff_stat:
-            self.outcome_m.run(self.rng_key, Y=self.Y,Z=self.Z,X=self.X,A=self.adj_mat,n=self.n)
-        else:
-            self.outcome_m.run(self.rng_key, Y=self.Y,Z=self.Z,X=self.X,expos=self.exposures,n=self.n)
-
-    def get_summary_outcome_model(self):
-        posterior_samples = self.outcome_m.get_samples()
-        mean_posterior = np.mean(posterior_samples["eta"],axis=0)[2]
-        median_posterior = np.median(posterior_samples["eta"],axis=0)[2]
-        std_posterior = np.std(posterior_samples["eta"],axis=0)[2]
-        q005_posterior = np.quantile(posterior_samples["eta"],q=0.005,axis=0)[2]
-        q025_posterior = np.quantile(posterior_samples["eta"],q=0.025,axis=0)[2]
-        q975_posterior = np.quantile(posterior_samples["eta"],q=0.975,axis=0)[2]
-        q995_posterior = np.quantile(posterior_samples["eta"],q=0.995,axis=0)[2]
-        min_posterior = np.min(posterior_samples["eta"],axis=0)[2]
-        max_posterior = np.max(posterior_samples["eta"],axis=0)[2]
-        return pd.DataFrame({'mean' : mean_posterior,
-                             'median' : median_posterior,
-                             'std' : std_posterior,
-                             'q005' : q005_posterior,
-                             'q025' : q025_posterior,
-                             'q975' : q975_posterior,
-                             'q995' : q995_posterior,
-                             'min' : min_posterior,
-                             'max' : max_posterior,
-                             'type' : self.type},
-                            index = [self.iter])
+        return pd.concat([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
 
 
 class Bayes_Modular:
