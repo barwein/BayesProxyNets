@@ -6,7 +6,8 @@ from jax import random, vmap
 import time
 import numpy as np
 import src.Aux_functions as aux
-from Simulations import vectorized_simulations, results_to_pd_df
+from Simulations import vectorized_simulations, results_to_pd_df, one_simuation_iter
+import argparse
 
 # parameters guides:
 # theta: p(A* | X, theta)
@@ -29,7 +30,7 @@ ALPHA = 0.5
 # N = 300
 N = 300
 # N_SIM = 500
-N_SIM = 3
+N_SIM = 25
 # N_REP = 1000
 N_REP = 100
 
@@ -38,10 +39,28 @@ if __name__ == "__main__":
     print("### Starting simulation ###")
     print("N_CORES: ", multiprocessing.cpu_count())
     print("N jax cpu devices: ", jax.local_device_count())
+
+    # parser = argparse.ArgumentParser(description="Run simulation with a specific job ID")
+    # parser.add_argument('job_id', type=int, help='Job ID to run the simulation')
+    # args = parser.parse_args()
+    # if args.job_id is None:
+    #     raise ValueError("Error: No job id is given.")
+
     start = time.time()
     idx_range = jnp.arange(N_SIM)
     # (idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha, w_path, dgp)
     # Run simulations
+    # for i in range(N_SIM):
+    #     sim_results = one_simuation_iter(i, THETA, GAMMA, ETA, SIG_Y, PZ, N_REP, LIN_Y, ALPHA)
+    #     df_results = results_to_pd_df(sim_results, i)
+    #     w_path = "results"
+    #     dgp = "linear_dgp"
+    #     with_header = i == 0
+    #     df_results.to_csv(w_path + "/" + dgp + "_" + args.job_id + ".csv",
+    #                       mode='a', index=False, header=with_header)
+        # df_results.to_csv(w_path + "/" + dgp + ".csv", index=False)
+
+
     sim_results = vectorized_simulations(idx_range, THETA, GAMMA,
                                          ETA, SIG_Y, PZ,
                                          N_REP, LIN_Y, ALPHA)

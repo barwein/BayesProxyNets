@@ -135,6 +135,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
 
 
 vectorized_simulations = vmap(one_simuation_iter, in_axes = (0,) + (None,) * 8)
+
 # vectorized_simulations = vmap(run_one_iter, in_axes= (0,) + (None,) * 10)
 # vectorized_simulations = vmap(run_one_iter, in_axes=(0,None,None,None,None,None,None,None,None,None,None))
 
@@ -158,6 +159,7 @@ ESTIMANDS = ['dynamic', 'dynamic', 'stoch', 'stoch',
 def results_to_pd_df(results, n_iter):
     res_df = jnp.vstack(results)
     combined_df_pd = pd.DataFrame(res_df, columns=COLUMNS)
+    # combined_df_pd = pd.DataFrame(results, columns=COLUMNS)
     combined_df_pd["method"] = METHODS*n_iter
     combined_df_pd["estimand"] = ESTIMANDS*n_iter
     return combined_df_pd
