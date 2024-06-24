@@ -459,15 +459,17 @@ def multistage_mcmc(samp_net, Y, Z_obs, Z_new, X, key):
     return jnp.array([lin_estimates, hsgp_estimates])
 
 parallel_multistage = pmap(multistage_mcmc, in_axes=(0, None, None, None, None, None))
+vectorized_multistage = pmap(multistage_mcmc, in_axes=(0, None, None, None, None, None))
 
 
 def multistage_run(multi_samp_nets, Y, Z_obs, Z_new, X, K, type, z_type, iter, true_estimand, key):
-    results = []
-    for i in range(0,K, N_CORES):
-        i_results = parallel_multistage(multi_samp_nets[i:(i+N_CORES),], Y,
-                                        Z_obs, Z_new, X, key)
-        results.append(i_results)
-    results_c = jnp.concatenate(results, axis=0)
+    # results = []
+    # for i in range(0,K, N_CORES):
+    #     i_results = parallel_multistage(multi_samp_nets[i:(i+N_CORES),], Y,
+    #                                     Z_obs, Z_new, X, key)
+    #     results.append(i_results)
+    # results_c = jnp.concatenate(results, axis=0)
+    results_c = vectorized_multistage(multi_samp_nets, Y, Z_obs, Z_new, X, key)
     n_samples = results_c.shape[2]
     results_lin = results_c[:,0,:]
     results_lin_long = results_lin.reshape(K*n_samples)
@@ -491,21 +493,25 @@ def network_posterior_stats(triu_sample, z):
     return zeigen
 
 parallel_network_stats = pmap(network_posterior_stats, in_axes=(0, None))
+vectorized_network_stats = vmap(network_posterior_stats, in_axes=(0, None))
 
 def get_onestage_stats(multi_triu_samples, Z_obs, Z_h, Z_stoch):
-    obs_zeigen = []
-    h_zeigen = []
-    stoch_zeigen = []
-    for i in range(0, multi_triu_samples.shape[0], N_CORES):
-        obs_results = parallel_network_stats(multi_triu_samples[i:(i + N_CORES), ], Z_obs)
-        obs_zeigen.append(obs_results)
-        new_results = parallel_network_stats(multi_triu_samples[i:(i + N_CORES), ], Z_h)
-        h_zeigen.append(new_results)
-        stoch_results = parallel_network_stats(multi_triu_samples[i:(i + N_CORES), ], Z_stoch)
-        stoch_zeigen.append(stoch_results)
-    obs_zeigen = jnp.concatenate(obs_zeigen, axis=0)
-    h_zeigen = jnp.concatenate(h_zeigen, axis=0)
-    stoch_zeigen = jnp.concatenate(stoch_zeigen, axis=0)
+    # obs_zeigen = []
+    # h_zeigen = []
+    # stoch_zeigen = []
+    # for i in range(0, multi_triu_samples.shape[0], N_CORES):
+    #     obs_results = parallel_network_stats(multi_triu_samples[i:(i + N_CORES), ], Z_obs)
+    #     obs_zeigen.append(obs_results)
+    #     new_results = parallel_network_stats(multi_triu_samples[i:(i + N_CORES), ], Z_h)
+    #     h_zeigen.append(new_results)
+    #     stoch_results = parallel_network_stats(multi_triu_samples[i:(i + N_CORES), ], Z_stoch)
+    #     stoch_zeigen.append(stoch_results)
+    # obs_zeigen = jnp.concatenate(obs_zeigen, axis=0)
+    # h_zeigen = jnp.concatenate(h_zeigen, axis=0)
+    # stoch_zeigen = jnp.concatenate(stoch_zeigen, axis=0)
+    obs_zeigen = vectorized_network_stats(multi_triu_samples, Z_obs)
+    h_zeigen = vectorized_network_stats(multi_triu_samples, Z_h)
+    stoch_zeigen = vectorized_network_stats(multi_triu_samples, Z_stoch)
     mean_zeigen_obs = jnp.mean(obs_zeigen, axis=0)
     mean_zeigen_h = jnp.mean(h_zeigen, axis=0)
     mean_zeigen_stoch = jnp.mean(stoch_zeigen, axis=0)
