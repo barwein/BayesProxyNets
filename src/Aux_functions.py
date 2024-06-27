@@ -459,17 +459,17 @@ def multistage_mcmc(samp_net, Y, Z_obs, Z_new, X, key):
     return jnp.array([lin_estimates, hsgp_estimates])
 
 parallel_multistage = pmap(multistage_mcmc, in_axes=(0, None, None, None, None, None))
-vectorized_multistage = pmap(multistage_mcmc, in_axes=(0, None, None, None, None, None))
+vectorized_multistage = vmap(multistage_mcmc, in_axes=(0, None, None, None, None, None))
 
 
 def multistage_run(multi_samp_nets, Y, Z_obs, Z_new, X, K, type, z_type, iter, true_estimand, key):
-    # results = []
-    # for i in range(0,K, N_CORES):
-    #     i_results = parallel_multistage(multi_samp_nets[i:(i+N_CORES),], Y,
-    #                                     Z_obs, Z_new, X, key)
-    #     results.append(i_results)
-    # results_c = jnp.concatenate(results, axis=0)
-    results_c = vectorized_multistage(multi_samp_nets, Y, Z_obs, Z_new, X, key)
+    results = []
+    for i in range(0,K, N_CORES):
+        i_results = parallel_multistage(multi_samp_nets[i:(i+N_CORES),], Y,
+                                        Z_obs, Z_new, X, key)
+        results.append(i_results)
+    results_c = jnp.concatenate(results, axis=0)
+    # results_c = vectorized_multistage(multi_samp_nets, Y, Z_obs, Z_new, X, key)
     n_samples = results_c.shape[2]
     results_lin = results_c[:,0,:]
     results_lin_long = results_lin.reshape(K*n_samples)
