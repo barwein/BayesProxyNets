@@ -94,7 +94,7 @@ class DataGeneration:
         # return jnp.where((self.X > threshold) | (self.X < -threshold), 1, 0)
 
     def stochastic_intervention(self, n_approx=100):
-    # def stochastic_intervention(self, n_approx=1000):
+    # def stochastic_intervention(self, n_approx=2000):
         return rng.binomial(n=1, p=self.alpha, size=(n_approx, self.n))
 
     def get_true_estimand(self, z_new):
@@ -401,11 +401,11 @@ class Outcome_MCMC:
         linear_stoch_pred = linear_pred(self.Z_stoch, stoch_zeigen,
                                         self.linear_post_samples, self.X, self.rng_key)
         linear_stoch_stats = compute_error_stats(jnp.mean(linear_stoch_pred, axis=0),
-                                             self.estimand_h, idx=self.iter)
+                                             self.estimand_stoch, idx=self.iter)
         hsgp_stoch_pred = hsgp_pred(self.Z_stoch, stoch_zeigen, self.hsgp_post_samples,
                                     self.X, self.ell, self.rng_key)
         hsgp_stoch_stats = compute_error_stats(jnp.mean(hsgp_stoch_pred, axis=0),
-                                           self.estimand_h, idx=self.iter)
+                                           self.estimand_stoch, idx=self.iter)
 
         return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
         # return pd.concat([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
@@ -556,12 +556,12 @@ class Onestage_MCMC:
         linear_stoch_pred = linear_pred(self.Z_stoch, self.stoch_zeigen,
                                         self.linear_post_samples, self.X, self.rng_key)
         linear_stoch_stats = compute_error_stats(jnp.mean(linear_stoch_pred, axis=0),
-                                             self.estimand_h, idx=self.iter)
+                                             self.estimand_stoch, idx=self.iter)
         hsgp_stoch_pred = hsgp_pred(self.Z_stoch, self.stoch_zeigen,
                                     self.hsgp_post_samples, self.X,
                                     self.ell, self.rng_key)
         hsgp_stoch_stats = compute_error_stats(jnp.mean(hsgp_stoch_pred, axis=0),
-                                           self.estimand_h, idx=self.iter)
+                                           self.estimand_stoch, idx=self.iter)
 
         return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
         # return pd.concat([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])

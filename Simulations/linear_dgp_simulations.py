@@ -24,7 +24,7 @@ THETA = jnp.array([-2, -0.5])
 GAMMA = jnp.array([0.05, 0.25])
 ETA = jnp.array([-1, 3, -0.25, 2.5])
 SIG_Y = .5
-PZ = 0.3
+PZ = 0.4
 LIN_Y = True
 ALPHA = 0.5
 # N = 300
@@ -32,7 +32,7 @@ N = 300
 # N_SIM = 500
 N_SIM = 25
 # N_REP = 1000
-N_REP = 100
+N_REP = 1
 
 
 if __name__ == "__main__":
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     # combined_df = pd.concat(sim_results, ignore_index=True)
     w_path = "results"
     dgp = "linear_dgp"
-    df_results.to_csv(w_path + "/" + dgp + ".csv", index=False)
+    # df_results.to_csv(w_path + "/" + dgp + ".csv", index=False)
 
     # for i in range(N_SIM):
     # # for i in range(184, N_SIM):

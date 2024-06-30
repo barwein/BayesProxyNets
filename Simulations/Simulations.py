@@ -31,7 +31,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
     # --- network module ---
     network_mcmc = aux.Network_MCMC(data=df_obs, rng_key=rng_key)
     # get posterior samples and predictive distributions
-    # network_post = network_mcmc.get_posterior_samples()
+    network_post = network_mcmc.get_posterior_samples()
     network_mean_post = network_mcmc.mean_posterior()
     network_pred_samples = network_mcmc.predictive_samples()
 
@@ -106,6 +106,11 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
                                                                            df_obs["Z"],
                                                                            df_obs["Z_h"],
                                                                            df_obs["Z_stoch"])
+
+    print("1S zeigen shape: ", post_zeigen.shape, "\n",
+          "1S zeigen_h shape: ", post_zeigen_h.shape, "\n",
+          "1S zeigen_stoch shape: ", post_zeigen_stoch.shape)
+
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
                                               Z_obs=df_obs["Z"],
