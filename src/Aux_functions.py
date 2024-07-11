@@ -84,7 +84,8 @@ class DataGeneration:
             # mean_y = np.dot(np.column_stack((df_lin, zeig)), self.eta)
         else:
             mean_lin = jnp.dot(df_lin, self.eta[0:3])
-            mean_nonlin = self.eta[3] / (1 + jnp.exp(-15 * (zeig - 0.4)))
+            # mean_nonlin = self.eta[3] / (1 + jnp.exp(-15 * (zeig - 0.4)))
+            mean_nonlin = self.eta[3]*(jnp.sin(7.5 * zeig) + jnp.log(zeig + 1))
             mean_y = mean_lin + mean_nonlin
         Y = jnp.array(mean_y + epsi)
         return Y, epsi
