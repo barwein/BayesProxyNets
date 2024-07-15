@@ -16,7 +16,7 @@ import argparse
 # alpha: pi_alpha(z) ---> stochastic intervention
 
 # --- Define global variables ---
-RANDOM_SEED = 6262523
+RANDOM_SEED = 62625235
 rng = np.random.default_rng(RANDOM_SEED)
 
 # THETA = [-2, -0.5]
@@ -26,13 +26,13 @@ ETA = jnp.array([-1, 3, -0.25, 2.5])
 SIG_Y = .5
 PZ = 0.4
 LIN_Y = True
-ALPHA = 0.5
+ALPHAS = (0.7,0.3)
 # N = 300
-N = 300
+N = 100
 # N_SIM = 500
-N_SIM = 25
+N_SIM = 1
 # N_REP = 1000
-N_REP = 1
+N_REP = 100
 
 
 if __name__ == "__main__":
@@ -61,14 +61,17 @@ if __name__ == "__main__":
         # df_results.to_csv(w_path + "/" + dgp + ".csv", index=False)
 
 
-    sim_results = vectorized_simulations(idx_range, THETA, GAMMA,
+    # sim_results = vectorized_simulations(idx_range, THETA, GAMMA,
+    #                                      ETA, SIG_Y, PZ,
+    #                                      N_REP, LIN_Y, ALPHAS)
+    sim_results = one_simuation_iter(1, THETA, GAMMA,
                                          ETA, SIG_Y, PZ,
-                                         N_REP, LIN_Y, ALPHA)
+                                         N_REP, LIN_Y, ALPHAS)
     df_results = results_to_pd_df(sim_results, N_SIM)
     # combined_df = pd.concat(sim_results, ignore_index=True)
     w_path = "results"
-    dgp = "linear_dgp"
-    # df_results.to_csv(w_path + "/" + dgp + ".csv", index=False)
+    dgp = "linear_dgp_test"
+    df_results.to_csv(w_path + "/" + dgp + ".csv", index=False)
 
     # for i in range(N_SIM):
     # # for i in range(184, N_SIM):

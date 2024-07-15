@@ -14,12 +14,12 @@ import src.Aux_functions as aux
 # eta, sig_y: p(Y | Z, X, A*, eta, sig_y)
 # alpha: pi_alpha(z) ---> stochastic intervention
 
-def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
+def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     rng_key = random.PRNGKey(idx)
     rng_key, rng_key_ = random.split(rng_key)
 
     # --- Get data ---
-    df_oracle = aux.DataGeneration(theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alpha=alpha).get_data()
+    df_oracle = aux.DataGeneration(theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
     # Generate noisy network measurement
     obs_network = aux.create_noisy_network(df_oracle["adj_mat"], gamma)
     # save observed df and update A* and triu
@@ -33,6 +33,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
     # get posterior samples and predictive distributions
     network_post = network_mcmc.get_posterior_samples()
     network_mean_post = network_mcmc.mean_posterior()
+    print("getting network posterior samples")
     network_pred_samples = network_mcmc.predictive_samples()
 
     print("Running obs and oracle outcome modules")
@@ -48,68 +49,44 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
     print("Running TWOSTAGE")
     # Two-Stage
     twostage_multi_nets = aux.get_many_post_astars(n_rep, network_mean_post, df_obs["X_diff"], df_obs["triu"])
-    twostage_h_results = aux.multistage_run(multi_samp_nets=twostage_multi_nets,
+    twostage_results = aux.multistage_run(multi_samp_nets=twostage_multi_nets,
                                             Y=df_obs["Y"],
                                             Z_obs=df_obs["Z"],
-                                            Z_new=df_obs["Z_h"],
+                                            Z_h=df_obs["Z_h"],
+                                            Z_stoch=df_obs["Z_stoch"],
                                             X=df_obs["X"],
                                             K=n_rep,
-                                            type="2S",
-                                            z_type="dynamic",
                                             iter=idx,
-                                            true_estimand=df_obs["estimand_h"],
-                                            key=rng_key_)
-
-    twostage_stoch_results = aux.multistage_run(multi_samp_nets=twostage_multi_nets,
-                                            Y=df_obs["Y"],
-                                            Z_obs=df_obs["Z"],
-                                            Z_new=df_obs["Z_stoch"],
-                                            X=df_obs["X"],
-                                            K=n_rep,
-                                            type="2S",
-                                            z_type="stoch",
-                                            iter=idx,
-                                            true_estimand=df_obs["estimand_stoch"],
+                                            h_estimand=df_obs["estimand_h"],
+                                            stoch_estimand=df_obs["estimand_stoch"],
                                             key=rng_key_)
 
     print("Running THREESTAGE")
     # Three-Stage
     i_range = np.random.choice(a=range(network_pred_samples.shape[0]), size=n_rep, replace=False)
     threestage_multi_nets = network_pred_samples[i_range,]
-    threestage_h_results = aux.multistage_run(multi_samp_nets=threestage_multi_nets,
+    threestage_results = aux.multistage_run(multi_samp_nets=threestage_multi_nets,
                                             Y=df_obs["Y"],
                                             Z_obs=df_obs["Z"],
-                                            Z_new=df_obs["Z_h"],
+                                            Z_h=df_obs["Z_h"],
+                                            Z_stoch=df_obs["Z_stoch"],
                                             X=df_obs["X"],
                                             K=n_rep,
-                                            type="3S",
-                                            z_type="dynamic",
                                             iter=idx,
-                                            true_estimand=df_obs["estimand_h"],
-                                            key=rng_key_)
-
-    threestage_stoch_results = aux.multistage_run(multi_samp_nets=threestage_multi_nets,
-                                            Y=df_obs["Y"],
-                                            Z_obs=df_obs["Z"],
-                                            Z_new=df_obs["Z_stoch"],
-                                            X=df_obs["X"],
-                                            K=n_rep,
-                                            type="3S",
-                                            z_type="stoch",
-                                            iter=idx,
-                                            true_estimand=df_obs["estimand_stoch"],
+                                            h_estimand=df_obs["estimand_h"],
+                                            stoch_estimand=df_obs["estimand_stoch"],
                                             key=rng_key_)
 
     print("Running ONESTAGE")
     # One-Stage
-    post_zeigen, post_zeigen_h, post_zeigen_stoch = aux.get_onestage_stats(network_pred_samples,
-                                                                           df_obs["Z"],
-                                                                           df_obs["Z_h"],
-                                                                           df_obs["Z_stoch"])
+    post_zeig, post_zeig_h1, post_zeig_h2, post_zeig_stoch1, post_zeig_stoch2 = aux.get_onestage_stats(network_pred_samples,
+                                                                                                       df_obs["Z"],
+                                                                                                       df_obs["Z_h"],
+                                                                                                       df_obs["Z_stoch"])
 
-    print("1S zeigen shape: ", post_zeigen.shape, "\n",
-          "1S zeigen_h shape: ", post_zeigen_h.shape, "\n",
-          "1S zeigen_stoch shape: ", post_zeigen_stoch.shape)
+    print("1S zeigen shape: ", post_zeig.shape, "\n",
+          "1S zeigen_h shape: ", post_zeig_h1.shape, "\n",
+          "1S zeigen_stoch shape: ", post_zeig_stoch1.shape)
 
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
@@ -118,16 +95,17 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alpha):
                                               Z_stoch=df_obs["Z_stoch"],
                                               estimand_h=df_obs["estimand_h"],
                                               estimand_stoch=df_obs["estimand_stoch"],
-                                              zeigen=post_zeigen,
-                                              h_zeigen=post_zeigen_h,
-                                              stoch_zeigen=post_zeigen_stoch,
+                                              zeigen=post_zeig,
+                                              h1_zeigen=post_zeig_h1,
+                                              h2_zeigen=post_zeig_h2,
+                                              stoch1_zeigen=post_zeig_stoch1,
+                                              stoch2_zeigen=post_zeig_stoch2,
                                               rng_key=rng_key_,
                                               iter=idx)
     onestage_results = onestage_outcome_mcmc.get_results()
 
     results_all = jnp.vstack([oracle_results, obs_results,
-                             twostage_h_results, twostage_stoch_results,
-                             threestage_h_results, threestage_stoch_results,
+                             twostage_results, threestage_results,
                              onestage_results])
 
     # results_all = pd.concat([oracle_results, obs_results,
