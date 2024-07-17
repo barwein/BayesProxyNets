@@ -431,7 +431,7 @@ class Outcome_MCMC:
         hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], stoch_zeigen2, self.hsgp_post_samples,
                                      self.X, self.ell, self.rng_key)
         hsgp_stoch_pred = jnp.mean(hsgp_stoch_pred1, axis=0) - jnp.mean(hsgp_stoch_pred2, axis=0)
-        hsgp_stoch_stats = compute_error_stats(jnp.mean(hsgp_stoch_pred, axis=0),
+        hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
                                            self.estimand_stoch, idx=self.iter)
 
         return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
@@ -634,7 +634,7 @@ class Onestage_MCMC:
         hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], self.stoch2_zeigen, self.hsgp_post_samples,
                                      self.X, self.ell, self.rng_key)
         hsgp_stoch_pred = jnp.mean(hsgp_stoch_pred1, axis=0) - jnp.mean(hsgp_stoch_pred2, axis=0)
-        hsgp_stoch_stats = compute_error_stats(jnp.mean(hsgp_stoch_pred, axis=0),
+        hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
                                            self.estimand_stoch, idx=self.iter)
 
         return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
