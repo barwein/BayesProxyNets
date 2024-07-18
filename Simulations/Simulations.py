@@ -21,7 +21,8 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # --- Get data ---
     df_oracle = aux.DataGeneration(theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
     # Generate noisy network measurement
-    obs_network = aux.create_noisy_network(df_oracle["adj_mat"], gamma)
+    # obs_network = aux.create_noisy_network(df_oracle["adj_mat"], gamma)
+    obs_network = aux.create_noisy_network(df_oracle["triu"], gamma, df_oracle["X_diff"])
     # save observed df and update A* and triu
     df_obs = df_oracle.copy()
     df_obs["adj_mat"] = obs_network["obs_mat"]
@@ -32,7 +33,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     network_mcmc = aux.Network_MCMC(data=df_obs, rng_key=rng_key)
     # get posterior samples and predictive distributions
     network_post = network_mcmc.get_posterior_samples()
-    network_mean_post = network_mcmc.mean_posterior()
+    # network_mean_post = network_mcmc.mean_posterior()
     print("getting network posterior samples")
     network_pred_samples = network_mcmc.predictive_samples()
 
@@ -46,20 +47,21 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     obs_results = obs_outcome_mcmc.get_results()
 
     #  --- cut-posterior ---
-    print("Running TWOSTAGE")
-    # Two-Stage
-    twostage_multi_nets = aux.get_many_post_astars(n_rep, network_mean_post, df_obs["X_diff"], df_obs["triu"])
-    twostage_results = aux.multistage_run(multi_samp_nets=twostage_multi_nets,
-                                            Y=df_obs["Y"],
-                                            Z_obs=df_obs["Z"],
-                                            Z_h=df_obs["Z_h"],
-                                            Z_stoch=df_obs["Z_stoch"],
-                                            X=df_obs["X"],
-                                            K=n_rep,
-                                            iter=idx,
-                                            h_estimand=df_obs["estimand_h"],
-                                            stoch_estimand=df_obs["estimand_stoch"],
-                                            key=rng_key_)
+    # print("Running TWOSTAGE")
+    # # Two-Stage
+    # twostage_multi_nets = aux.get_many_post_astars(n_rep, network_mean_post, df_obs["X_diff"], df_obs["triu"])
+    # twostage_results = aux.multistage_run(multi_samp_nets=twostage_multi_nets,
+    #                                         Y=df_obs["Y"],
+    #                                         Z_obs=df_obs["Z"],
+    #                                         Z_h=df_obs["Z_h"],
+    #                                         Z_stoch=df_obs["Z_stoch"],
+    #                                         X=df_obs["X"],
+    #                                         X2=df_obs["X2"],
+    #                                         K=n_rep,
+    #                                         iter=idx,
+    #                                         h_estimand=df_obs["estimand_h"],
+    #                                         stoch_estimand=df_obs["estimand_stoch"],
+    #                                         key=rng_key_)
 
     print("Running THREESTAGE")
     # Three-Stage
@@ -71,6 +73,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                             Z_h=df_obs["Z_h"],
                                             Z_stoch=df_obs["Z_stoch"],
                                             X=df_obs["X"],
+                                            X2=df_obs["X2"],
                                             K=n_rep,
                                             iter=idx,
                                             h_estimand=df_obs["estimand_h"],
@@ -90,6 +93,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
 
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
+                                              X2=df_obs["X2"],
                                               Z_obs=df_obs["Z"],
                                               Z_h=df_obs["Z_h"],
                                               Z_stoch=df_obs["Z_stoch"],
@@ -105,7 +109,8 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     onestage_results = onestage_outcome_mcmc.get_results()
 
     results_all = jnp.vstack([oracle_results, obs_results,
-                             twostage_results, threestage_results,
+                             # twostage_results, threestage_results,
+                             threestage_results,
                              onestage_results])
 
     # results_all = pd.concat([oracle_results, obs_results,
@@ -129,13 +134,13 @@ COLUMNS = ["idx", "mean", "median", "true", "bias",
 
 METHODS = ['Linear_oracle', 'GP_oracle', 'Linear_oracle', 'GP_oracle',
              'Linear_observed', 'GP_observed', 'Linear_observed', 'GP_observed',
-             'Linear_2S', 'GP_2S', 'Linear_2S', 'GP_2S',
+             # 'Linear_2S', 'GP_2S', 'Linear_2S', 'GP_2S',
              'Linear_3S', 'GP_3S', 'Linear_3S', 'GP_3S',
              'Linear_1S', 'GP_1S', 'Linear_1S', 'GP_1S']
 
 ESTIMANDS = ['dynamic', 'dynamic', 'stoch', 'stoch',
             'dynamic', 'dynamic', 'stoch', 'stoch',
-            'dynamic', 'dynamic', 'stoch', 'stoch',
+            # 'dynamic', 'dynamic', 'stoch', 'stoch',
             'dynamic', 'dynamic', 'stoch', 'stoch',
             'dynamic', 'dynamic', 'stoch', 'stoch']
 
