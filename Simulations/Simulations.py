@@ -22,7 +22,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     df_oracle = aux.DataGeneration(theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
     # Generate noisy network measurement
     # obs_network = aux.create_noisy_network(df_oracle["adj_mat"], gamma)
-    obs_network = aux.create_noisy_network(df_oracle["triu"], gamma, df_oracle["X_diff"])
+    obs_network = aux.create_noisy_network(df_oracle["triu"], gamma, df_oracle["X2_equal"])
     # save observed df and update A* and triu
     df_obs = df_oracle.copy()
     df_obs["adj_mat"] = obs_network["obs_mat"]
@@ -87,10 +87,6 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                                                                                        df_obs["Z_h"],
                                                                                                        df_obs["Z_stoch"])
 
-    print("1S zeigen shape: ", post_zeig.shape, "\n",
-          "1S zeigen_h shape: ", post_zeig_h1.shape, "\n",
-          "1S zeigen_stoch shape: ", post_zeig_stoch1.shape)
-
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
                                               X2=df_obs["X2"],
@@ -128,7 +124,7 @@ vectorized_simulations = vmap(one_simuation_iter, in_axes = (0,) + (None,) * 8)
 # vectorized_simulations = vmap(run_one_iter, in_axes=(0,None,None,None,None,None,None,None,None,None,None))
 
 COLUMNS = ["idx", "mean", "median", "true", "bias",
-           "std", "RMSE", "q025", "q975", "covering"]
+           "std", "RMSE", "MAE", "MAPE", "q025", "q975", "covering"]
 # COLUMNS = ["idx", "method", "estimand", "mean", "median",
 #                     "true", "bias", "std", "RMSE", "q025", "q975", "covering"]
 
