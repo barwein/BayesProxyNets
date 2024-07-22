@@ -19,8 +19,8 @@ from hsgp.approximation import hsgp_squared_exponential
 N_CORES = 4
 # N_CORES = 20
 os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
-RANDOM_SEED = 892357143
-rng = np.random.default_rng(RANDOM_SEED)
+# RANDOM_SEED = 892357143
+# rng = np.random.default_rng(RANDOM_SEED)
 
 # --- Set global variables and values ---
 N = 300
@@ -30,13 +30,14 @@ C = 3.5
 
 # --- data generation for each iteration ---
 class DataGeneration:
-    def __init__(self, theta, eta, sig_y, pz, lin, alphas, n=N):
+    def __init__(self, rng, theta, eta, sig_y, pz, lin, alphas, n=N):
         self.n = n
         self.theta = theta
         self.eta = eta
         self.sig_y = sig_y
         self.lin = lin
         self.alphas = alphas
+        self.rng = rng
         self.X = self.generate_X()
         self.X2 = self.generate_X2()
         self.Z = self.generate_Z(p=pz)
@@ -56,17 +57,20 @@ class DataGeneration:
 
     def generate_X(self, loc=0, scale=3):
         # return rng.normal(loc=loc, scale=scale, size=self.n)
-        return jnp.array(rng.normal(loc=loc, scale=scale, size=self.n))
+        # return jnp.array(rng.normal(loc=loc, scale=scale, size=self.n))
+        return jnp.array(self.rng.normal(loc=loc, scale=scale, size=self.n))
 
     def generate_X2(self,p=0.1):
-        return jnp.array(rng.binomial(n=1, p=p, size=self.n))
+        # return jnp.array(rng.binomial(n=1, p=p, size=self.n))
+        return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
 
     def generate_Z(self, p):
         # return rng.binomial(n=1, p=p, size=self.n)
-        return jnp.array(rng.binomial(n=1, p=p, size=self.n))
+        # return jnp.array(rng.binomial(n=1, p=p, size=self.n))
+        return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
 
     def x_diff(self):
-        idx_pairs = combinations(range(self.n), 2)
+        idx_pairs = list(combinations(range(self.n), 2))
         # x_d = np.array([abs(self.X[i] - self.X[j]) for i, j in idx_pairs])
         x_d = jnp.array([abs(self.X[i] - self.X[j]) for i, j in idx_pairs])
         return x_d
@@ -74,13 +78,14 @@ class DataGeneration:
     def x2_equal(self):
         idx_pairs = list(combinations(range(self.n), 2))
         # x2_equal = np.array([1 if self.X2[i] == 1 and self.X2[j] == 1 else 0 for i, j in idx_pairs])
-        x2_equal = np.array([1 if self.X2[i] == 1 or self.X2[j] == 1 else 0 for i, j in idx_pairs])
+        x2_equal = jnp.array([1 if (self.X2[i] == 1 or self.X2[j] == 1) else 0 for i, j in idx_pairs])
         return x2_equal
 
     def generate_triu(self):
         probs = expit(self.theta[0] + self.theta[1]*self.X_diff  + self.theta[2]*self.X2_equal)
-        return jnp.array(rng.binomial(n=1, p=probs, size=self.triu_dim))
+        # return jnp.array(rng.binomial(n=1, p=probs, size=self.triu_dim))
         # return rng.binomial(n=1, p=probs, size=self.triu_dim)
+        return self.rng.binomial(n=1, p=probs, size=self.triu_dim)
 
     def generate_adj_matrix(self):
         mat = np.zeros((self.n, self.n))
@@ -100,7 +105,8 @@ class DataGeneration:
             mean_nonlin = self.eta[4]*(jnp.sin(5 * zeig) + jnp.log(zeig + 1))
             mean_y = mean_lin + mean_nonlin
         if with_epsi:
-            epsi = jnp.array(rng.normal(loc=0, scale=self.sig_y, size=self.n))
+            # epsi = jnp.array(rng.normal(loc=0, scale=self.sig_y, size=self.n))
+            epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
             Y = jnp.array(mean_y + epsi)
             return Y, epsi
         else:
@@ -114,8 +120,10 @@ class DataGeneration:
 
     def stochastic_intervention(self, n_approx=100):
     # def stochastic_intervention(self, n_approx=2000):
-        z_stoch1 = rng.binomial(n=1, p=self.alphas[0], size=(n_approx, self.n))
-        z_stoch2 = rng.binomial(n=1, p=self.alphas[1], size=(n_approx, self.n))
+        z_stoch1 = self.rng.binomial(n=1, p=self.alphas[0], size=(n_approx, self.n))
+        # z_stoch1 = rng.binomial(n=1, p=self.alphas[0], size=(n_approx, self.n))
+        # z_stoch2 = rng.binomial(n=1, p=self.alphas[1], size=(n_approx, self.n))
+        z_stoch2 = self.rng.binomial(n=1, p=self.alphas[1], size=(n_approx, self.n))
         return jnp.array([z_stoch1, z_stoch2])
         # return rng.binomial(n=1, p=self.alpha, size=(n_approx, self.n))
 
@@ -155,28 +163,19 @@ class DataGeneration:
 
 
 # --- General aux functions ---
-def create_noisy_network(triu_vals, gamma, x2_equal):
+def create_noisy_network(rng, triu_vals, gamma, x_diff):
     obs_mat = np.zeros((N, N))  # create nXn matrix of zeros
     triu_idx = np.triu_indices(n=N, k=1)
-    # obs_mat[triu_idx] = adj_mat[triu_idx]  # init as true network
-    # for i in range(0, N):  # add noise
-    #     for j in range(i + 1, N):
-    #         if adj_mat[i, j] == 1:
-    #             obs_mat[i, j] = rng.binomial(n=1, p=1-gamma[1], size=1)[0]  # retain existing edge w.p. `1-gamma1`
-    #         else:
-    #             obs_mat[i, j] = rng.binomial(n=1, p=gamma[0], size=1)[0]  # add non-existing edge w.p. `gamma0`
-    # prob_nois = triu_vals*(1 - gamma[1]) + (1 - triu_vals)*expit(-1 - .1*x_diff)
-    logit_nois = triu_vals*logit(gamma[0]) + (1 - triu_vals)*(gamma[1] + gamma[2]*x2_equal)
-    # prob_nois = triu_vals * (1 - gamma[1]) + (1 - triu_vals)*gamma[0]
+    # logit_nois = triu_vals*logit(gamma[0]) + (1 - triu_vals)*(gamma[1] + gamma[2]*x2_equal)
+    # logit_nois = triu_vals*logit(gamma[0]) + (1 - triu_vals)*(gamma[1]*x_diff)
+    logit_nois = triu_vals*gamma[0] + (1-triu_vals)*(gamma[1]*x_diff)
+    # edges_noisy = rng.binomial(n=1, p=expit(logit_nois), size=TRIL_DIM)
     edges_noisy = rng.binomial(n=1, p=expit(logit_nois), size=TRIL_DIM)
     obs_mat[triu_idx] = edges_noisy
-    # mat[idx_lt] = edges
     obs_mat = obs_mat + obs_mat.T
-    # triu_obs = obs_mat[np.triu_indices(n, k=1)]
-    # obs_mat = obs_mat + obs_mat.T
-    triu_obs = obs_mat[triu_idx]
+    # triu_obs = obs_mat[triu_idx]
     return {"obs_mat" : obs_mat,
-            "triu_obs" : triu_obs}
+            "triu_obs" : edges_noisy}
 
 @jit
 def Triu_to_mat(triu_v):
@@ -233,20 +232,21 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
 
 # --- NumPyro models ---
 @config_enumerate
-def network_model(X_diff, X2_eq, TriU):
+def network_model(X_d, X2_eq, triu_v):
     # Network model
     with numpyro.plate("theta_i", 3):
         theta = numpyro.sample("theta", dist.Normal(0, 5))
-    mu_net = theta[0] + theta[1]*X_diff + theta[2]*X2_eq
+    mu_net = theta[0] + theta[1]*X_d + theta[2]*X2_eq
 
-    with numpyro.plate("gamma_i", 3):
+    with numpyro.plate("gamma_i", 2):
         gamma = numpyro.sample("gamma", dist.Normal(0, 5))
 
-    with numpyro.plate("A* and A", TriU.shape[0]):
+    with numpyro.plate("A* and A", triu_v.shape[0]):
         triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=mu_net),
                                    infer={"enumerate": "parallel"})
-        logit_misspec = triu_star*gamma[0] + (1 - triu_star)*(gamma[1] + gamma[2]*X2_eq)
-        numpyro.sample("obs_triu", dist.Bernoulli(logits=logit_misspec), obs=TriU)
+        # logit_misspec = (triu_star*gamma[0]) + ((1 - triu_star)*(gamma[1] + gamma[2]*X2_eq))
+        logit_misspec = triu_star*gamma[0] + (1 - triu_star)*(gamma[1]*X_d)
+        numpyro.sample("obs_triu", dist.Bernoulli(logits=logit_misspec), obs=triu_v)
 
 
 def outcome_model(df, Y=None):
@@ -370,7 +370,7 @@ def get_many_post_astars(K, post_pred_mean, x_diff, x2_eq, triu_v):
 
 
 class Network_MCMC:
-    def __init__(self, data, rng_key, n_warmup=2000, n_samples=2500, n_chains=4):
+    def __init__(self, data, rng_key, n_warmup=1000, n_samples=1000, n_chains=4):
     # def __init__(self, data, rng_key, n_warmup=2000, n_samples=4000, n_chains=4):
     # def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=2000, n_chains=6):
         self.X_diff = data["X_diff"]
@@ -390,7 +390,8 @@ class Network_MCMC:
                     num_chains=self.n_chains, progress_bar=False)
 
     def get_posterior_samples(self):
-        self.network_m.run(self.rng_key, X_diff=self.X_diff, X2_eq=self.X2_eq, TriU=self.triu)
+        self.network_m.run(self.rng_key, X_d=self.X_diff, X2_eq=self.X2_eq, triu_v=self.triu)
+        self.network_m.print_summary()
         self.post_samples = self.network_m.get_samples()
         return self.post_samples
 
@@ -402,7 +403,7 @@ class Network_MCMC:
     def predictive_samples(self):
         posterior_predictive = Predictive(model=network_model, posterior_samples=self.post_samples,
                                           infer_discrete=True)
-        return posterior_predictive(self.rng_key, X_diff=self.X_diff, X2_eq=self.X2_eq, TriU=self.triu)["triu_star"]
+        return posterior_predictive(self.rng_key, X_d=self.X_diff, X2_eq=self.X2_eq, triu_v=self.triu)["triu_star"]
 
 
 class Outcome_MCMC:
@@ -410,7 +411,7 @@ class Outcome_MCMC:
         self.X = data["X"]
         self.X2 = data["X2"]
         self.Z = data["Z"]
-        self.Y = jnp.array(data["Y"])
+        self.Y = data["Y"]
         self.adj_mat = data["adj_mat"]
         self.eig_cen = eigen_centrality(self.adj_mat)
         self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)

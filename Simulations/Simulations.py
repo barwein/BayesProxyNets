@@ -18,15 +18,21 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     rng_key = random.PRNGKey(idx)
     rng_key, rng_key_ = random.split(rng_key)
 
+    rng = np.random.default_rng(idx)
+
     # --- Get data ---
-    df_oracle = aux.DataGeneration(theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
+    df_oracle = aux.DataGeneration(rng=rng, theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
     # Generate noisy network measurement
     # obs_network = aux.create_noisy_network(df_oracle["adj_mat"], gamma)
-    obs_network = aux.create_noisy_network(df_oracle["triu"], gamma, df_oracle["X2_equal"])
+    # obs_network = aux.create_noisy_network(df_oracle["triu"], gamma, df_oracle["X2_equal"])
+    obs_network = aux.create_noisy_network(rng, df_oracle["triu"], gamma, df_oracle["X_diff"])
     # save observed df and update A* and triu
     df_obs = df_oracle.copy()
     df_obs["adj_mat"] = obs_network["obs_mat"]
     df_obs["triu"] = obs_network["triu_obs"]
+
+    trils_pd = pd.DataFrame({'true': df_oracle["triu"], 'obs': df_obs["triu"]})
+    print(pd.crosstab(index=trils_pd['true'], columns=trils_pd['obs']))
 
     print("Running network module")
     # --- network module ---
@@ -86,6 +92,8 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                                                                                        df_obs["Z"],
                                                                                                        df_obs["Z_h"],
                                                                                                        df_obs["Z_stoch"])
+
+    print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])))
 
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
