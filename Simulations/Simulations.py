@@ -15,8 +15,8 @@ import src.Aux_functions as aux
 # alpha: pi_alpha(z) ---> stochastic intervention
 
 def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
-    rng_key = random.PRNGKey(idx)
-    rng_key, rng_key_ = random.split(rng_key)
+    rng_key = random.PRNGKey(1)
+    _, rng_key = random.split(rng_key)
 
     rng = np.random.default_rng(idx)
 
@@ -84,7 +84,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                             iter=idx,
                                             h_estimand=df_obs["estimand_h"],
                                             stoch_estimand=df_obs["estimand_stoch"],
-                                            key=rng_key_)
+                                            key=rng_key)
 
     print("Running ONESTAGE")
     # One-Stage
@@ -108,7 +108,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                               h2_zeigen=post_zeig_h2,
                                               stoch1_zeigen=post_zeig_stoch1,
                                               stoch2_zeigen=post_zeig_stoch2,
-                                              rng_key=rng_key_,
+                                              rng_key=rng_key,
                                               iter=idx)
     onestage_results = onestage_outcome_mcmc.get_results()
 

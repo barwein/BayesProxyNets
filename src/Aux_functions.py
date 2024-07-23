@@ -78,11 +78,13 @@ class DataGeneration:
     def x2_equal(self):
         idx_pairs = list(combinations(range(self.n), 2))
         # x2_equal = np.array([1 if self.X2[i] == 1 and self.X2[j] == 1 else 0 for i, j in idx_pairs])
-        x2_equal = jnp.array([1 if (self.X2[i] == 1 or self.X2[j] == 1) else 0 for i, j in idx_pairs])
+        # x2_equal = jnp.array([1 if (self.X2[i] == 1 or self.X2[j] == 1) else 0 for i, j in idx_pairs])
+        x2_equal = jnp.array([1 if (self.X2[i] + self.X2[j] == 1) else 0 for i, j in idx_pairs])
         return x2_equal
 
     def generate_triu(self):
-        probs = expit(self.theta[0] + self.theta[1]*self.X_diff  + self.theta[2]*self.X2_equal)
+        # probs = expit(self.theta[0] + self.theta[1]*self.X_diff  + self.theta[2]*self.X2_equal)
+        probs = expit(self.theta[0] + self.theta[1]*self.X2_equal)
         # return jnp.array(rng.binomial(n=1, p=probs, size=self.triu_dim))
         # return rng.binomial(n=1, p=probs, size=self.triu_dim)
         return self.rng.binomial(n=1, p=probs, size=self.triu_dim)
@@ -234,9 +236,9 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
 @config_enumerate
 def network_model(X_d, X2_eq, triu_v):
     # Network model
-    with numpyro.plate("theta_i", 3):
+    with numpyro.plate("theta_i", 2):
         theta = numpyro.sample("theta", dist.Normal(0, 5))
-    mu_net = theta[0] + theta[1]*X_d + theta[2]*X2_eq
+    mu_net = theta[0] + theta[1]*X2_eq
 
     with numpyro.plate("gamma_i", 2):
         gamma = numpyro.sample("gamma", dist.Normal(0, 5))
@@ -289,7 +291,7 @@ def linear_model_samples_parallel(key, Y, df):
 @jit
 def linear_model_samples_vectorized(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=500, num_samples=100, num_chains=1,
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=600, num_samples=50, num_chains=1,
     # lin_mcmc = MCMC(kernel_outcome, num_warmup=400, num_samples=150, num_chains=1,
                     progress_bar=False, chain_method="vectorized")
     lin_mcmc.run(key, df=df, Y=Y)
@@ -311,7 +313,7 @@ def HSGP_model_samples_parallel(key, Y, Xgp, Xlin, ell):
 @jit
 def HSGP_model_samples_vectorized(key, Y, Xgp, Xlin, ell):
     kernel_hsgp = NUTS(HSGP_model)
-    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=500, num_samples=100,num_chains=1,
+    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=600, num_samples=50,num_chains=1,
     # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=400, num_samples=150,num_chains=1,
                      progress_bar=False, chain_method="vectorized")
     hsgp_mcmc.run(key, Xgp=Xgp, Xlin=Xlin, ell=ell ,m=M, Y=Y)
@@ -357,7 +359,7 @@ def hsgp_pred(z, zeigen, post_samples, x, x2, ell, key):
 @jit
 def Astar_pred(i, post_samples, Xd, X2_eq, triu):
     pred_func = Predictive(model=network_model, posterior_samples=post_samples, infer_discrete=True, num_samples=1)
-    sampled_net = pred_func(random.PRNGKey(i), X_diff=Xd, X2_eq=X2_eq, TriU=triu)["triu_star"]
+    sampled_net = pred_func(random.PRNGKey(i), X_d=Xd, X2_eq=X2_eq, TriU=triu)["triu_star"]
     return jnp.squeeze(sampled_net, axis=0)
 
 vectorized_astar_pred = vmap(Astar_pred, in_axes=(0, None, None, None, None))
@@ -370,7 +372,7 @@ def get_many_post_astars(K, post_pred_mean, x_diff, x2_eq, triu_v):
 
 
 class Network_MCMC:
-    def __init__(self, data, rng_key, n_warmup=1000, n_samples=1000, n_chains=4):
+    def __init__(self, data, rng_key, n_warmup=1000, n_samples=2000, n_chains=4):
     # def __init__(self, data, rng_key, n_warmup=2000, n_samples=4000, n_chains=4):
     # def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=2000, n_chains=6):
         self.X_diff = data["X_diff"]
@@ -385,7 +387,7 @@ class Network_MCMC:
         self.post_samples = None
 
     def network(self):
-        kernel = NUTS(network_model)
+        kernel = NUTS(network_model, init_strategy=numpyro.infer.init_to_median(num_samples=30))
         return MCMC(kernel, num_warmup=self.n_warmup, num_samples=self.n_samples,
                     num_chains=self.n_chains, progress_bar=False)
 
