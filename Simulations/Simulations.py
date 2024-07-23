@@ -84,7 +84,11 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                             iter=idx,
                                             h_estimand=df_obs["estimand_h"],
                                             stoch_estimand=df_obs["estimand_stoch"],
-                                            key=rng_key)
+                                            key=rng_key,
+                                            true_zeigen = df_oracle["Zeigen"])
+
+    print("Mean MS zeigen error: ", threestage_results[1])
+    threestage_results = threestage_results[0]
 
     print("Running ONESTAGE")
     # One-Stage
@@ -93,7 +97,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                                                                                        df_obs["Z_h"],
                                                                                                        df_obs["Z_stoch"])
 
-    print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])))
+    print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])/np.abs(df_oracle["Zeigen"])))
 
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
@@ -111,6 +115,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                               rng_key=rng_key,
                                               iter=idx)
     onestage_results = onestage_outcome_mcmc.get_results()
+
 
     results_all = jnp.vstack([oracle_results, obs_results,
                              # twostage_results, threestage_results,
