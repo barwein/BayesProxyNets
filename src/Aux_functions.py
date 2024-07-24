@@ -117,6 +117,8 @@ class DataGeneration:
     def dynamic_intervention(self, thresholds=(1.5, 2)):
         Z_h1 = jnp.where((self.X > thresholds[0]) | (self.X < -thresholds[0]), 1, 0)
         Z_h2 = jnp.where((self.X > thresholds[1]) | (self.X < -thresholds[1]), 1, 0)
+        # Z_h1 = jnp.where(((self.X >= -1) & (self.X <= 1)) | (self.X2 == 1), 1, 0)
+        # Z_h2 = jnp.where(self.X2 == 1, 1, 0)
         return jnp.array([Z_h1, Z_h2])
         # return jnp.where((self.X > threshold) | (self.X < -threshold), 1, 0)
 
@@ -328,6 +330,7 @@ def HSGP_jit_pred(post_samples, Xgp, Xlin, ell, key):
 def linear_model_outcome_pred(z, zeigen, post_samples, x, x2, key):
     # df = jnp.transpose(jnp.array([[1] * N, z, x, x2, zeigen]))
     df = jnp.transpose(jnp.array([[1] * N, z, x, zeigen]))
+    # df = jnp.transpose(jnp.array([[1] * N, z, zeigen]))
     pred = outcome_jit_pred(post_samples, df, key)
     return jnp.mean(pred["Y"], axis=1)
 
@@ -345,8 +348,10 @@ def hsgp_model_outcome_pred(z, zeigen, post_samples, x, x2, ell, key):
     # ell_ = jnp.array(c*jnp.max(jnp.abs(zeigen))).reshape(1,1)
     # df = jnp.transpose(jnp.array([[1] * x.shape[0], z, x, x2, zeigen]))
     df = jnp.transpose(jnp.array([[1] * x.shape[0], z, x, zeigen]))
+    # df = jnp.transpose(jnp.array([[1] * N, z, zeigen]))
     # pred = HSGP_jit_pred(post_samples, Xgp=df[:, 4:], Xlin=df[:, 0:4], ell=ell, key=key)
     pred = HSGP_jit_pred(post_samples, Xgp=df[:, 3:], Xlin=df[:, 0:3], ell=ell, key=key)
+    # pred = HSGP_jit_pred(post_samples, Xgp=df[:, 2:], Xlin=df[:, 0:2], ell=ell, key=key)
     return jnp.mean(pred["Y"], axis=1)
 
 hsgp_model_pred = vmap(hsgp_model_outcome_pred, in_axes=(0, 0, None, None, None, None, None))
@@ -432,6 +437,7 @@ class Outcome_MCMC:
         self.iter = iter
         self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, Y=self.Y, df=self.df)
         self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y, Xgp=self.zeigen,
+                                                             # Xlin=self.df[:,0:2], ell=self.ell)
                                                              Xlin=self.df[:,0:3], ell=self.ell)
                                                              # Xlin=self.df[:,0:4], ell=self.ell)
         self.print_zeig_error(data)
@@ -443,6 +449,7 @@ class Outcome_MCMC:
     def get_df(self):
         # return jnp.transpose(jnp.array([[1]*self.n, self.Z, self.X, self.X2, self.zeigen]))
         return jnp.transpose(jnp.array([[1]*self.n, self.Z, self.X, self.zeigen]))
+        # return jnp.transpose(jnp.array([[1]*self.n, self.Z, self.zeigen]))
 
     def get_results(self):
         # dynamic (h) intervention
@@ -514,8 +521,11 @@ def get_samples_new_Astar(key, Y, Z, X, X2, curr_Astar, true_zeigen):
     # get df
     # cur_df = jnp.transpose(jnp.array([[1] * N, Z, X, X2, cur_Zeigen]))
     cur_df = jnp.transpose(jnp.array([[1] * N, Z, X, cur_Zeigen]))
+    # cur_df = jnp.transpose(jnp.array([[1] * N, Z, cur_Zeigen]))
     # Run MCMC
     cur_lin_samples = linear_model_samples_vectorized(key, Y, cur_df)
+    # cur_hsgp_samples = HSGP_model_samples_vectorized(key, Y=Y, Xgp=cur_df[:, 2:],
+    #                                        Xlin=cur_df[:, 0:2], ell=ell)
     cur_hsgp_samples = HSGP_model_samples_vectorized(key, Y=Y, Xgp=cur_df[:, 3:],
                                            Xlin=cur_df[:, 0:3], ell=ell)
     # cur_hsgp_samples = HSGP_model_samples_vectorized(key, Y=Y, Xgp=cur_df[:, 4:],
@@ -677,9 +687,11 @@ class Onestage_MCMC:
         self.ell = jnp.array(C*jnp.max(jnp.abs(self.zeigen))).reshape(1,1)
         self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, Y=self.Y, df=self.df)
         self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y, Xgp=self.zeigen,
+                                                             # Xlin=self.df[:,0:2], ell=self.ell)
                                                              Xlin=self.df[:,0:3], ell=self.ell)
                                                              # Xlin=self.df[:,0:4], ell=self.ell)
     def get_df(self):
+        # return jnp.transpose(jnp.array([[1]*self.n, self.Z_obs, self.zeigen]))
         return jnp.transpose(jnp.array([[1]*self.n, self.Z_obs, self.X, self.zeigen]))
         # return jnp.transpose(jnp.array([[1]*self.n, self.Z_obs, self.X, self.X2, self.zeigen]))
 
