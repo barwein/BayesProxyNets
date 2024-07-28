@@ -34,7 +34,7 @@ ETA = jnp.array([-1, 3, -0.25, 0, 2.5])
 # ETA = jnp.array([-1, 3, 0, 0, 2.5])
 SIG_Y = 1
 PZ = 0.5
-LIN_Y = True
+LIN_Y = False
 ALPHAS = (0.7,0.3)
 # N = 300
 N = 300
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # sim_results = vectorized_simulations(idx_range, THETA, GAMMA,
     #                                      ETA, SIG_Y, PZ,
     #                                      N_REP, LIN_Y, ALPHAS)
-    sim_results = one_simuation_iter(13, THETA, GAMMA,
+    sim_results = one_simuation_iter(12, THETA, GAMMA,
                                          ETA, SIG_Y, PZ,
                                          N_REP, LIN_Y, ALPHAS)
     df_results = results_to_pd_df(sim_results, N_SIM)
