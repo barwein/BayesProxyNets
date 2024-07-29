@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # sim_results = vectorized_simulations(idx_range, THETA, GAMMA,
     #                                      ETA, SIG_Y, PZ,
     #                                      N_REP, LIN_Y, ALPHAS)
-    sim_results = one_simuation_iter(12, THETA, GAMMA,
+    sim_results = one_simuation_iter(31, THETA, GAMMA,
                                          ETA, SIG_Y, PZ,
                                          N_REP, LIN_Y, ALPHAS)
     df_results = results_to_pd_df(sim_results, N_SIM)

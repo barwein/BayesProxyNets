@@ -97,15 +97,17 @@ class DataGeneration:
 
     def f_zeigen(self, zeig, param):
         # Conditions
-        cond1 = zeig < .8
-        cond2 = (zeig >= .8) & (zeig < 1)
-        cond3 = zeig >= 1
+        cond1 = zeig < 1.2
+        # cond2 = (zeig >= .6) & (zeig < 1)
         # Functions
-        f1 = 0
-        f2 = 10 * param * (zeig - .8)
-        f3 = 10 * param * (1 - .8)
+        # f1 = 0
+        # f2 = 10 * param * (zeig - .8)
+        # f3 = 10 * param * (1 - .8)
+        f2 = jnp.maximum(5 * param * (zeig - .6) ,0)
+        f3 = jnp.maximum(5*param*(1.2-0.6) - 2.5*param*(zeig-1.2), 0)
         # Using jnp.where to implement piecewise function
-        result = jnp.where(cond1, f1, jnp.where(cond2, f2, f3))
+        # result = jnp.where(cond1, f1, jnp.where(cond2, f2, f3))
+        result = jnp.where(cond1, f2, f3)
         return result
 
     def gen_outcome(self, z, zeig, with_epsi):
@@ -117,10 +119,11 @@ class DataGeneration:
             mean_lin = jnp.dot(df_lin, self.eta[0:4])
             # mean_nonlin = self.eta[3] / (1 + jnp.exp(-15 * (zeig - 0.4)))
             # mean_nonlin = self.eta[3]*(jnp.sin(20 * zeig) + jnp.log(zeig + 1))
-            # mean_nonlin = self.eta[4]*(jnp.sin(2 * zeig) + jnp.log(2*zeig + 1))
-            mean_nonlin = jnp.exp(self.eta[4]*zeig)/40
+            # mean_nonlin = 1.2*self.eta[4]*(jnp.sin(4 * (zeig - jnp.pi)) + jnp.log(zeig + 1))
+            # mean_nonlin = jnp.exp(self.eta[4]*zeig)/40
+            # mean_nonlin = -3*self.eta[4]*jnp.power(zeig-.8,2) + 3*self.eta[4]*zeig
             # mean_nonlin = 2*self.eta[4] / (1+jnp.exp(-5*zeig + 7.5))
-            # mean_nonlin = self.f_zeigen(zeig, self.eta[4])
+            mean_nonlin = self.f_zeigen(zeig, self.eta[4])
             mean_y = mean_lin + mean_nonlin
         if with_epsi:
             # epsi = jnp.array(rng.normal(loc=0, scale=self.sig_y, size=self.n))

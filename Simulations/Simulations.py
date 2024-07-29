@@ -22,6 +22,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
 
     # --- Get data ---
     df_oracle = aux.DataGeneration(rng=rng, theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
+    print("Median true Zeigen = ", jnp.median(df_oracle["Zeigen"]))
     # Generate noisy network measurement
     # obs_network = aux.create_noisy_network(df_oracle["adj_mat"], gamma)
     # obs_network = aux.create_noisy_network(df_oracle["triu"], gamma, df_oracle["X2_equal"])
