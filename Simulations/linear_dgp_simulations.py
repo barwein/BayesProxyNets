@@ -34,14 +34,14 @@ ETA = jnp.array([-1, 3, -0.25, 0, 2.5])
 # ETA = jnp.array([-1, 3, 0, 0, 2.5])
 SIG_Y = 1
 PZ = 0.5
-LIN_Y = False
+LIN_Y = True
 ALPHAS = (0.7,0.3)
 # N = 300
 N = 300
 # N_SIM = 500
 N_SIM = 1
 # N_REP = 1000
-N_REP = 500
+N_REP = 1600
 
 if __name__ == "__main__":
     print("### Starting simulation ###")

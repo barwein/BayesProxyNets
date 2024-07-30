@@ -123,7 +123,9 @@ class DataGeneration:
             # mean_nonlin = jnp.exp(self.eta[4]*zeig)/40
             # mean_nonlin = -3*self.eta[4]*jnp.power(zeig-.8,2) + 3*self.eta[4]*zeig
             # mean_nonlin = 2*self.eta[4] / (1+jnp.exp(-5*zeig + 7.5))
-            mean_nonlin = self.f_zeigen(zeig, self.eta[4])
+            # mean_nonlin = self.f_zeigen(zeig, self.eta[4])
+            mean_nonlin = jnp.maximum(-2*self.eta[4]*jnp.power(zeig-1.2,2) + 2*self.eta[4]*zeig, 0)
+            # mean_nonlin = jnp.maximum(-2*self.eta[4]*jnp.power(zeig-1.5,2) + 3*self.eta[4]*jnp.log(zeig+1), 0)
             mean_y = mean_lin + mean_nonlin
         if with_epsi:
             # epsi = jnp.array(rng.normal(loc=0, scale=self.sig_y, size=self.n))
@@ -231,6 +233,25 @@ def between_var(x, mean_all):
     n_rep = len(x)
     return (1/(n_rep - 1))*np.sum(np.square(x-mean_all))
 
+
+def compute_hdi(samples, cred_mass):
+    sorted_samples = jnp.sort(samples)
+    interval_size = int(jnp.ceil(cred_mass * len(sorted_samples)))
+
+    min_width = jnp.inf
+    hdi_lower = 0
+    hdi_upper = 0
+
+    for i in range(len(sorted_samples) - interval_size):
+        current_width = sorted_samples[i + interval_size] - sorted_samples[i]
+        if current_width < min_width:
+            min_width = current_width
+            hdi_lower = sorted_samples[i]
+            hdi_upper = sorted_samples[i + interval_size]
+
+    return hdi_lower, hdi_upper
+
+
 # def compute_error_stats(esti_post_draws, true_estimand, method="TEST", estimand = "h", idx=None):
 def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     mean = jnp.round(jnp.mean(esti_post_draws),3)
@@ -241,12 +262,14 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     MAPE = jnp.round(jnp.mean(jnp.abs(esti_post_draws - true_estimand)/jnp.abs(true_estimand)), 3)
     q025 = jnp.quantile(esti_post_draws, 0.025)
     q975 = jnp.quantile(esti_post_draws, 0.975)
+    # hdi_lower, hdi_upper = compute_hdi(esti_post_draws, 0.95)
     cover = (q025 <= true_estimand) & (true_estimand <= q975)
     # cover = q025 <= true_estimand <= q975
     return jnp.array([idx, mean, medi, jnp.round(true_estimand,3),
                       jnp.round(mean - true_estimand,3), std, RMSE,
                       MAE, MAPE,
                       jnp.round(q025,3), jnp.round(q975,3), cover])
+                      # , jnp.round(hdi_lower,3), jnp.round(hdi_upper,3)])
  # return pd.DataFrame([{"idx" : idx, "method" : method, "estimand" : estimand,
  #            "mean" : mean, "median" : medi, "true" : jnp.round(true_estimand,3),
  #            "bias" : jnp.round(mean - true_estimand,3), "std" : std, "RMSE" : RMSE,
@@ -304,16 +327,16 @@ def HSGP_model(Xlin, Xgp, ell, m, Y=None, non_centered=True):
 # @jit
 def linear_model_samples_parallel(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=1000, num_samples=2000,num_chains=4, progress_bar=False)
-    # lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=4000,num_chains=4, progress_bar=False)
+    # lin_mcmc = MCMC(kernel_outcome, num_warmup=1000, num_samples=2000,num_chains=4, progress_bar=False)
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=4000,num_chains=4, progress_bar=False)
     lin_mcmc.run(key, df=df, Y=Y)
     return lin_mcmc.get_samples()
 
 @jit
 def linear_model_samples_vectorized(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=600, num_samples=150, num_chains=1,
-    # lin_mcmc = MCMC(kernel_outcome, num_warmup=400, num_samples=150, num_chains=1,
+    # lin_mcmc = MCMC(kernel_outcome, num_warmup=600, num_samples=150, num_chains=1,
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=1000, num_samples=10, num_chains=1,
                     progress_bar=False, chain_method="vectorized")
     lin_mcmc.run(key, df=df, Y=Y)
     return lin_mcmc.get_samples()
@@ -326,16 +349,16 @@ def outcome_jit_pred(post_samples, df_arr, key):
 # @jit
 def HSGP_model_samples_parallel(key, Y, Xgp, Xlin, ell):
     kernel_hsgp = NUTS(HSGP_model)
-    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=1000, num_samples=2000,num_chains=4, progress_bar=False)
-    # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=2000, num_samples=4000,num_chains=4, progress_bar=False)
+    # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=1000, num_samples=2000,num_chains=4, progress_bar=False)
+    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=2000, num_samples=4000,num_chains=4, progress_bar=False)
     hsgp_mcmc.run(key, Xgp=Xgp, Xlin=Xlin, ell=ell ,m=M, Y=Y)
     return hsgp_mcmc.get_samples()
 
 @jit
 def HSGP_model_samples_vectorized(key, Y, Xgp, Xlin, ell):
     kernel_hsgp = NUTS(HSGP_model)
-    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=600, num_samples=150,num_chains=1,
-    # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=400, num_samples=150,num_chains=1,
+    # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=600, num_samples=150,num_chains=1,
+    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=1000, num_samples=10,num_chains=1,
                      progress_bar=False, chain_method="vectorized")
     hsgp_mcmc.run(key, Xgp=Xgp, Xlin=Xlin, ell=ell ,m=M, Y=Y)
     return hsgp_mcmc.get_samples()
@@ -399,8 +422,8 @@ def get_many_post_astars(K, post_pred_mean, x_diff, x2_eq, triu_v):
 
 
 class Network_MCMC:
-    def __init__(self, data, rng_key, n_warmup=1000, n_samples=1500, n_chains=4):
-    # def __init__(self, data, rng_key, n_warmup=2000, n_samples=4000, n_chains=4):
+    # def __init__(self, data, rng_key, n_warmup=1000, n_samples=1500, n_chains=4):
+    def __init__(self, data, rng_key, n_warmup=2000, n_samples=4000, n_chains=4):
     # def __init__(self, data, n, rng_key, n_warmup=1000, n_samples=2000, n_chains=6):
         self.X_diff = data["X_diff"]
         self.X2_eq = data["X2_equal"]
