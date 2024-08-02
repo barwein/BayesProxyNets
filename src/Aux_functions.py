@@ -156,28 +156,30 @@ class DataGeneration:
     def get_true_estimand(self, z_new):
         if z_new.ndim == 3:
             zeigen_new1 = zeigen_value(z_new[0,:,:], self.eig_cen, self.adj_mat)
-            # zeigen_new2 = zeigen_value(z_new[1,:,:], self.eig_cen, self.adj_mat)
+            zeigen_new2 = zeigen_value(z_new[1,:,:], self.eig_cen, self.adj_mat)
             n_stoch = z_new.shape[1]
             results = np.zeros((n_stoch, N))
             for i in range(n_stoch):
                 # df = np.transpose(np.array([[1] * self.n, z_new[i,], self.X]))
                 y1 = self.gen_outcome(z_new[0,i,], zeigen_new1[i,], with_epsi=False)
-                # y2 = self.gen_outcome(z_new[1,i,], zeigen_new2[i,], with_epsi=False)
+                y2 = self.gen_outcome(z_new[1,i,], zeigen_new2[i,], with_epsi=False)
                 # results[i,] = jnp.mean(y1 - epsi2) - jnp.mean(y2 - epsi2)
                 # results[i,] = jnp.mean(y1 - y2)
                 # results[i,] = jnp.mean(y1)
-                results[i,] = y1
+                # results[i,] = y1
+                results[i,] = y1 - y2
             return jnp.mean(results, axis=0).squeeze()
         else:
             # assert Z_stoch.ndim == 2
             zeigen_new1 = zeigen_value(z_new[0,:], self.eig_cen, self.adj_mat)
-            # zeigen_new2 = zeigen_value(z_new[1,:], self.eig_cen, self.adj_mat)
+            zeigen_new2 = zeigen_value(z_new[1,:], self.eig_cen, self.adj_mat)
             y1 = self.gen_outcome(z_new[0,], zeigen_new1, with_epsi=False)
-            # y2 = self.gen_outcome(z_new[1,], zeigen_new2, with_epsi=False)
+            y2 = self.gen_outcome(z_new[1,], zeigen_new2, with_epsi=False)
             # return jnp.mean(y1 - epsi1) - jnp.mean(y2 - epsi2)
             # return jnp.mean(y1 - y2)
             # return jnp.mean(y1)
-            return y1
+            # return y1
+            return y1 - y2
 
     def get_data(self):
         return {"Z" : self.Z, "X" : self.X,
@@ -262,7 +264,7 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     mean_estimand = jnp.mean(true_estimand)  # scalar
     mean_units = jnp.mean(esti_post_draws, axis=1)  # shape (M,)
     mean_samples = jnp.mean(esti_post_draws, axis=0)  # shape (N,)
-    mean_all = jnp.round(np.mean(esti_post_draws), 3)  # scalar
+    mean_all = jnp.round(jnp.mean(esti_post_draws), 3)  # scalar
     # mean = jnp.round(jnp.mean(esti_post_draws),3)
     medi = jnp.round(jnp.median(mean_units),3)
     std = jnp.round(jnp.std(mean_units),3)
@@ -351,7 +353,7 @@ def linear_model_samples_parallel(key, Y, df):
 def linear_model_samples_vectorized(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
     # lin_mcmc = MCMC(kernel_outcome, num_warmup=600, num_samples=150, num_chains=1,
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=1000, num_samples=10, num_chains=1,
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=1000, num_samples=100, num_chains=1,
                     progress_bar=False, chain_method="vectorized")
     lin_mcmc.run(key, df=df, Y=Y)
     return lin_mcmc.get_samples()
@@ -373,7 +375,7 @@ def HSGP_model_samples_parallel(key, Y, Xgp, Xlin, ell):
 def HSGP_model_samples_vectorized(key, Y, Xgp, Xlin, ell):
     kernel_hsgp = NUTS(HSGP_model)
     # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=600, num_samples=150,num_chains=1,
-    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=1000, num_samples=10,num_chains=1,
+    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=1000, num_samples=100,num_chains=1,
                      progress_bar=False, chain_method="vectorized")
     hsgp_mcmc.run(key, Xgp=Xgp, Xlin=Xlin, ell=ell ,m=M, Y=Y)
     return hsgp_mcmc.get_samples()
