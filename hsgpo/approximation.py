@@ -21,22 +21,22 @@ from hsgp.spectral_densities import (
 import numpyro.distributions as dist
 
 
-def _non_centered_approximation(phi: ArrayImpl, spd: ArrayImpl, m: int, i: str) -> ArrayImpl:
-    with numpyro.plate("basis" + i, m):
-        beta = numpyro.sample("beta" + i, dist.Normal(loc=0.0, scale=1.0))
+def _non_centered_approximation(phi: ArrayImpl, spd: ArrayImpl, m: int) -> ArrayImpl:
+    with numpyro.plate("basis", m):
+        beta = numpyro.sample("beta", dist.Normal(loc=0.0, scale=1.0))
 
     return phi @ (spd * beta)
 
 
-def _centered_approximation(phi: ArrayImpl, spd: ArrayImpl, m: int, i:str) -> ArrayImpl:
-    with numpyro.plate("basis" + i, m):
-        beta = numpyro.sample("beta" + i, dist.Normal(loc=0.0, scale=spd))
+def _centered_approximation(phi: ArrayImpl, spd: ArrayImpl, m: int) -> ArrayImpl:
+    with numpyro.plate("basis", m):
+        beta = numpyro.sample("beta", dist.Normal(loc=0.0, scale=spd))
 
     return phi @ beta
 
 
 def linear_approximation(
-    phi: ArrayImpl, spd: ArrayImpl, m: int | list[int], i: str, non_centered: bool = True
+    phi: ArrayImpl, spd: ArrayImpl, m: int | list[int], non_centered: bool = True
 ) -> ArrayImpl:
     """
     Linear approximation formula of the Hilbert space Gaussian process.
@@ -57,8 +57,8 @@ def linear_approximation(
     :rtype: ArrayImpl
     """
     if non_centered:
-        return _non_centered_approximation(phi, spd, m, i)
-    return _centered_approximation(phi, spd, m, i)
+        return _non_centered_approximation(phi, spd, m)
+    return _centered_approximation(phi, spd, m)
 
 
 def hsgp_squared_exponential(
@@ -67,7 +67,6 @@ def hsgp_squared_exponential(
     length: float,
     ell: float | int | list[float | int],
     m: int | list[int],
-    i: str,
     non_centered: bool = True,
 ) -> ArrayImpl:
     """
@@ -94,7 +93,6 @@ def hsgp_squared_exponential(
     :param int | list[m] m: number of eigenvalues to compute and include in the approximation for each dimension
         (:math:`\\left\\{1, ..., D\\right\\}`).
         If an integer, the same number of eigenvalues is computed in each dimension.
-    :param str i: index of df
     :param bool non_centered: whether to use a non-centered parameterization. By default, it is set to True
     :return: the low-rank approximation linear model
     :rtype: ArrayImpl
@@ -107,7 +105,7 @@ def hsgp_squared_exponential(
         )
     )
     return linear_approximation(
-        phi=phi, spd=spd, m=phi.shape[-1], i=i, non_centered=non_centered
+        phi=phi, spd=spd, m=phi.shape[-1], non_centered=non_centered
     )
 
 
