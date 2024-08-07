@@ -138,7 +138,8 @@ vectorized_simulations = vmap(one_simuation_iter, in_axes = (0,) + (None,) * 8)
 # vectorized_simulations = vmap(run_one_iter, in_axes=(0,None,None,None,None,None,None,None,None,None,None))
 
 COLUMNS = ["idx", "mean", "median", "true", "bias",
-           "std", "RMSE", "MAE", "q025", "q975", "covering", "mean_ind_cover"]
+           "std", "RMSE", "MAE", "MAPE",
+           "q025", "q975", "covering", "mean_ind_cover"]
            # "std", "RMSE", "MAE", "MAPE", "q025", "q975", "covering"]
            # , "hdi_lower", "hdi_upper"]
 # COLUMNS = ["idx", "method", "estimand", "mean", "median",
