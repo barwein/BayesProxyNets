@@ -26,7 +26,7 @@ os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 N = 300
 TRIL_DIM = int(N*(N-1)/2)
 M = 20
-C = 3.5
+C = 3
 
 # --- data generation for each iteration ---
 class DataGeneration:
@@ -125,10 +125,11 @@ class DataGeneration:
             # mean_nonlin = 2*self.eta[4] / (1+jnp.exp(-5*zeig + 7.5))
             # mean_nonlin = self.f_zeigen(zeig, self.eta[4])
             # mean_nonlin = jnp.maximum(-2*self.eta[4]*jnp.power(zeig-1.2,2) + 2*self.eta[4]*zeig, 0)
-            mean_nonlin = jnp.maximum(0, jnp.minimum(8*self.eta[4]*(zeig-1.2), 8*self.eta[4]*0.2))
-            mean_nonlin += self.eta[4] * z * zeig
+            mean_nonlin = jnp.maximum(0, jnp.minimum(4*self.eta[4]*(zeig-1.2), 4*self.eta[4]*0.3))
+            mean_nonlin += 4 * z * zeig
+            # mean_nonlin += self.eta[4] * z * zeig
             mean_lin = jnp.dot(df_lin, self.eta[0:4])
-            mean_y = mean_lin + mean_nonlin + 0.2*jnp.power(z*self.X,2)
+            mean_y = mean_lin + mean_nonlin + 0.25*jnp.power(z*self.X,2)
         if with_epsi:
             # epsi = jnp.array(rng.normal(loc=0, scale=self.sig_y, size=self.n))
             epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
