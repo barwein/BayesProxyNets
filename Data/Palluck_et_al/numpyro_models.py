@@ -33,25 +33,25 @@ from hsgp.spectral_densities import diag_spectral_density_squared_exponential
 def noisy_networks_model(x_eq: jnp.ndarray, triu_v: jnp.ndarray, N: int, K = 2):
     # True network priors
     # Latent variable for each unit from bi-normal distribution
-    sigma_sq = numpyro.sample("sigma_sq", dist.InverseGamma(0.1, 1.0))
+    # sigma_sq = numpyro.sample("sigma_sq", dist.InverseGamma(0.1, 1.0))
     # cov_matrix = sigma_sq * jnp.eye(K)
     # cov_matrix = 5.0 * jnp.eye(K)
     # N = ((1 + jnp.sqrt(1 + 8*x_eq.shape[0]))/2).astype(int)
     # N = jax.lax.convert_element_type((1 + jnp.sqrt(1 + 8*x_eq.shape[0]))/2, jnp.int32)
-    with numpyro.plate("nu_i", N):
+    # with numpyro.plate("nu_i", N):
         # nu = numpyro.sample("nu", dist.MultivariateNormal(loc=jnp.zeros(K), covariance_matrix=cov_matrix))
         # nu_standard = numpyro.sample("nu_standard", dist.Normal(jnp.zeros(K), jnp.ones(K)))
-        nu_standard = numpyro.sample("nu_standard", dist.MultivariateNormal(loc=jnp.zeros(K), covariance_matrix=jnp.eye(K)))
+        # nu_standard = numpyro.sample("nu_standard", dist.MultivariateNormal(loc=jnp.zeros(K), covariance_matrix=jnp.eye(K)))
         # nu = numpyro.deterministic("nu", nu_standard*jnp.sqrt(sigma_sq))
         # nu = numpyro.deterministic("nu", nu_standard*3.0)
 
     # nu_standard = numpyro.sample("nu_standard", dist.Normal(0, 1).expand((N, K)))
 
-    nu = numpyro.deterministic("nu", nu_standard * jnp.sqrt(sigma_sq))
+    # nu = numpyro.deterministic("nu", nu_standard * jnp.sqrt(sigma_sq))
     # Calculate pairwise differences
-    idx = jnp.triu_indices(n=N, k=1)
-    nu_diff = nu[idx[0]] - nu[idx[1]]
-    nu_diff_norm_val = jnp.linalg.norm(nu_diff, axis=1)
+    # idx = jnp.triu_indices(n=N, k=1)
+    # nu_diff = nu[idx[0]] - nu[idx[1]]
+    # nu_diff_norm_val = jnp.linalg.norm(nu_diff, axis=1)
     # nu_diff = nu[:, None, :] - nu[None, :, :]  # Shape: (N*(N-1)/2, N*(N-1)/2, K)
     # nu_diff_norm = jnp.linalg.norm(nu_diff, axis=2)  # Shape: (N*(N-1)/2, N*(N-1)/2)
     # nu_diff_norm_val = nu_diff_norm[jnp.triu_indices(n=N,k=1)] # Shape: (N*(N-1)/2,)
@@ -65,11 +65,12 @@ def noisy_networks_model(x_eq: jnp.ndarray, triu_v: jnp.ndarray, N: int, K = 2):
     # theta = numpyro.sample("theta", dist.Normal(0, 5).expand((x_eq.shape[1],)))
     # Save logits for A*
     # mu_net = theta_intercept + jnp.dot(x_eq, theta) + theta_latent*nu_diff_norm_val
-    mu_net = theta_intercept + jnp.dot(x_eq, theta) - nu_diff_norm_val
+    # mu_net = theta_intercept + jnp.dot(x_eq, theta) - nu_diff_norm_val
+    mu_net = theta_intercept + jnp.dot(x_eq, theta)
     # mu_net = theta_intercept + jnp.dot(x_eq, theta)
 
     if triu_v.ndim == 1:
-        with numpyro.plate("gamma_i", 3):
+        with numpyro.plate("gamma_i", 2 + x_eq.shape[1]):
         # # with numpyro.plate("gamma_i", 2):
             gamma = numpyro.sample("gamma", dist.Normal(0, 5))
         # gamma = numpyro.sample("gamma", dist.Normal(0, 5).expand((3,)))
@@ -82,7 +83,8 @@ def noisy_networks_model(x_eq: jnp.ndarray, triu_v: jnp.ndarray, N: int, K = 2):
             # logit_misspec = triu_star*gamma[0] + (1 - triu_star)*(gamma[1] + gamma[2]*nu_diff_norm_val)
             logit_misspec = jnp.where(triu_star,
                                       gamma[0],
-                                      gamma[1] + gamma[2] * nu_diff_norm_val)
+                                      gamma[1] + jnp.dot(x_eq, gamma[2:]))
+                                      # gamma[1] + gamma[2] * nu_diff_norm_val)
             numpyro.sample("obs_triu", dist.Bernoulli(logits=logit_misspec), obs=triu_v)
 
     else: # triu_v.ndim == 2
@@ -101,12 +103,14 @@ def noisy_networks_model(x_eq: jnp.ndarray, triu_v: jnp.ndarray, N: int, K = 2):
             # logit_misspec_A1 = triu_star*gamma_a1[0] + (1 - triu_star)*(gamma_a1[1] + gamma_a1[2]*nu_diff_norm_val)
             logit_misspec_A1 = jnp.where(triu_star,
                                          gamma_a1[0],
-                                         gamma_a1[1] + gamma_a1[2] * nu_diff_norm_val)
+                                         gamma_a1[1] )
+                                         # gamma_a1[1] + gamma_a1[2] * nu_diff_norm_val)
             # logit_misspec_A2 = triu_star*(gamma_a2[0] + gamma_a2[1]*triu_v[0,:])
             # + (1 - triu_star)*(gamma_a2[2] + gamma_a2[3]*triu_v[0,:] + gamma_a2[4]*nu_diff_norm_val)
             logit_misspec_A2 = jnp.where(triu_star,
                                          gamma_a2[0] + gamma_a2[1]*triu_v[0,:],
-                                         gamma_a2[2] + gamma_a2[3]*triu_v[0,:] + gamma_a2[4]*nu_diff_norm_val)
+                                         gamma_a2[2] + gamma_a2[3]*triu_v[0,:])
+                                         # gamma_a2[2] + gamma_a2[3]*triu_v[0,:] + gamma_a2[4]*nu_diff_norm_val)
             # logit_misspec_A2 = triu_star*(gamma_a2[0]*(1 - triu_v[0,:]) + gamma_a2[1]*triu_v[0,:])
             # + (1 - triu_star)*((gamma_a2[2] + gamma_a2[3]*nu_diff_norm_val)*(1 - triu_v[0,:]) + (gamma_a2[4] + gamma_a2[5]*nu_diff_norm_val)*triu_v[0,:])
             # + (1 - triu_star)*(gamma_a2[2]*(1 - triu_v[0,:]) + gamma_a2[3]*triu_v[0,:])
