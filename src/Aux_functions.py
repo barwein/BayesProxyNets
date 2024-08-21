@@ -14,6 +14,10 @@ from numpyro.contrib.funsor import config_enumerate
 from numpyro.infer import MCMC, NUTS, Predictive
 from hsgp.approximation import hsgp_squared_exponential, eigenfunctions
 from hsgp.spectral_densities import diag_spectral_density_squared_exponential
+import pyro
+import pyro.contrib.gp as gp
+import torch
+
 
 # --- Set cores and seed ---
 N_CORES = 4
@@ -40,9 +44,11 @@ class DataGeneration:
         self.rng = rng
         self.X = self.generate_X()
         self.X2 = self.generate_X2()
+        self.U_latent = self.generate_U_latent()
         self.Z = self.generate_Z(p=pz)
         self.X_diff = self.x_diff()
         self.X2_equal = self.x2_equal()
+        self.U_diff_norm = self.latent_to_norm_of_diff()
         self.triu_dim = int(self.n*(self.n-1)/2)
         self.triu = self.generate_triu()
         self.adj_mat = self.generate_adj_matrix()
@@ -64,6 +70,9 @@ class DataGeneration:
         # return jnp.array(rng.binomial(n=1, p=p, size=self.n))
         return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
 
+    def generate_U_latent(self, loc=0, scale=1, K=2):
+        return jnp.array(self.rng.normal(loc=loc, scale=scale, size=(self.n, K)))
+
     def generate_Z(self, p):
         # return rng.binomial(n=1, p=p, size=self.n)
         # return jnp.array(rng.binomial(n=1, p=p, size=self.n))
@@ -82,9 +91,14 @@ class DataGeneration:
         x2_equal = jnp.array([1 if (self.X2[i] + self.X2[j] == 1) else 0 for i, j in idx_pairs])
         return x2_equal
 
+    def latent_to_norm_of_diff(self):
+        idx = jnp.triu_indices(n=self.n, k=1)
+        U_diff = self.U_latent[idx[0]] - self.U_latent[idx[1]]
+        return jnp.linalg.norm(U_diff, axis=1)
+
     def generate_triu(self):
         # probs = expit(self.theta[0] + self.theta[1]*self.X_diff  + self.theta[2]*self.X2_equal)
-        probs = expit(self.theta[0] + self.theta[1]*self.X2_equal)
+        probs = expit(self.theta[0] + self.theta[1]*self.X2_equal - self.U_diff_norm)
         # return jnp.array(rng.binomial(n=1, p=probs, size=self.triu_dim))
         # return rng.binomial(n=1, p=probs, size=self.triu_dim)
         return self.rng.binomial(n=1, p=probs, size=self.triu_dim)
@@ -125,7 +139,7 @@ class DataGeneration:
             # mean_nonlin = 2*self.eta[4] / (1+jnp.exp(-5*zeig + 7.5))
             # mean_nonlin = self.f_zeigen(zeig, self.eta[4])
             # mean_nonlin = jnp.maximum(-2*self.eta[4]*jnp.power(zeig-1.2,2) + 2*self.eta[4]*zeig, 0)
-            mean_nonlin = jnp.maximum(0, jnp.minimum(4*self.eta[4]*(zeig-1.2), 4*self.eta[4]*0.3))
+            mean_nonlin = jnp.maximum(0, jnp.minimum(4*self.eta[4]*(zeig-.4), 4*self.eta[4]*0.3))
             mean_nonlin += 4 * z * zeig
             # mean_nonlin += self.eta[4] * z * zeig
             mean_lin = jnp.dot(df_lin, self.eta[0:4])
@@ -200,7 +214,7 @@ def create_noisy_network(rng, triu_vals, gamma, x_diff):
     triu_idx = np.triu_indices(n=N, k=1)
     # logit_nois = triu_vals*logit(gamma[0]) + (1 - triu_vals)*(gamma[1] + gamma[2]*x2_equal)
     # logit_nois = triu_vals*logit(gamma[0]) + (1 - triu_vals)*(gamma[1]*x_diff)
-    logit_nois = triu_vals*gamma[0] + (1-triu_vals)*(gamma[1]*x_diff)
+    logit_nois = triu_vals*gamma[0] + (1-triu_vals)*(gamma[1] + gamma[2]*x_diff)
     # edges_noisy = rng.binomial(n=1, p=expit(logit_nois), size=TRIL_DIM)
     edges_noisy = rng.binomial(n=1, p=expit(logit_nois), size=TRIL_DIM)
     obs_mat[triu_idx] = edges_noisy
@@ -295,7 +309,55 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
  #            "q025" : jnp.round(q025,3), "q975" : jnp.round(q975,3), "covering" : cover}])
 
 
-# --- NumPyro models ---
+# --- NumPyro and pyro models ---
+
+@pyro.infer.config_enumerate
+def pyro_noisy_networks_model(x, x2, triu_v, N, K=2, eps=1e-3):
+    """
+    Network model for one noisy observed network. True network is geenrated from LSM.
+    :param x: pairwise x-differences
+    :param x2: pariwise x2-equality
+    :param triu_v: observed triu values (upper triangular)
+    :param N: number of units
+    :param K: latent variables dimension
+    """
+    # log_sigma_sq = pyro.sample("log_sigma_sq", dist.Normal(0, 5))
+    # sigma_sq = torch.exp(log_sigma_sq)
+    with pyro.plate("Latent_dim", N):
+        nu = pyro.sample("nu",
+                         pyro.distributions.MultivariateNormal(torch.zeros(K) + eps, torch.eye(K)))
+        # nu_standard = pyro.sample("nu_standard", dist.MultivariateNormal(torch.zeros(K), torch.eye(K)))
+    # nu = pyro.deterministic("nu", nu_standard * torch.sqrt(sigma_sq))
+
+    idx = torch.triu_indices(N, N, offset=1)
+    nu_diff = nu[idx[0]] - nu[idx[1]]
+    nu_diff_norm_val = torch.norm(nu_diff, dim=1)
+
+    with pyro.plate("theta_dim", 2):
+        theta = pyro.sample("theta",
+                            pyro.distributions.Normal(0, 5))
+
+    mu_net = theta[0] + x2 * theta[1] - nu_diff_norm_val
+    mu_net = torch.clamp(mu_net, min=-30, max=30)
+
+    with pyro.plate("gamma_i", 3):
+        gamma = pyro.sample("gamma",
+                            pyro.distributions.Normal(0, 5))
+
+    with pyro.plate("A* and A", x.shape[0]):
+        triu_star = pyro.sample("triu_star",
+                                pyro.distributions.Bernoulli(logits=mu_net),
+                                infer={"enumerate": "parallel"})
+
+        logit_misspec = torch.where(triu_star == 1.0,
+                                    gamma[0],
+                                    gamma[1] + gamma[2] * x)
+
+        pyro.sample("obs_triu",
+                    pyro.distributions.Bernoulli(logits=logit_misspec),
+                    obs=triu_v)
+
+
 @config_enumerate
 def network_model(X_d, X2_eq, triu_v):
     # Network model
@@ -375,7 +437,7 @@ def HSGP_model(df1, df2, ell1, ell2, m, Y=None):
 def linear_model_samples_parallel(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
     # lin_mcmc = MCMC(kernel_outcome, num_warmup=1000, num_samples=2000,num_chains=4, progress_bar=False)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=4000,num_chains=4, progress_bar=False)
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=2500,num_chains=4, progress_bar=False)
     lin_mcmc.run(key, df=df, Y=Y)
     return lin_mcmc.get_samples()
 
@@ -398,7 +460,7 @@ def outcome_jit_pred(post_samples, df_arr, key):
 def HSGP_model_samples_parallel(key, Y, df1, df2, ell1, ell2):
     kernel_hsgp = NUTS(HSGP_model, target_accept_prob=0.9)
     # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=1000, num_samples=2000,num_chains=4, progress_bar=False)
-    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=2000, num_samples=4000,num_chains=4, progress_bar=False)
+    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=2000, num_samples=2500,num_chains=4, progress_bar=False)
     hsgp_mcmc.run(key, df1=df1, df2=df2, ell1=ell1, ell2=ell2 ,m=M, Y=Y)
     return hsgp_mcmc.get_samples()
 
@@ -509,6 +571,52 @@ def get_many_post_astars(K, post_pred_mean, x_diff, x2_eq, triu_v):
     return vectorized_astar_pred(i_range, post_pred_mean, x_diff, x2_eq, triu_v)
 
 
+class Network_SVI:
+    def __init__(self, data, rng_key, n_iter=10000, n_samples=5000, network_model=pyro_noisy_networks_model):
+        self.X_diff = torch.tensor(np.array(data["X_diff"]), dtype=torch.float32)
+        self.X2_eq = torch.tensor(np.array(data["X2_equal"]), dtype=torch.float32)
+        self.triu = torch.tensor(np.array(data["triu"]), dtype=torch.float32)
+        self.n = N
+        # self.adj_mat = data["adj_mat"]
+        self.rng_key = rng_key
+        self.n_iter = n_iter
+        self.n_samples = n_samples
+        self.network_model = network_model
+        self.guide = self.get_guide()
+
+    def get_guide(self):
+        return pyro.infer.autoguide.AutoLowRankMultivariateNormal(pyro.poutine.block(pyro_noisy_networks_model,
+                                                              hide=["triu_star"]),
+                                      init_loc_fn = pyro.infer.autoguide.init_to_median())
+
+    def train_model(self):
+        pyro.clear_param_store()
+        loss_func = pyro.infer.TraceEnum_ELBO(max_plate_nesting=1)
+        optimzer = pyro.optim.ClippedAdam({"lr": 0.001})
+        svi = pyro.infer.SVI(self.network_model, self.guide, optimzer, loss=loss_func)
+        # losses_full = []
+        for _ in range(self.n_iter):
+            svi.step(self.X_diff, self.X2_eq, self.triu, self.n)
+            # loss = svi.step(self.X_diff, self.X2_eq, self.triu, self.n)
+            # losses_full.append(loss)
+
+    def network_samples(self):
+        triu_star_samples = []
+        for _ in range(self.n_samples):
+            # Get a trace from the guide
+            guide_trace = pyro.poutine.trace(self.guide).get_trace(self.X_diff, self.X2_eq, self.triu, self.n)
+            # Run infer_discrete
+            inferred_model = pyro.infer.infer_discrete(pyro.poutine.replay(self.network_model, guide_trace),
+                                            first_available_dim=-2)
+            # Get a trace from the inferred model
+            model_trace = pyro.poutine.trace(inferred_model).get_trace(self.X_diff, self.X2_eq, self.triu, self.n)
+            # Extract triu_star from the trace
+            triu_star_samples.append(model_trace.nodes['triu_star']['value'])
+        # Convert to tensor
+        return jnp.stack(jnp.array(triu_star_samples))
+        # triu_star_samples = torch.stack(triu_star_samples)
+        # return jnp.array(triu_star_samples)
+
 class Network_MCMC:
     # def __init__(self, data, rng_key, n_warmup=1000, n_samples=1500, n_chains=4):
     def __init__(self, data, rng_key, n_warmup=2000, n_samples=4000, n_chains=4):
@@ -559,11 +667,11 @@ class Outcome_MCMC:
         self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)
         self.n = N
         # self.ell = jnp.array(C*jnp.max(jnp.abs(self.zeigen))).reshape(1,1)
-        self.ell1 = [C, C*jnp.max(jnp.abs(self.X))]
-        self.ell2 = [C, C*jnp.max(jnp.abs(self.zeigen))]
-        self.df = self.get_df()
-        self.df1 = jnp.transpose(jnp.array([self.Z, self.X]))
-        self.df2 = jnp.transpose(jnp.array([self.Z, self.zeigen]))
+        # self.ell1 = [C, C*jnp.max(jnp.abs(self.X))]
+        # self.ell2 = [C, C*jnp.max(jnp.abs(self.zeigen))]
+        self.df_lin = self.get_df()
+        # self.df1 = jnp.transpose(jnp.array([self.Z, self.X]))
+        # self.df2 = jnp.transpose(jnp.array([self.Z, self.zeigen]))
         self.Z_h = data["Z_h"]
         self.Z_stoch = data["Z_stoch"]
         self.estimand_h = data["estimand_h"]
@@ -572,9 +680,11 @@ class Outcome_MCMC:
         self.rng_key = rng_key
         self.iter = iter
         self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, Y=self.Y, df=self.df)
-        self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y,
-                                                             df1=self.df1, df2=self.df2,
-                                                                ell1=self.ell1, ell2=self.ell2)
+        self.gp_reg = Outcome_GP(self.X, self.Y, self.Z, self.zeigen)
+        self.linear_gp.train_model()
+        # self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y,
+        #                                                      df1=self.df1, df2=self.df2,
+        #                                                         ell1=self.ell1, ell2=self.ell2)
         self.print_zeig_error(data)
 
     def print_zeig_error(self, data):
@@ -603,18 +713,21 @@ class Outcome_MCMC:
         # linear_h = jnp.mean(linear_h1_pred, axis=0)
         linear_h_stats = compute_error_stats(linear_h, self.estimand_h, idx=self.iter)
 
-        hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], h1_zeigen, self.hsgp_post_samples,
-                                self.X, self.X2, self.ell1, self.ell2)
+        # hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], h1_zeigen, self.hsgp_post_samples,
+        #                         self.X, self.X2, self.ell1, self.ell2)
         # hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], h1_zeigen, self.hsgp_post_samples,
         #                         self.X, self.X2,self.ell, self.rng_key)
         # hsgp_h2_pred = hsgp_pred(self.Z_h[1,:], h2_zeigen, self.hsgp_post_samples,
         #                           self.X, self.X2, self.ell, self.rng_key)
         # hsgp_h = jnp.mean(hsgp_h1_pred, axis=0) - jnp.mean(hsgp_h2_pred, axis=0)
         # hsgp_h = hsgp_h1_pred - hsgp_h2_pred
-        hsgp_h = hsgp_h1_pred
+        # hsgp_h = hsgp_h1_pred
+        # hsgp_h = hsgp_h1_pred
         # hsgp_h = jnp.mean(hsgp_h1_pred - hsgp_h2_pred, axis=0)
         # hsgp_h = jnp.mean(hsgp_h1_pred, axis=0)
-        hsgp_h_stats = compute_error_stats(hsgp_h, self.estimand_h, idx=self.iter)
+        # hsgp_h_stats = compute_error_stats(hsgp_h, self.estimand_h, idx=self.iter)
+        gp_h_pred = self.gp_reg.predict(self.Z_h[0,:], h1_zeigen)
+        gp_h_stats = compute_error_stats(gp_h_pred, self.estimand_h, idx=self.iter)
 
         # stochastic intervention
         stoch_zeigen1 = zeigen_value(self.Z_stoch[0,:,:], self.eig_cen, self.adj_mat)
@@ -631,22 +744,89 @@ class Outcome_MCMC:
         # linear_stoch_pred = jnp.mean(linear_stoch_pred1, axis=0)
         linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
 
-        hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], stoch_zeigen1, self.hsgp_post_samples,
-                                    self.X, self.X2, self.ell1, self.ell2)
+        # hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], stoch_zeigen1, self.hsgp_post_samples,
+        #                             self.X, self.X2, self.ell1, self.ell2)
         # hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], stoch_zeigen1, self.hsgp_post_samples,
         #                             self.X, self.X2, self.ell, self.rng_key)
         # hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], stoch_zeigen2, self.hsgp_post_samples,
                                      # self.X, self.X2, self.ell, self.rng_key)
         # hsgp_stoch_pred = jnp.mean(hsgp_stoch_pred1, axis=0) - jnp.mean(hsgp_stoch_pred2, axis=0)
         # hsgp_stoch_pred = hsgp_stoch_pred1 - hsgp_stoch_pred2
-        hsgp_stoch_pred = hsgp_stoch_pred1
+        # hsgp_stoch_pred = hsgp_stoch_pred1
         # hsgp_stoch_pred = jnp.mean(hsgp_stoch_pred1 - hsgp_stoch_pred2, axis=0)
         # hsgp_stoch_pred = jnp.mean(hsgp_stoch_pred1, axis=0)
-        hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
+        # hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
+        #                                    self.estimand_stoch, idx=self.iter)
+        gp_stoch_pred = self.gp_reg.predict(self.Z_stoch[0,:,:], stoch_zeigen1)
+        gp_stoch_stats = compute_error_stats(gp_stoch_pred,
                                            self.estimand_stoch, idx=self.iter)
+
 
         return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
         # return pd.concat([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
+
+class Outcome_GP:
+    def __init__(self, X, Y, Z, Zeigen, n_iter = 5000, n_samples = 10000):
+        self.X = torch.tensor(X)
+        # self.X2 = torch.tensor(X2)
+        self.Y = torch.tensor(Y)
+        self.Z = torch.tensor(Z)
+        # self.adj_mat = data["adj_mat"]
+        # self.eig_cen = eigen_centrality(self.adj_mat)
+        # self.zeigen = torch.from_numpy(np.array(zeigen_value(self.Z, self.eig_cen, self.adj_mat)))
+        self.zeigen = torch.tensor(Zeigen)
+        self.n = N
+        self.df = self.get_df()
+        self.gpr = self.gpr_model()
+        # self.rng_key = rng_key
+        self.n_iter = n_iter
+        self.n_samples = n_samples
+        self.post_samples = None
+
+    def get_df(self):
+        return torch.stack([torch.tensor(self.Z), self.zeigen, self.X], dim=1)
+
+    def gpr_model(self):
+        kernel = gp.kernels.RBF(input_dim=3, variance=torch.tensor(1.0), lengthscale=torch.tensor(1.0))
+        return gp.models.GPRegression(self.df, self.Y, kernel, noise=torch.tensor(1.0))
+
+    def train_model(self):
+        pyro.clear_param_store()
+        # Define priors on the hyperparameters
+        self.gpr.kernel.lengthscale = pyro.nn.PyroSample(dist.LogNormal(0.0, 5.0))
+        self.gpr.kernel.variance = pyro.nn.PyroSample(dist.LogNormal(0.0, 2.0))
+        self.gpr.noise = pyro.nn.PyroSample(dist.LogNormal(0.0, 1.0))
+        # Set up the optimizer
+        optimizer = torch.optim.Adam(self.gpr.parameters(), lr=0.001)
+        loss_fn = pyro.infer.Trace_ELBO().differentiable_loss
+        # Training loop
+        for i in range(self.n_iter):
+            optimizer.zero_grad()
+            loss = loss_fn(self.gpr.model, self.gpr.guide)
+            # loss = compute_loss(gpr.model, gpr.guide)
+            loss.backward()
+            optimizer.step()
+
+    def predict_one_df(self, df):
+        with torch.no_grad():
+            mean, cov = self.gpr(df, full_cov=True, noiseless=False)
+            samples = pyro.distributions.MultivariateNormal(mean, cov).sample(sample_shape=(self.n_samples,))
+        return jnp.array(samples)
+
+    def predict(self, z_new, zeigen_new):
+        if z_new.ndim == 1:
+            df_new = torch.stack([z_new, zeigen_new, self.X], dim=1)
+            return self.predict_one_df(df_new)
+        elif z_new.ndim == 2:
+            n_z = z_new.shape[0]
+            df_new = torch.stack([z_new, zeigen_new, self.X.repeat(n_z, 1)], dim=1)
+            samples_multi = []
+            for i in range(n_z):
+                samples_multi.append(self.predict_one_df(df_new[i]))
+            return jnp.array(samples_multi)
+        # TODO: conitnue here
+        # return mean, cov, samples
+
 
 # --- Modular bayesian inference from cut-posterior ---
 # Aux functions

@@ -37,12 +37,15 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
 
     print("Running network module")
     # --- network module ---
-    network_mcmc = aux.Network_MCMC(data=df_obs, rng_key=rng_key)
+    # network_mcmc = aux.Network_MCMC(data=df_obs, rng_key=rng_key)
+    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=5000, n_samples=1000)
+    network_svi.train_model()
     # get posterior samples and predictive distributions
-    network_post = network_mcmc.get_posterior_samples()
+    # network_post = network_mcmc.get_posterior_samples()
     # network_mean_post = network_mcmc.mean_posterior()
     print("getting network posterior samples")
-    network_pred_samples = network_mcmc.predictive_samples()
+    # network_pred_samples = network_mcmc.predictive_samples()
+    network_pred_samples = network_svi.network_samples()
 
     print("Running obs and oracle outcome modules")
     # --- Outcome module (linear & GP) ---
