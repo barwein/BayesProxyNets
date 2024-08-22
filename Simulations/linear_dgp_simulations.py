@@ -26,7 +26,7 @@ THETA = [-2.5, 1.5]
 # GAMMA = jnp.array([0.05, 0.3])
 # GAMMA = jnp.array([0.75, -2.5, -1])
 # GAMMA = jnp.array([0.75, -1])
-GAMMA = [1.1, -1]
+GAMMA = [1.1, 0.2,  -1]
 # GAMMA = [2.5, -1.5]
 # GAMMA = [1.5, -1.5]
 # ETA = jnp.array([-1, 3, -0.25, 2.5])
@@ -42,7 +42,7 @@ N = 300
 # N_SIM = 500
 N_SIM = 1
 # N_REP = 1000
-N_REP = 500
+N_REP = 20
 
 if __name__ == "__main__":
     print("### Starting simulation ###")

@@ -35,15 +35,15 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     trils_pd = pd.DataFrame({'true': df_oracle["triu"], 'obs': df_obs["triu"]})
     print(pd.crosstab(index=trils_pd['true'], columns=trils_pd['obs']))
 
-    print("Running network module")
+    # print("Running network module")
     # --- network module ---
     # network_mcmc = aux.Network_MCMC(data=df_obs, rng_key=rng_key)
-    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=5000, n_samples=1000)
+    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=2000, n_samples=1000)
     network_svi.train_model()
     # get posterior samples and predictive distributions
     # network_post = network_mcmc.get_posterior_samples()
     # network_mean_post = network_mcmc.mean_posterior()
-    print("getting network posterior samples")
+    # print("getting network posterior samples")
     # network_pred_samples = network_mcmc.predictive_samples()
     network_pred_samples = network_svi.network_samples()
 
@@ -84,7 +84,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                             Z_stoch=df_obs["Z_stoch"],
                                             X=df_obs["X"],
                                             X2=df_obs["X2"],
-                                            K=n_rep,
+                                            B=n_rep,
                                             iter=idx,
                                             h_estimand=df_obs["estimand_h"],
                                             stoch_estimand=df_obs["estimand_stoch"],
