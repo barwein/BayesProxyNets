@@ -37,8 +37,8 @@ SIG_Y = 1
 PZ = 0.5
 LIN_Y = True
 ALPHAS = (0.7,0.3)
+N = 500
 # N = 300
-N = 300
 # N_SIM = 500
 N_SIM = 1
 # N_REP = 1000
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # sim_results = vectorized_simulations(idx_range, THETA, GAMMA,
     #                                      ETA, SIG_Y, PZ,
     #                                      N_REP, LIN_Y, ALPHAS)
-    sim_results = one_simuation_iter(31, THETA, GAMMA,
+    sim_results = one_simuation_iter(35, THETA, GAMMA,
                                          ETA, SIG_Y, PZ,
                                          N_REP, LIN_Y, ALPHAS)
     df_results = results_to_pd_df(sim_results, N_SIM)

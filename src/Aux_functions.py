@@ -165,7 +165,7 @@ class DataGeneration:
         return jnp.array([Z_h1, Z_h2])
         # return jnp.where((self.X > threshold) | (self.X < -threshold), 1, 0)
 
-    def stochastic_intervention(self, n_approx=1000):
+    def stochastic_intervention(self, n_approx=100):
     # def stochastic_intervention(self, n_approx=2000):
         z_stoch1 = self.rng.binomial(n=1, p=self.alphas[0], size=(n_approx, self.n))
         # z_stoch1 = rng.binomial(n=1, p=self.alphas[0], size=(n_approx, self.n))
@@ -834,10 +834,10 @@ class Outcome_GP:
     def predict_one_df(self, df):
         with torch.no_grad():
             mean, cov = self.gpr(df, full_cov=True, noiseless=False)
-            print("GP mean is: ", mean.mean())
+            # print("GP mean is: ", mean.mean())
             # cov = cov + torch.eye(cov.shape[0]) * self.jitter
             # Add small jitter to ensure positive definiteness
-            jitter = torch.eye(cov.shape[0]) * 1e-6
+            jitter = torch.eye(cov.shape[0]) * 1e-4
             L = torch.linalg.cholesky(cov + jitter)
 
             # Generate samples from standard normal distribution
