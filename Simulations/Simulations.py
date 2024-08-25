@@ -38,7 +38,8 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # print("Running network module")
     # --- network module ---
     # network_mcmc = aux.Network_MCMC(data=df_obs, rng_key=rng_key)
-    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=2000, n_samples=1000)
+    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=15000, n_samples=10000)
+    # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=100, n_samples=30)
     network_svi.train_model()
     # get posterior samples and predictive distributions
     # network_post = network_mcmc.get_posterior_samples()
@@ -47,7 +48,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # network_pred_samples = network_mcmc.predictive_samples()
     network_pred_samples = network_svi.network_samples()
 
-    print("Running obs and oracle outcome modules")
+    # print("Running obs and oracle outcome modules")
     # --- Outcome module (linear & GP) ---
     # with true network
     oracle_outcome_mcmc = aux.Outcome_MCMC(data=df_oracle, type="oracle", rng_key=rng_key, iter=idx)
@@ -73,35 +74,63 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     #                                         stoch_estimand=df_obs["estimand_stoch"],
     #                                         key=rng_key_)
 
-    print("Running THREESTAGE")
+    # Get posterior network stats
+    post_zeig, post_zeig_h1, post_zeig_stoch1 = aux.get_post_net_stats(network_pred_samples,
+                                                                       df_obs["Z"],
+                                                                       df_obs["Z_h"],
+                                                                       df_obs["Z_stoch"])
+
+    print("Post abs zeigen estimator error:", np.mean(np.abs(np.mean(post_zeig,axis=0) - df_oracle["Zeigen"])))
+    print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])))
+    print("post_zeg shape: ", post_zeig.shape, post_zeig_h1.shape, post_zeig_stoch1.shape)
+
+    print("Running Multistage")
     # Three-Stage
     i_range = np.random.choice(a=range(network_pred_samples.shape[0]), size=n_rep, replace=False)
-    threestage_multi_nets = network_pred_samples[i_range,]
-    threestage_results = aux.multistage_run(multi_samp_nets=threestage_multi_nets,
-                                            Y=df_obs["Y"],
-                                            Z_obs=df_obs["Z"],
-                                            Z_h=df_obs["Z_h"],
-                                            Z_stoch=df_obs["Z_stoch"],
-                                            X=df_obs["X"],
-                                            X2=df_obs["X2"],
-                                            B=n_rep,
-                                            iter=idx,
+
+    print("multistage post zeig shape: ", post_zeig[i_range,].shape, post_zeig_h1[i_range,].shape, post_zeig_stoch1[i_range,].shape)
+
+    # threestage_multi_nets = network_pred_samples[i_range,]
+    threestage_results = aux.multistage_run(zeigen_post = post_zeig[i_range,],
+                                            zeigen_h1_post = post_zeig_h1[i_range,],
+                                            zeigen_stoch_post = post_zeig_stoch1[i_range,],
+                                            x=df_obs["X"],
+                                            y=df_obs["Y"],
+                                            z_obs=df_obs["Z"],
+                                            z_h=df_obs["Z_h"],
+                                            z_stoch=df_obs["Z_stoch"],
                                             h_estimand=df_obs["estimand_h"],
                                             stoch_estimand=df_obs["estimand_stoch"],
-                                            key=rng_key,
-                                            true_zeigen = df_oracle["Zeigen"])
+                                            iter=idx,
+                                            key=rng_key)
 
-    print("Mean MS zeigen error: ", threestage_results[1])
-    threestage_results = threestage_results[0]
+    # threestage_results = aux.multistage_run(multi_samp_nets=threestage_multi_nets,
+    #                                         Y=df_obs["Y"],
+    #                                         Z_obs=df_obs["Z"],
+    #                                         Z_h=df_obs["Z_h"],
+    #                                         Z_stoch=df_obs["Z_stoch"],
+    #                                         X=df_obs["X"],
+    #                                         X2=df_obs["X2"],
+    #                                         B=n_rep,
+    #                                         iter=idx,
+    #                                         h_estimand=df_obs["estimand_h"],
+    #                                         stoch_estimand=df_obs["estimand_stoch"],
+    #                                         key=rng_key,
+    #                                         true_zeigen = df_oracle["Zeigen"])
 
-    print("Running ONESTAGE")
-    # One-Stage
-    post_zeig, post_zeig_h1, post_zeig_h2, post_zeig_stoch1, post_zeig_stoch2 = aux.get_onestage_stats(network_pred_samples,
-                                                                                                       df_obs["Z"],
-                                                                                                       df_obs["Z_h"],
-                                                                                                       df_obs["Z_stoch"])
-
-    print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])/np.abs(df_oracle["Zeigen"])))
+    # print("Mean MS zeigen error: ", threestage_results[1])
+    # threestage_results = threestage_results[0]
+    #
+    # print("Running ONESTAGE")
+    # # One-Stage
+    # # post_zeig, post_zeig_h1, post_zeig_h2, post_zeig_stoch1, post_zeig_stoch2 = aux.get_onestage_stats(network_pred_samples,
+    # #                                                                                                    df_obs["Z"],
+    # #                                                                                                    df_obs["Z_h"],
+    # #                                                                                                    df_obs["Z_stoch"])
+    #
+    mean_post_zeig = post_zeig.mean(axis=0)
+    mean_post_zeigen_h1 = post_zeig_h1.mean(axis=0)
+    mean_post_zeigen_stoch1 = post_zeig_stoch1.mean(axis=0)
 
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
@@ -111,11 +140,11 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                               Z_stoch=df_obs["Z_stoch"],
                                               estimand_h=df_obs["estimand_h"],
                                               estimand_stoch=df_obs["estimand_stoch"],
-                                              zeigen=post_zeig,
-                                              h1_zeigen=post_zeig_h1,
-                                              h2_zeigen=post_zeig_h2,
-                                              stoch1_zeigen=post_zeig_stoch1,
-                                              stoch2_zeigen=post_zeig_stoch2,
+                                              zeigen=mean_post_zeig,
+                                              h1_zeigen=mean_post_zeigen_h1,
+                                              # h2_zeigen=post_zeig_h2,
+                                              stoch1_zeigen=mean_post_zeigen_stoch1,
+                                              # stoch2_zeigen=post_zeig_stoch2,
                                               rng_key=rng_key,
                                               iter=idx)
     onestage_results = onestage_outcome_mcmc.get_results()
@@ -141,7 +170,8 @@ vectorized_simulations = vmap(one_simuation_iter, in_axes = (0,) + (None,) * 8)
 # vectorized_simulations = vmap(run_one_iter, in_axes=(0,None,None,None,None,None,None,None,None,None,None))
 
 COLUMNS = ["idx", "mean", "median", "true", "bias",
-           "std", "RMSE", "MAE", "MAPE",
+           "std", "RMSE", "RMSE_all", "MAE", "MAE_all", "MAPE",
+           # "std", "RMSE", "MAE", "MAPE",
            "q025", "q975", "covering", "mean_ind_cover"]
            # "std", "RMSE", "MAE", "MAPE", "q025", "q975", "covering"]
            # , "hdi_lower", "hdi_upper"]
@@ -151,13 +181,15 @@ COLUMNS = ["idx", "mean", "median", "true", "bias",
 METHODS = ['Linear_oracle', 'GP_oracle', 'Linear_oracle', 'GP_oracle',
              'Linear_observed', 'GP_observed', 'Linear_observed', 'GP_observed',
              # 'Linear_2S', 'GP_2S', 'Linear_2S', 'GP_2S',
-             'Linear_3S', 'GP_3S', 'Linear_3S', 'GP_3S',
+             'Linear_3S','Linear_3S', 'GP_3S', 'GP_3S',
+             # 'Linear_3S', 'GP_3S', 'Linear_3S', 'GP_3S',
              'Linear_1S', 'GP_1S', 'Linear_1S', 'GP_1S']
 
 ESTIMANDS = ['dynamic', 'dynamic', 'stoch', 'stoch',
             'dynamic', 'dynamic', 'stoch', 'stoch',
             # 'dynamic', 'dynamic', 'stoch', 'stoch',
-            'dynamic', 'dynamic', 'stoch', 'stoch',
+            'dynamic', 'stoch', 'dynamic', 'stoch',
+            # 'dynamic', 'dynamic', 'stoch', 'stoch',
             'dynamic', 'dynamic', 'stoch', 'stoch']
 
 def results_to_pd_df(results, n_iter):

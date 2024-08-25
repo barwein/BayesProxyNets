@@ -22,7 +22,7 @@ rng = np.random.default_rng(RANDOM_SEED)
 # THETA = [-2, -0.5]
 # THETA = jnp.array([-2, -0.5, 2])
 # THETA = jnp.array([-2, -.5, 2])
-THETA = [-2.5, 1.5]
+THETA = [-2, 1.5]
 # GAMMA = jnp.array([0.05, 0.3])
 # GAMMA = jnp.array([0.75, -2.5, -1])
 # GAMMA = jnp.array([0.75, -1])
@@ -42,7 +42,7 @@ N = 300
 # N_SIM = 500
 N_SIM = 1
 # N_REP = 1000
-N_REP = 20
+N_REP = 1000
 
 if __name__ == "__main__":
     print("### Starting simulation ###")
