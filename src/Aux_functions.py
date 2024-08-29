@@ -32,7 +32,7 @@ os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 # rng = np.random.default_rng(RANDOM_SEED)
 
 # --- Set global variables and values ---
-N = 300
+N = 500
 TRIL_DIM = int(N*(N-1)/2)
 M = 20
 C = 3
@@ -522,10 +522,10 @@ def linear_model_outcome_pred(z, zeigen, post_samples, x, x2, key):
     df = jnp.transpose(jnp.array([[1] * N, z, x, z*x, zeigen]))
     # df = jnp.transpose(jnp.array([[1] * N, z, zeigen]))
     # pred = outcome_jit_pred(post_samples, df, key)
-    return outcome_jit_pred(post_samples, df, key)["Y"]
+    # return outcome_jit_pred(post_samples, df, key)["Y"]
     # pred = manual_linear_pred(post_samples, df)
     # return jnp.mean(pred["Y"], axis=1)
-    # return manual_linear_pred(post_samples, df)
+    return manual_linear_pred(post_samples, df)
 
 linear_model_pred = vmap(linear_model_outcome_pred, in_axes=(0, 0, None, None, None, None))
 
@@ -773,6 +773,18 @@ class Outcome_MCMC:
         # return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
         # return pd.concat([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
 
+def robust_cholesky(matrix, max_tries=5, initial_jitter=1e-6):
+    jitter = initial_jitter
+    num_tries = 0
+    while num_tries < max_tries:
+        try:
+            L = torch.linalg.cholesky(matrix + torch.eye(matrix.shape[0]) * jitter)
+            return L
+        except RuntimeError:
+            jitter *= 10
+            num_tries += 1
+    raise ValueError(f"Matrix is not positive definite, even with jitter of {jitter}")
+
 class Outcome_GP:
     def __init__(self, X, Y, Z, Zeigen, n_iter = 5000, n_samples = 10000):
         self.X = torch.from_numpy(np.array(X))
@@ -833,12 +845,17 @@ class Outcome_GP:
 
     def predict_one_df(self, df):
         with torch.no_grad():
-            mean, cov = self.gpr(df, full_cov=True, noiseless=False)
+            # mean, cov = self.gpr(df, full_cov=True, noiseless=False)
+            mean, cov = self.gpr(df, full_cov=True, noiseless=True)
             # print("GP mean is: ", mean.mean())
             # cov = cov + torch.eye(cov.shape[0]) * self.jitter
             # Add small jitter to ensure positive definiteness
-            jitter = torch.eye(cov.shape[0]) * 1e-4
-            L = torch.linalg.cholesky(cov + jitter)
+            # jitter = torch.eye(cov.shape[0]) * 1e-3
+            # print("any negative cov values: ", torch.any(cov + jitter < 0))
+            # print("minimal cov + jitter value: ", torch.min(cov + jitter))
+            # print("minimal cov value: ", torch.min(cov))
+            # L = torch.linalg.cholesky(cov + jitter)
+            L = robust_cholesky(cov)
 
             # Generate samples from standard normal distribution
             eps = torch.randn(cov.shape[0], self.n_samples)

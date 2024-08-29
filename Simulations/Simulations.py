@@ -51,9 +51,11 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # print("Running obs and oracle outcome modules")
     # --- Outcome module (linear & GP) ---
     # with true network
+    print("Running Oracle")
     oracle_outcome_mcmc = aux.Outcome_MCMC(data=df_oracle, type="oracle", rng_key=rng_key, iter=idx)
     oracle_results = oracle_outcome_mcmc.get_results()
     # with observed network
+    print("Running Observed")
     obs_outcome_mcmc = aux.Outcome_MCMC(data=df_obs, type="observed", rng_key=rng_key, iter=idx)
     obs_results = obs_outcome_mcmc.get_results()
 
