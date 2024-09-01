@@ -42,7 +42,7 @@ N = 500
 # N_SIM = 500
 N_SIM = 1
 # N_REP = 1000
-N_REP = 100
+N_REP = 12
 
 if __name__ == "__main__":
     print("### Starting simulation ###")

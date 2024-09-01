@@ -84,13 +84,10 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
 
     print("Post abs zeigen estimator error:", np.mean(np.abs(np.mean(post_zeig,axis=0) - df_oracle["Zeigen"])))
     print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])))
-    print("post_zeg shape: ", post_zeig.shape, post_zeig_h1.shape, post_zeig_stoch1.shape)
 
     print("Running Multistage")
     # Three-Stage
     i_range = np.random.choice(a=range(network_pred_samples.shape[0]), size=n_rep, replace=False)
-
-    print("multistage post zeig shape: ", post_zeig[i_range,].shape, post_zeig_h1[i_range,].shape, post_zeig_stoch1[i_range,].shape)
 
     # threestage_multi_nets = network_pred_samples[i_range,]
     threestage_results = aux.multistage_run(zeigen_post = post_zeig[i_range,],
@@ -180,19 +177,33 @@ COLUMNS = ["idx", "mean", "median", "true", "bias",
 # COLUMNS = ["idx", "method", "estimand", "mean", "median",
 #                     "true", "bias", "std", "RMSE", "q025", "q975", "covering"]
 
-METHODS = ['Linear_oracle', 'GP_oracle', 'Linear_oracle', 'GP_oracle',
-             'Linear_observed', 'GP_observed', 'Linear_observed', 'GP_observed',
+METHODS = ['Linear_oracle', 'GP_oracle',
+             'Linear_observed', 'GP_observed',
              # 'Linear_2S', 'GP_2S', 'Linear_2S', 'GP_2S',
-             'Linear_3S','Linear_3S', 'GP_3S', 'GP_3S',
+             'Linear_3S', 'GP_3S',
              # 'Linear_3S', 'GP_3S', 'Linear_3S', 'GP_3S',
-             'Linear_1S', 'GP_1S', 'Linear_1S', 'GP_1S']
+             'Linear_1S', 'GP_1S']
 
-ESTIMANDS = ['dynamic', 'dynamic', 'stoch', 'stoch',
-            'dynamic', 'dynamic', 'stoch', 'stoch',
+ESTIMANDS = ['dynamic', 'dynamic',
+            'dynamic', 'dynamic',
             # 'dynamic', 'dynamic', 'stoch', 'stoch',
-            'dynamic', 'stoch', 'dynamic', 'stoch',
+            'dynamic', 'dynamic',
             # 'dynamic', 'dynamic', 'stoch', 'stoch',
-            'dynamic', 'dynamic', 'stoch', 'stoch']
+            'dynamic', 'dynamic']
+
+# METHODS = ['Linear_oracle', 'GP_oracle', 'Linear_oracle', 'GP_oracle',
+#              'Linear_observed', 'GP_observed', 'Linear_observed', 'GP_observed',
+#              # 'Linear_2S', 'GP_2S', 'Linear_2S', 'GP_2S',
+#              'Linear_3S','Linear_3S', 'GP_3S', 'GP_3S',
+#              # 'Linear_3S', 'GP_3S', 'Linear_3S', 'GP_3S',
+#              'Linear_1S', 'GP_1S', 'Linear_1S', 'GP_1S']
+#
+# ESTIMANDS = ['dynamic', 'dynamic', 'stoch', 'stoch',
+#             'dynamic', 'dynamic', 'stoch', 'stoch',
+#             # 'dynamic', 'dynamic', 'stoch', 'stoch',
+#             'dynamic', 'stoch', 'dynamic', 'stoch',
+#             # 'dynamic', 'dynamic', 'stoch', 'stoch',
+#             'dynamic', 'dynamic', 'stoch', 'stoch']
 
 def results_to_pd_df(results, n_iter):
     res_df = jnp.vstack(results)

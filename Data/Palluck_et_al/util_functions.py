@@ -10,14 +10,82 @@ from numpyro.contrib.funsor import config_enumerate
 # import
 from numpyro.infer import MCMC, NUTS, Predictive, SVI, TraceEnum_ELBO, TraceGraph_ELBO
 from numpyro.infer.autoguide import AutoNormal
+import pyro
+import torch
 from hsgp.approximation import hsgp_squared_exponential, eigenfunctions
 from hsgp.spectral_densities import diag_spectral_density_squared_exponential
-from numpyro_models import noisy_networks_model
+import models_for_data_analysis as models
+from tqdm import tqdm
 
 # --- Utility functions ---
 
 def n_edges_to_n_nodes(n_edges):
     return int((1 + jnp.sqrt(1 + 8*n_edges))/2)
+
+class Network_SVI:
+    def __init__(self, x_df, triu_obs, n_iter=15000, n_samples=10000, network_model=models.one_noisy_networks_model):
+        self.x_df = x_df
+        self.triu_obs = triu_obs
+        self.N_edges = self.x_df.shape[0]
+        self.N = n_edges_to_n_nodes(self.N_edges)
+        # self.adj_mat = data["adj_mat"]
+        self.n_iter = n_iter
+        self.n_samples = n_samples
+        self.network_model = network_model
+        self.guide = self.get_guide()
+
+    def get_guide(self):
+        return pyro.infer.autoguide.AutoLowRankMultivariateNormal(pyro.poutine.block(self.network_model,
+                                                              hide=["triu_star"]),
+                                      init_loc_fn = pyro.infer.autoguide.init_to_median())
+
+    def train_model(self):
+        pyro.clear_param_store()
+        loss_func = pyro.infer.TraceEnum_ELBO(max_plate_nesting=1)
+        optimzer = pyro.optim.ClippedAdam({"lr": 0.001})
+        svi = pyro.infer.SVI(self.network_model, self.guide, optimzer, loss=loss_func)
+        # losses_full = []
+        for _ in tqdm(range(self.n_iter), desc="Training network model"):
+            svi.step(self.x_df, self.triu_obs, self.N)
+            # loss = svi.step(self.X_diff, self.X2_eq, self.triu, self.n)
+            # losses_full.append(loss)
+
+    def network_samples(self):
+        triu_star_samples = []
+        for _ in tqdm(range(self.n_samples), desc="Sampling A*"):
+            # Get a trace from the guide
+            guide_trace = pyro.poutine.trace(self.guide).get_trace(self.x_df, self.triu_obs, self.N)
+            # Run infer_discrete
+            inferred_model = pyro.infer.infer_discrete(pyro.poutine.replay(self.network_model, guide_trace),
+                                            first_available_dim=-2)
+            # Get a trace from the inferred model
+            model_trace = pyro.poutine.trace(inferred_model).get_trace(self.x_df, self.triu_obs, self.N)
+            # Extract triu_star from the trace
+            triu_star_samples.append(model_trace.nodes['triu_star']['value'])
+        # Convert to jnp array
+        return jnp.stack(jnp.array(triu_star_samples))
+        # triu_star_samples = torch.stack(triu_star_samples)
+        # return jnp.array(triu_star_samples)
+
+    def sample_triu_obs_predictive(self, num_samples=1000):
+        """Sample triu_obs for posterior predictive checks"""
+        predictive = pyro.infer.Predictive(self.network_model, guide=self.guide, num_samples=num_samples)
+
+        # Generate samples
+        with torch.no_grad():
+            posterior_samples = predictive(self.x_df, None, self.N)
+
+        print(posterior_samples.keys())
+
+        # Extract triu_obs samples
+        if self.triu_obs.ndim == 1:
+            triu_obs_samples = posterior_samples['obs_triu']
+        else:
+            triu_obs_A1 = posterior_samples['obs_triu_A1']
+            triu_obs_A2 = posterior_samples['obs_triu_A2']
+            triu_obs_samples = torch.stack([triu_obs_A1, triu_obs_A2])
+        return triu_obs_samples
+
 
 class Network_MCMC:
     # def __init__(self, data, rng_key, n_warmup=1000, n_samples=1500, n_chains=4):

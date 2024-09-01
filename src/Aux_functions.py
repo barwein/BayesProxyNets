@@ -737,19 +737,19 @@ class Outcome_MCMC:
         gp_h_stats = compute_error_stats(gp_h_pred, self.estimand_h, idx=self.iter)
 
         # stochastic intervention
-        stoch_zeigen1 = zeigen_value(self.Z_stoch[0,:,:], self.eig_cen, self.adj_mat)
+        # stoch_zeigen1 = zeigen_value(self.Z_stoch[0,:,:], self.eig_cen, self.adj_mat)
         # stoch_zeigen2 = zeigen_value(self.Z_stoch[1,:,:], self.eig_cen, self.adj_mat)
 
-        linear_stoch_pred1 = linear_pred(self.Z_stoch[0,:,:], stoch_zeigen1,
-                                        self.linear_post_samples, self.X, self.X2, self.rng_key)
+        # linear_stoch_pred1 = linear_pred(self.Z_stoch[0,:,:], stoch_zeigen1,
+        #                                 self.linear_post_samples, self.X, self.X2, self.rng_key)
         # linear_stoch_pred2 = linear_pred(self.Z_stoch[1,:,:], stoch_zeigen2,
         #                                  self.linear_post_samples, self.X, self.X2, self.rng_key)
         # linear_stoch_pred = jnp.mean(linear_stoch_pred1, axis=0) - jnp.mean(linear_stoch_pred2, axis=0)
         # linear_stoch_pred = linear_stoch_pred1 - linear_stoch_pred2
-        linear_stoch_pred = linear_stoch_pred1
+        # linear_stoch_pred = linear_stoch_pred1
         # linear_stoch_pred = jnp.mean(linear_stoch_pred1 - linear_stoch_pred2, axis=0)
         # linear_stoch_pred = jnp.mean(linear_stoch_pred1, axis=0)
-        linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
+        # linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
 
         # hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], stoch_zeigen1, self.hsgp_post_samples,
         #                             self.X, self.X2, self.ell1, self.ell2)
@@ -764,12 +764,13 @@ class Outcome_MCMC:
         # hsgp_stoch_pred = jnp.mean(hsgp_stoch_pred1, axis=0)
         # hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
         #                                    self.estimand_stoch, idx=self.iter)
-        gp_stoch_pred = self.gp_reg.predict(self.Z_stoch[0,:,:], stoch_zeigen1)
-        gp_stoch_stats = compute_error_stats(gp_stoch_pred,
-                                           self.estimand_stoch, idx=self.iter)
+        # gp_stoch_pred = self.gp_reg.predict(self.Z_stoch[0,:,:], stoch_zeigen1)
+        # gp_stoch_stats = compute_error_stats(gp_stoch_pred,
+        #                                    self.estimand_stoch, idx=self.iter)
 
 
-        return jnp.vstack([linear_h_stats, gp_h_stats, linear_stoch_stats, gp_stoch_stats])
+        return jnp.vstack([linear_h_stats, gp_h_stats])
+        # return jnp.vstack([linear_h_stats, gp_h_stats, linear_stoch_stats, gp_stoch_stats])
         # return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
         # return pd.concat([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
 
@@ -890,8 +891,9 @@ def train_and_predict_single_gpr(args):
     gpr.train_model()
     # Make prediction
     gp_h_pred = gpr.predict(z_h, zeigen_h)
-    gp_stoch_pred = gpr.predict(z_stoch, zeigen_stoch)
-    return jnp.array([gp_h_pred, gp_stoch_pred])
+    # gp_stoch_pred = gpr.predict(z_stoch, zeigen_stoch)
+    return jnp.array([gp_h_pred])
+    # return jnp.array([gp_h_pred, gp_stoch_pred])
 
 
 def run_parallel_gpr(args_list, num_processes=N_CORES):
@@ -915,12 +917,14 @@ def get_args_list(x, y, z_obs, zeigen_df, z_h, z_stoch, zeigen_h, zeigen_stoch, 
 def GP_multistage(x, y, z_obs, zeigen_df, z_h, z_stoch, zeigen_h, zeigen_stoch, h_estimand, stoch_estimand, iter, n_iter=1500, n_samples=250):
     args_list = get_args_list(x, y, z_obs, zeigen_df, z_h[0,:], z_stoch[0,:,:], zeigen_h, zeigen_stoch, n_iter, n_samples)
     gp_run = run_parallel_gpr(args_list)
-    gp_h_pred, gp_stoch_pred = gp_run[:,0,:,:], gp_run[:,1,:,:]
+    # gp_h_pred, gp_stoch_pred = gp_run[:,0,:,:], gp_run[:,1,:,:]
+    gp_h_pred = gp_run
     gp_h_pred_long = gp_h_pred.reshape(-1, gp_h_pred.shape[-1])
     gp_h_error_stats = compute_error_stats(gp_h_pred_long, h_estimand, idx=iter)
-    gp_stoch_pred_long = gp_stoch_pred.reshape(-1, gp_stoch_pred.shape[-1])
-    gp_stoch_error_stats = compute_error_stats(gp_stoch_pred_long, stoch_estimand, idx=iter)
-    return jnp.vstack([gp_h_error_stats, gp_stoch_error_stats])
+    # gp_stoch_pred_long = gp_stoch_pred.reshape(-1, gp_stoch_pred.shape[-1])
+    # gp_stoch_error_stats = compute_error_stats(gp_stoch_pred_long, stoch_estimand, idx=iter)
+    return jnp.vstack([gp_h_error_stats])
+    # return jnp.vstack([gp_h_error_stats, gp_stoch_error_stats])
 
 @jit
 def compute_net_stats(Astar, Z):
@@ -984,8 +988,9 @@ def one_linear_run(zeigen, zeigen_h1, zeigen_stoch, x, y, z_obs, z_h, z_stoch, k
     lin_samples = linear_model_samples_vectorized(key, y, df)
     # get prediction for z_h1 and z_stoch
     lin_h1_pred = linear_pred(z_h[0,:], zeigen_h1, lin_samples, x, x, key)
-    lin_stoch1_pred = linear_pred(z_stoch[0,:,:], zeigen_stoch, lin_samples, x, x, key)
-    return jnp.array([lin_h1_pred, lin_stoch1_pred])
+    # lin_stoch1_pred = linear_pred(z_stoch[0,:,:], zeigen_stoch, lin_samples, x, x, key)
+    # return jnp.array([lin_h1_pred, lin_stoch1_pred])
+    return jnp.array([lin_h1_pred])
 
 parallel_linear_run = pmap(one_linear_run, in_axes=(0,0,0, None, None, None, None, None, None))
 
@@ -1003,17 +1008,19 @@ def linear_multistage(zeigen_post, zeigen_h1_post, zeigen_stoch_post, x, y, z_ob
     # results_c = vectorized_multistage(multi_samp_nets, Y, Z_obs, Z_new, X, key)
     n_samples = results_c.shape[2]
     # save error stats
-    results_lin_h = results_c[:, 0, :, :]
+    # results_lin_h = results_c[:, 0, :, :]
+    results_lin_h = results_c
     results_lin_h_long = results_lin_h.reshape((B * n_samples, N))
     error_stats_lin_h = compute_error_stats(esti_post_draws=results_lin_h_long,
                                             true_estimand=h_estimand,
                                             idx=iter)
-    results_lin_stoch = results_c[:, 1, :, :]
-    results_lin_stoch_long = results_lin_stoch.reshape((B * n_samples, N))
-    error_stats_lin_stoch = compute_error_stats(esti_post_draws=results_lin_stoch_long,
-                                               true_estimand=stoch_estimand,
-                                               idx=iter)
-    return jnp.vstack([error_stats_lin_h, error_stats_lin_stoch])
+    # results_lin_stoch = results_c[:, 1, :, :]
+    # results_lin_stoch_long = results_lin_stoch.reshape((B * n_samples, N))
+    # error_stats_lin_stoch = compute_error_stats(esti_post_draws=results_lin_stoch_long,
+    #                                            true_estimand=stoch_estimand,
+    #                                            idx=iter)
+    # return jnp.vstack([error_stats_lin_h, error_stats_lin_stoch])
+    return jnp.vstack([error_stats_lin_h])
 
 def multistage_run(zeigen_post, zeigen_h1_post, zeigen_stoch_post, x, y, z_obs, z_h, z_stoch, h_estimand, stoch_estimand, iter, key):
     # Run linear model and get error stats from predictions
@@ -1230,16 +1237,16 @@ class Onestage_MCMC:
 
 
         # stochastic intervention
-        linear_stoch_pred1 = linear_pred(self.Z_stoch[0,:,:], self.stoch1_zeigen,
-                                        self.linear_post_samples, self.X, self.X2, self.rng_key)
+        # linear_stoch_pred1 = linear_pred(self.Z_stoch[0,:,:], self.stoch1_zeigen,
+        #                                 self.linear_post_samples, self.X, self.X2, self.rng_key)
         # linear_stoch_pred2 = linear_pred(self.Z_stoch[1,:,:], self.stoch2_zeigen,
         #                                  self.linear_post_samples, self.X, self.X2, self.rng_key)
         # linear_stoch_pred = jnp.mean(linear_stoch_pred1, axis=0) - jnp.mean(linear_stoch_pred2, axis=0)
         # linear_stoch_pred = linear_stoch_pred1 - linear_stoch_pred2
-        linear_stoch_pred = linear_stoch_pred1
+        # linear_stoch_pred = linear_stoch_pred1
         # linear_stoch_pred = jnp.mean(linear_stoch_pred1 - linear_stoch_pred2, axis=0)
         # linear_stoch_pred = jnp.mean(linear_stoch_pred1, axis=0)
-        linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
+        # linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
 
         # hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], self.stoch1_zeigen, self.hsgp_post_samples,
         #                             self.X, self.X2, self.ell1, self.ell2)
@@ -1252,10 +1259,11 @@ class Onestage_MCMC:
         # # hsgp_stoch_pred = jnp.mean(hsgp_stoch_pred1, axis=0)
         # hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
         #                                    self.estimand_stoch, idx=self.iter)
-        gp_stoch_pred = self.gp_reg.predict(self.Z_stoch[0, :, :], self.stoch1_zeigen)
-        gp_stoch_stats = compute_error_stats(gp_stoch_pred,
-                                             self.estimand_stoch, idx=self.iter)
+        # gp_stoch_pred = self.gp_reg.predict(self.Z_stoch[0, :, :], self.stoch1_zeigen)
+        # gp_stoch_stats = compute_error_stats(gp_stoch_pred,
+        #                                      self.estimand_stoch, idx=self.iter)
 
-        return jnp.vstack([linear_h_stats, gp_h_stats, linear_stoch_stats, gp_stoch_stats])
+        return jnp.vstack([linear_h_stats, gp_h_stats])
+        # return jnp.vstack([linear_h_stats, gp_h_stats, linear_stoch_stats, gp_stoch_stats])
         # return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
         # return pd.concat([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
