@@ -248,31 +248,42 @@ def one_linear_run(post_exposures, post_new_exposures, obs_trts, new_trts, sch_t
                                grade, school,
                                lin_samples, key)
         preds.append(lin_pred)
-    return jnp.array(preds)
 
-parallel_linear_run = pmap(one_linear_run, in_axes=(0, 0, None, None, None, None, None, None))
+    res = jnp.array(preds)
+    print(res.shape)
+    return res
+    # return jnp.array(preds)
+
+parallel_linear_run = pmap(one_linear_run, in_axes=(0, 0, None, None, None, None, None, None, None, None))
 
 
 def linear_multistage(post_exposures, post_new_expsoures, obs_trts, new_trts, sch_trts, fixed_df,
                       grade, school, Y, key):
-    B = post_exposures.shape[0]
+    num_net_samples = post_exposures.shape[0]
     n = obs_trts.shape[0]
     results = []
-    for i in range(0, B, N_CORES):
-        i_results = parallel_linear_run(post_exposures[i:(i + N_CORES), ],
-                                        post_new_expsoures[i:(i + N_CORES), ],
+    for i in tqdm(range(0, num_net_samples, N_CORES),desc="Multistage run"):
+        i_results = parallel_linear_run(post_exposures[i:(i + N_CORES)],
+                                        post_new_expsoures[i:(i + N_CORES)],
                                         obs_trts, new_trts, sch_trts,
                                         fixed_df, grade, school,
                                         Y, key)
         results.append(i_results)
-    results_c = jnp.concatenate(results, axis=0)
+    results_arr = jnp.concatenate(results, axis=0)
+    print("result_c shape: ", results_arr.shape)
+    result_arr = jnp.transpose(results_arr, axes=(1, 0, 2, 3))
+    print("result transposed shape: ", result_arr.shape)
+    num_new_trts = new_trts.shape[0]
+    num_post_samples = result_arr.shape[-2]
+    result_arr = result_arr.reshape((num_new_trts, num_net_samples*num_post_samples , n))
+    return result_arr
     # results_c = vectorized_multistage(multi_samp_nets, Y, Z_obs, Z_new, X, key)
-    n_samples = results_c.shape[2]
+    # n_samples = results_c.shape[2]
     # save error stats
     # results_lin_h = results_c[:, 0, :, :]
-    results_lin_h = results_c
-    results_lin_h_long = results_lin_h.reshape((B * n_samples, n))
-    return results_lin_h_long
+    # results_lin_h = results_c
+    # results_lin_h_long = results_lin_h.reshape((B * n_samples, n))
+    # return results_lin_h_long
 
 
 class Onestage_MCMC:
