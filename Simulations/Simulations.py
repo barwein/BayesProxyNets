@@ -38,7 +38,8 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # print("Running network module")
     # --- network module ---
     # network_mcmc = aux.Network_MCMC(data=df_obs, rng_key=rng_key)
-    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=15000, n_samples=10000)
+    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=1000, n_samples=300)
+    # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=15000, n_samples=10000)
     # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=100, n_samples=30)
     network_svi.train_model()
     # get posterior samples and predictive distributions
@@ -177,33 +178,33 @@ COLUMNS = ["idx", "mean", "median", "true", "bias",
 # COLUMNS = ["idx", "method", "estimand", "mean", "median",
 #                     "true", "bias", "std", "RMSE", "q025", "q975", "covering"]
 
-METHODS = ['Linear_oracle', 'GP_oracle',
-             'Linear_observed', 'GP_observed',
-             # 'Linear_2S', 'GP_2S', 'Linear_2S', 'GP_2S',
-             'Linear_3S', 'GP_3S',
-             # 'Linear_3S', 'GP_3S', 'Linear_3S', 'GP_3S',
-             'Linear_1S', 'GP_1S']
-
-ESTIMANDS = ['dynamic', 'dynamic',
-            'dynamic', 'dynamic',
-            # 'dynamic', 'dynamic', 'stoch', 'stoch',
-            'dynamic', 'dynamic',
-            # 'dynamic', 'dynamic', 'stoch', 'stoch',
-            'dynamic', 'dynamic']
-
-# METHODS = ['Linear_oracle', 'GP_oracle', 'Linear_oracle', 'GP_oracle',
-#              'Linear_observed', 'GP_observed', 'Linear_observed', 'GP_observed',
+# METHODS = ['Linear_oracle', 'GP_oracle',
+#              'Linear_observed', 'GP_observed',
 #              # 'Linear_2S', 'GP_2S', 'Linear_2S', 'GP_2S',
-#              'Linear_3S','Linear_3S', 'GP_3S', 'GP_3S',
+#              'Linear_3S', 'GP_3S',
 #              # 'Linear_3S', 'GP_3S', 'Linear_3S', 'GP_3S',
-#              'Linear_1S', 'GP_1S', 'Linear_1S', 'GP_1S']
+#              'Linear_1S', 'GP_1S']
 #
-# ESTIMANDS = ['dynamic', 'dynamic', 'stoch', 'stoch',
-#             'dynamic', 'dynamic', 'stoch', 'stoch',
+# ESTIMANDS = ['dynamic', 'dynamic',
+#             'dynamic', 'dynamic',
 #             # 'dynamic', 'dynamic', 'stoch', 'stoch',
-#             'dynamic', 'stoch', 'dynamic', 'stoch',
+#             'dynamic', 'dynamic',
 #             # 'dynamic', 'dynamic', 'stoch', 'stoch',
-#             'dynamic', 'dynamic', 'stoch', 'stoch']
+#             'dynamic', 'dynamic']
+
+METHODS = ['Linear_oracle', 'GP_oracle', 'Linear_oracle', 'GP_oracle',
+             'Linear_observed', 'GP_observed', 'Linear_observed', 'GP_observed',
+             # 'Linear_2S', 'GP_2S', 'Linear_2S', 'GP_2S',
+             'Linear_3S','Linear_3S', 'GP_3S', 'GP_3S',
+             # 'Linear_3S', 'GP_3S', 'Linear_3S', 'GP_3S',
+             'Linear_1S', 'GP_1S', 'Linear_1S', 'GP_1S']
+
+ESTIMANDS = ['dynamic', 'dynamic', 'stoch', 'stoch',
+            'dynamic', 'dynamic', 'stoch', 'stoch',
+            # 'dynamic', 'dynamic', 'stoch', 'stoch',
+            'dynamic', 'stoch', 'dynamic', 'stoch',
+            # 'dynamic', 'dynamic', 'stoch', 'stoch',
+            'dynamic', 'dynamic', 'stoch', 'stoch']
 
 def results_to_pd_df(results, n_iter):
     res_df = jnp.vstack(results)
