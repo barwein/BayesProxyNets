@@ -6,6 +6,7 @@ import jax.numpy as jnp
 from itertools import combinations
 import torch
 import networkx as nx
+import utils_for_inference as util
 
 
 ### Global variables ###
@@ -74,7 +75,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     return data_subset
 
 
-def network_by_school(df: pd.DataFrame, school_id: float | int, cols: list[str], plot_network = False) -> np.ndarray:
+def network_by_school(df: pd.DataFrame, cols: list[str], plot_network = False) -> np.ndarray:
     """
     Create network adjacency matrix for a given school.
     :param df: data frame
@@ -82,24 +83,19 @@ def network_by_school(df: pd.DataFrame, school_id: float | int, cols: list[str],
     :param cols: list of columns that defines the network
     :return: adj matrix
     """
-    # Save subset of df
-    school_mask = df['SCHID'] == school_id
-    school_df = df[school_mask].copy()  # Create a copy to avoid warnings
-    # school_df['unique_id'] = (school_df['SCHID'] * 1000 + school_df['ID']).astype(int)
-    # school_df['unique_id'] = school_df['unique_id'].astype(int)
     # Replace 999 with NaN as 999 is the code for missing values
     for col in cols:
-        row_mask = school_df[col] == 999
-        school_df.loc[row_mask, col] = np.nan
+        row_mask = df[col] == 999
+        df.loc[row_mask, col] = np.nan
     # Add SCHID * 1000 to survey data (to obtain edge list with `unique_id` values)
     for col in cols:
-        school_df[col] += school_df['SCHID'] * 1000
+        df[col] += df['SCHID'] * 1000
     # Save edgelists
     school_edgelist = []
     for col in cols:
-        school_edgelist.extend(zip(school_df['unique_id'], school_df[col]))
+        school_edgelist.extend(zip(df['unique_id'], df[col]))
 
-    valid_ids = set(school_df['unique_id'])
+    valid_ids = set(df['unique_id'])
     school_edgelist = [
         (int(a), int(b))
         for a, b in school_edgelist
@@ -117,7 +113,7 @@ def network_by_school(df: pd.DataFrame, school_id: float | int, cols: list[str],
 
     if plot_network:
         nx.draw_circular(school_network,
-                         node_color=school_df['TREAT_NUMERIC'],
+                         node_color=df['TREAT_NUMERIC'],
                          node_size=[school_network.degree(node) + 1 for node in school_network.nodes()],
                          width=0.15)
     # return adj. matrix
@@ -134,21 +130,18 @@ def cov_equal(X: pd.DataFrame, idx_pairs: list) -> list[int]:
     return [int(np.all(X.iloc[i] == X.iloc[j])) for i, j in idx_pairs]
 
 
-def create_net_covar_df(df: pd.DataFrame, schid: float) -> torch.tensor:
+def create_net_covar_df(df: pd.DataFrame) -> torch.tensor:
     """
     Create a data frame with covariates for network analysis.
     :param df: data frame
-    :param cov_groups: which covariates to include
     :return: data frame of covariates ready for network analysis
     """
     # Save subset of df
-    school_mask = df['SCHID'] == schid
-    school_df = df[school_mask].copy()  # Create a copy to avoid warnings
-    idx_pairs = list(combinations(range(school_df.shape[0]), 2))
-    cov_eq = [cov_equal(school_df[cov], idx_pairs) for cov in COV_FOR_NETWORK]
+    idx_pairs = list(combinations(range(df.shape[0]), 2))
+    cov_eq = [cov_equal(df[cov], idx_pairs) for cov in COV_FOR_NETWORK]
     df_network = pd.DataFrame(dict(zip(['+'.join(cov) for cov in COV_FOR_NETWORK], cov_eq)))
 
-    expected_rows = school_df.shape[0] * (school_df.shape[0] - 1) // 2
+    expected_rows = df.shape[0] * (df.shape[0] - 1) // 2
     assert df_network.shape[0] == expected_rows, f"Expected {expected_rows} rows, got {df_network.shape[0]}"
 
     return torch.tensor(np.array(df_network), dtype=torch.float32)
@@ -161,3 +154,36 @@ def adj_to_triu(mat: np.ndarray) -> torch.tensor:
     """
     return torch.tensor(mat[np.triu_indices(mat.shape[0], k=1)], dtype=torch.float32)
 
+
+def group_indicators_to_indices(df):
+    """
+    Convert a DataFrame of binary group indicators to a vector of indices.
+    Parameters:
+    df (pandas.DataFrame): N x K DataFrame of binary indicators.
+                           Each row should sum to 1.
+    Returns:
+    jax.numpy.ndarray: N x 1 array of indices.
+    """
+    # Check if each row sums to 1
+    if not (df.sum(axis=1) == 1).all():
+        raise ValueError("Each row in the DataFrame must sum to 1")
+    indices = jnp.argmax(df.values, axis=1)
+    return indices
+
+def data_for_outcome_regression(df, adj_mat):
+    """Get the school data for the outcome regression"""
+    school_df_elig = df[df['ELIGIBLE'] == 1]
+    fixed_df = jnp.array(school_df_elig[["GENC", "ETHW", "ETHH", "GAME"]].values)
+    all_trts = jnp.array(df['TREAT_NUMERIC'].values == 2, dtype=int)
+    elig_trts = jnp.array(school_df_elig['TREAT_NUMERIC'].values == 2, dtype=int)
+    Y = jnp.array(school_df_elig['WRISTOW2_NUMERIC'].values)
+    sch_trt = jnp.array(school_df_elig['SCHTREAT_NUMERIC'].values)
+    exposures_all = util.zeigen_value(all_trts, adj_mat)
+    exposures_elig = exposures_all[(df['ELIGIBLE'] == 1).values]
+    grades = group_indicators_to_indices(school_df_elig[['GRC_6', 'GRC_7', 'GRC_8']])
+    school = jnp.array(school_df_elig['SCHID'].values - 1, dtype = int)
+    # school = jnp.array(school_df_elig['SCHID'].values)
+
+    return {'X' : fixed_df, 'school' : school,  'grade' : grades,
+            'trts' : elig_trts, 'sch_trts' : sch_trt ,
+             'exposures' : exposures_elig, 'Y' : Y}

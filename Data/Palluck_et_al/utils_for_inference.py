@@ -72,9 +72,17 @@ def zeigen_value(Z, adj_mat):
     # else:
     #     return zeigen
 
+
 def stochastic_intervention(alpha, n, n_approx=100):
     z_stoch = rng.binomial(n=1, p=alpha, size=(n_approx, n))
     return z_stoch
+
+def trt_and_exposures_of_elig(new_trts_arr, new_exposures_arr, df):
+    """Get the treatments and exposures of the eligible students"""
+    elig_mask = df['ELIGIBLE'].values == 1
+    elig_trts = new_trts_arr[:,:,elig_mask]
+    elig_exposures = new_exposures_arr[:,:,elig_mask]
+    return elig_trts, elig_exposures
 
 # --- MCMC aux functions ---
 def linear_model_samples_parallel(key, trts, exposures, sch_treat, fixed_df, grade, school, Y):
