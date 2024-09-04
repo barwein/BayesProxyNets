@@ -89,7 +89,8 @@ def network_by_school(df: pd.DataFrame, cols: list[str], plot_network = False) -
         df.loc[row_mask, col] = np.nan
     # Add SCHID * 1000 to survey data (to obtain edge list with `unique_id` values)
     for col in cols:
-        df[col] += df['SCHID'] * 1000
+        # df[col] += df['SCHID'] * 1000
+        df.loc[:,col] += df['SCHID'] * 1000
     # Save edgelists
     school_edgelist = []
     for col in cols:
@@ -181,9 +182,41 @@ def data_for_outcome_regression(df, adj_mat):
     exposures_all = util.zeigen_value(all_trts, adj_mat)
     exposures_elig = exposures_all[(df['ELIGIBLE'] == 1).values]
     grades = group_indicators_to_indices(school_df_elig[['GRC_6', 'GRC_7', 'GRC_8']])
-    school = jnp.array(school_df_elig['SCHID'].values - 1, dtype = int)
+    school = jnp.array(school_df_elig['SCHID'].values, dtype = int)
     # school = jnp.array(school_df_elig['SCHID'].values)
 
     return {'X' : fixed_df, 'school' : school,  'grade' : grades,
             'trts' : elig_trts, 'sch_trts' : sch_trt ,
              'exposures' : exposures_elig, 'Y' : Y}
+
+
+def concatenate_dict_arrays(dict_list):
+    """
+    Concatenate arrays from a list of dictionaries.
+    Each dictionary contains arrays with shapes:
+    [(n_x, 4), (n_x,), (n_x,), (n_x,), (n_x,), (n_x,), (n_x,)]
+
+    :param dict_list: List of dictionaries containing JAX arrays
+    :return: A single dictionary with concatenated arrays
+    """
+    # Initialize the result dictionary
+    result = {}
+    # Get the keys from the first dictionary (assuming all dictionaries have the same keys)
+    keys = dict_list[0].keys()
+    for key in keys:
+        # Collect all arrays for this key across all dictionaries
+        arrays_to_concat = [d[key] for d in dict_list]
+        result[key] = jnp.concatenate(arrays_to_concat)
+
+    return result
+
+
+def transform_schid(schid_array):
+    """
+    Transform school IDs to be in range (0, n_unique_schid-1).
+
+    :param schid_array: JAX array of shape (n,) containing school IDs
+    :return: JAX array of same shape with transformed school IDs
+    """
+    unique_ids, inverse_indices = jnp.unique(schid_array, return_inverse=True)
+    return inverse_indices

@@ -31,8 +31,8 @@ def one_school_network_analysis(df: pd.DataFrame):
     one_noisy_net = util.Network_SVI(x_df = cov_for_net,
                                       triu_obs = dw.adj_to_triu(ST_net),
                                       network_model=models.one_noisy_networks_model,
-                                      n_iter = 1000,
-                                      n_samples = 1000)
+                                      n_iter = 500,
+                                      n_samples = 500)
     one_noisy_net.train_model()
     post_one_noisy_net = one_noisy_net.network_samples()
 
@@ -41,8 +41,8 @@ def one_school_network_analysis(df: pd.DataFrame):
                                      triu_obs = torch.stack([dw.adj_to_triu(ST_net),
                                                              dw.adj_to_triu(ST_W2_net)]),
                                      network_model=models.repeated_noisy_networks_model,
-                                     n_iter = 1000,
-                                     n_samples = 1000)
+                                     n_iter = 500,
+                                     n_samples = 500)
     two_noisy_net.train_model()
     post_two_noisy_net = two_noisy_net.network_samples()
 
@@ -51,8 +51,8 @@ def one_school_network_analysis(df: pd.DataFrame):
                                       triu_obs = torch.stack([dw.adj_to_triu(ST_net),
                                                               dw.adj_to_triu(BF_net)]),
                                       network_model=models.multilayer_networks_model,
-                                      n_iter = 1000,
-                                      n_samples = 1000)
+                                      n_iter = 500,
+                                      n_samples = 500)
     multilayer_net.train_model()
     post_multilayer_net = multilayer_net.network_samples()
 
@@ -130,7 +130,25 @@ def one_school_iteration(all_df, schid):
     return obs_data, elig_stoch_expos, post_obs_exposure, post_stoch_expos
 
 
-# TODO: Add function to run all schools
-# TODO: check network creation function as there are warnings and often the resulting network is empty
+def all_schools_network_run_and_posterior(all_df):
+    # get unique school ids
+    school_ids = all_df['SCHID'].unique()
+    obs_data_list = []
+    stoch_trt_expos_list = []
+    post_obs_expos_list = []
+    post_stoch_expos_list = []
+    # run for each school
+    for schid in school_ids:
+        print("running for schid: ", schid)
+        obs_data, stoch_trt_expos, post_obs_expos, post_stoch_expos = one_school_iteration(all_df, schid)
+        obs_data_list.append(obs_data)
+        stoch_trt_expos_list.append(stoch_trt_expos)
+        post_obs_expos_list.append(post_obs_expos)
+        post_stoch_expos_list.append(post_stoch_expos)
 
+    all_data = dw.concatenate_dict_arrays(obs_data_list)
+    all_stoch_trt_expos = jnp.concatenate(stoch_trt_expos_list, axis=-1)
+    all_post_obs_expos = jnp.concatenate(post_obs_expos_list, axis=-1)
+    all_post_stoch_expos = jnp.concatenate(post_stoch_expos_list, axis=-1)
 
+    return all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos

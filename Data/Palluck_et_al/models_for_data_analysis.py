@@ -17,7 +17,7 @@ from hsgp.spectral_densities import diag_spectral_density_squared_exponential
 
 # --- Global variables ---
 
-NUM_SCHOOLS = 1
+NUM_SCHOOLS = 3
 # NUM_SCHOOLS = 56
 NUM_GRADES = 3
 
@@ -212,7 +212,8 @@ def outcome_model(trts, exposures, sch_treat, fixed_df, grade, school, Y=None):
     eta_trt = numpyro.sample("eta_trt", dist.Normal(0, 5))
     eta_exposures = numpyro.sample("eta_exposures", dist.Normal(0, 5))
     eta_interaction = numpyro.sample("eta_interaction", dist.Normal(0, 5))
-    treat_effect = sch_treat*(eta_trt*trts + eta_exposures*exposures + eta_interaction*trts*exposures)
+    # treat_effect = sch_treat*(eta_trt*trts + eta_exposures*exposures + eta_interaction*trts*exposures)
+    treat_effect = eta_trt*trts + eta_exposures*exposures + eta_interaction*trts*exposures
 
     # --- outcome model ---
     mu_y = fixed_effects + eta_sch[school] + eta_grade[grade] + treat_effect
