@@ -131,6 +131,6 @@ def one_school_iteration(all_df, schid):
 
 
 # TODO: Add function to run all schools
-# TODO: check network creation function as there are warning and often the resulting network is empty
+# TODO: check network creation function as there are warnings and often the resulting network is empty
 
 
