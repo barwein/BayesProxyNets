@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import jax.numpy as jnp
 import torch
+from pandas import DataFrame
+
 import utils_for_inference as util
 import data_wrangle as dw
 import models_for_data_analysis as models
@@ -10,6 +12,7 @@ import models_for_data_analysis as models
 ### Global variables ###
 # ALPHAS = [0.3, 0.5, 0.7]
 ALPHAS = [0.3, 0.7]
+MODELS_NAMES = ['one_noisy', 'repeated_noisy', 'multilayer']
 
 ### Functions ###
 def one_school_network_analysis(df: pd.DataFrame):
@@ -152,3 +155,130 @@ def all_schools_network_run_and_posterior(all_df):
     all_post_stoch_expos = jnp.concatenate(post_stoch_expos_list, axis=-1)
 
     return all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos
+
+
+def compute_summary_of_predictions(predictions, estimand_name, model_name, method_type):
+    """
+    :param predictions: array with shape (M, N) where M is number of posterior samples and N is number of units
+    :param estimand: name of the estimand (e.g., 'stoch_30')
+    :param model_name: name of the network model used for posterior draws ('observed', 'one_noisy', etc.)
+    :param method_type: one of ('observed', 'onestage', 'multistage')
+    :return: pd.Dataframe of results
+    """
+    # Get the mean across units (aka estimand)
+    estimand_mean = jnp.mean(predictions, axis=1) # shape (M,)
+    # Get mean and median of estimand over posterior samples
+    post_mean = jnp.mean(estimand_mean).item()
+    post_median = jnp.median(estimand_mean).item()
+    # Get the posterior standard deviation of the estimand
+    post_std = jnp.std(estimand_mean).item()
+    # Get the 95% credible interval
+    q025 = jnp.quantile(estimand_mean, 0.025).item()
+    q975 = jnp.quantile(estimand_mean, 0.975).item()
+    # Create a DataFrame with the results
+    results_df = pd.DataFrame({'post_mean': [post_mean],
+                               'post_median': [post_median],
+                               'post_std': [post_std],
+                               'q025': [q025],
+                               'q975': [q975],
+                               'estimand': [estimand_name],
+                               'model': [model_name],
+                               'method': [method_type]})
+    return results_df
+
+
+def observed_network_run(all_data, all_stoch_trt_expos, key):
+    # run the model
+    outcome_model = util.Outcome_MCMC(data=all_data, rng_key=key)
+    # get predicted values
+    pred_values = outcome_model.get_predicted_values(trts=all_stoch_trt_expos[0],
+                                                      exposures=all_stoch_trt_expos[1])
+    # save results for each new treatment
+    results = []
+    for i in range(len(ALPHAS)):
+        trt_name = 'stoch_' + str(int(ALPHAS[i]*100))
+        results.append(compute_summary_of_predictions(pred_values[i],
+                                                    trt_name,
+                                                    'observed',
+                                                    'observed'))
+    return pd.concat(results)
+
+
+def onestage_run(all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos, key):
+    """
+    wrap onestage inference for all models and obtaining predicted values for all new treatments
+    :param all_data:
+    :param all_stoch_trt_expos:
+    :param all_post_obs_expos:
+    :param all_post_stoch_expos:
+    :param key:
+    :return:
+    """
+
+    assert len(ALPHAS) == all_stoch_trt_expos.shape[0]
+
+    results_list = []
+    for i in range(len(MODELS_NAMES)):
+        # Run one-stage estimation
+        onestage_results = util.Onestage_MCMC(obs_trts=all_data['trts'],
+                                                post_exposures= all_post_obs_expos[i].mean(axis=0),
+                                                sch_trts = all_data['sch_trts'],
+                                                fixed_df=all_data['X'],
+                                                grade = all_data['grade'],
+                                                school = all_data['school'],
+                                                Y = all_data['Y'],
+                                                rng_key=key)
+        # get predictions
+        pred = onestage_results.get_predicted_values(trts=all_stoch_trt_expos[0],
+                                                  exposures = all_post_stoch_expos[i].mean(axis=1))
+        # save results for each new treatment
+        for j in range(len(ALPHAS)):
+            trt_name = 'stoch_' + str(int(ALPHAS[j]*100))
+            results_df = compute_summary_of_predictions(pred[j],
+                                                        trt_name,
+                                                        MODELS_NAMES[i],
+                                                        'onestage')
+            results_list.append(results_df)
+        # Get the results in a DataFrame
+    return pd.concat(results_list)
+
+def multistage_run(all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos, num_rep, key):
+    """
+    wrap multistage inference for all models and obtaining predicted values for all new treatments
+    :param all_data:
+    :param all_stoch_trt_expos:
+    :param all_post_obs_expos:
+    :param all_post_stoch_expos:
+    :param num_rep: number of multistage iterations
+    :param key:
+    :return:
+    """
+
+    assert len(ALPHAS) == all_stoch_trt_expos.shape[0]
+    reshaped_post_stoch_expos = jnp.transpose(all_post_stoch_expos, axes=(0,2,1,3,4))
+    i_range = np.random.choice(a=range(all_post_obs_expos.shape[1]),
+                               size=num_rep,
+                               replace=False)
+    results_list = []
+    for i in range(len(MODELS_NAMES)):
+        # Run multi-stage estimation
+        multistage_preds = util.linear_multistage(post_exposures = all_post_obs_expos[i][i_range],
+                                            post_new_exposures = reshaped_post_stoch_expos[i][i_range],
+                                            obs_trts = all_data['trts'],
+                                            new_trts = all_stoch_trt_expos[0],
+                                            sch_trts = all_data['sch_trts'],
+                                            fixed_df = all_data['X'],
+                                            grade = all_data['grade'],
+                                            school = all_data['school'],
+                                            Y = all_data['Y'],
+                                            key=key)
+        # save results for each new treatment
+        for j in range(len(ALPHAS)):
+            trt_name = 'stoch_' + str(int(ALPHAS[j]*100))
+            results_df = compute_summary_of_predictions(multistage_preds[j],
+                                                        trt_name,
+                                                        MODELS_NAMES[i],
+                                                        'multistage')
+            results_list.append(results_df)
+        # Get the results in a DataFrame
+    return pd.concat(results_list)

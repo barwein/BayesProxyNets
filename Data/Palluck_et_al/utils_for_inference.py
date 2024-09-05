@@ -214,12 +214,22 @@ class Outcome_MCMC:
                                                                  Y=self.Y)
 
     def get_predicted_values(self, trts, exposures):
-        predictions = linear_pred(trts=trts, exposures=exposures, sch_treat=self.sch_trts,
-                                  fixed_df=self.fixed_df, grade=self.grade, school=self.school,
-                                  post_samples=self.linear_post_samples, key=self.rng_key)
-
-        return predictions
-
+        if trts.ndim in [1, 2]:
+            predictions = linear_pred(trts=trts, exposures=exposures, sch_treat=self.sch_trts,
+                                      fixed_df=self.fixed_df, grade=self.grade, school=self.school,
+                                      post_samples=self.linear_post_samples, key=self.rng_key)
+            return predictions
+        elif trts.ndim == 3:
+            preds_list = []
+            for i in range(trts.shape[0]):
+                preds_list.append(linear_pred(trts=trts[i], exposures=exposures[i], sch_treat=self.sch_trts,
+                                              fixed_df=self.fixed_df, grade=self.grade, school=self.school,
+                                              post_samples=self.linear_post_samples, key=self.rng_key))
+            return jnp.stack(preds_list)
+        # return predictions
+        else:
+            raise ValueError("Invalid number of dimensions for trts")
+            return None
 
 
 # --- Multistage and onestage inference ---
@@ -257,30 +267,30 @@ def one_linear_run(post_exposures, post_new_exposures, obs_trts, new_trts, sch_t
                                lin_samples, key)
         preds.append(lin_pred)
 
-    res = jnp.array(preds)
-    print(res.shape)
+    res = jnp.stack(preds)
+    # print(res.shape)
     return res
     # return jnp.array(preds)
 
 parallel_linear_run = pmap(one_linear_run, in_axes=(0, 0, None, None, None, None, None, None, None, None))
 
 
-def linear_multistage(post_exposures, post_new_expsoures, obs_trts, new_trts, sch_trts, fixed_df,
+def linear_multistage(post_exposures, post_new_exposures, obs_trts, new_trts, sch_trts, fixed_df,
                       grade, school, Y, key):
     num_net_samples = post_exposures.shape[0]
     n = obs_trts.shape[0]
     results = []
     for i in tqdm(range(0, num_net_samples, N_CORES),desc="Multistage run"):
         i_results = parallel_linear_run(post_exposures[i:(i + N_CORES)],
-                                        post_new_expsoures[i:(i + N_CORES)],
+                                        post_new_exposures[i:(i + N_CORES)],
                                         obs_trts, new_trts, sch_trts,
                                         fixed_df, grade, school,
                                         Y, key)
         results.append(i_results)
     results_arr = jnp.concatenate(results, axis=0)
-    print("result_c shape: ", results_arr.shape)
+    # print("result_c shape: ", results_arr.shape)
     result_arr = jnp.transpose(results_arr, axes=(1, 0, 2, 3))
-    print("result transposed shape: ", result_arr.shape)
+    # print("result transposed shape: ", result_arr.shape)
     num_new_trts = new_trts.shape[0]
     num_post_samples = result_arr.shape[-2]
     result_arr = result_arr.reshape((num_new_trts, num_net_samples*num_post_samples , n))
@@ -311,8 +321,20 @@ class Onestage_MCMC:
                                                                  school=self.school,
                                                                  Y=self.Y)
 
-    def get_predicted_values(self, new_trts, new_exposures):
-        predictions = linear_pred(trts=new_trts, exposures=new_exposures, sch_treat=self.sch_trts,
-                                  fixed_df=self.fixed_df, grade=self.grade, school=self.school,
-                                  post_samples=self.linear_post_samples, key=self.rng_key)
-        return predictions
+    def get_predicted_values(self, trts, exposures):
+        if trts.ndim in [1, 2]:
+            predictions = linear_pred(trts=trts, exposures=exposures, sch_treat=self.sch_trts,
+                                      fixed_df=self.fixed_df, grade=self.grade, school=self.school,
+                                      post_samples=self.linear_post_samples, key=self.rng_key)
+            return predictions
+        elif trts.ndim == 3:
+            preds_list = []
+            for i in range(trts.shape[0]):
+                preds_list.append(linear_pred(trts=trts[i], exposures=exposures[i], sch_treat=self.sch_trts,
+                                              fixed_df=self.fixed_df, grade=self.grade, school=self.school,
+                                              post_samples=self.linear_post_samples, key=self.rng_key))
+            return jnp.stack(preds_list)
+        # return predictions
+        else:
+            raise ValueError("Invalid number of dimensions for trts")
+            return None
