@@ -20,7 +20,8 @@ from tqdm import tqdm
 from src.Aux_functions import N_CORES
 
 # --- Global variables ---
-N_CORES = 4
+# N_CORES = 4
+N_CORES = 10
 rng = np.random.default_rng(151)
 
 # --- Utility functions ---
@@ -73,7 +74,7 @@ def zeigen_value(Z, adj_mat):
     #     return zeigen
 
 
-def stochastic_intervention(alpha, n, n_approx=100):
+def stochastic_intervention(alpha, n, n_approx=1000):
     z_stoch = rng.binomial(n=1, p=alpha, size=(n_approx, n))
     return z_stoch
 
@@ -129,7 +130,7 @@ def linear_pred(trts, exposures, sch_treat, fixed_df, grade, school, post_sample
 
 class Network_SVI:
     """Class for training the network module and obtaining samples"""
-    def __init__(self, x_df, triu_obs, n_iter=15000, n_samples=10000, network_model=models.one_noisy_networks_model):
+    def __init__(self, x_df, triu_obs, n_iter=20000, n_samples=10000, network_model=models.one_noisy_networks_model):
         self.x_df = x_df
         self.triu_obs = triu_obs
         self.N_edges = self.x_df.shape[0]
@@ -151,14 +152,16 @@ class Network_SVI:
         optimzer = pyro.optim.ClippedAdam({"lr": 0.001})
         svi = pyro.infer.SVI(self.network_model, self.guide, optimzer, loss=loss_func)
         # losses_full = []
-        for _ in tqdm(range(self.n_iter), desc="Training network model"):
+        for _ in range(self.n_iter):
+        # for _ in tqdm(range(self.n_iter), desc="Training network model"):
             svi.step(self.x_df, self.triu_obs, self.N)
             # loss = svi.step(self.X_diff, self.X2_eq, self.triu, self.n)
             # losses_full.append(loss)
 
     def network_samples(self):
         triu_star_samples = []
-        for _ in tqdm(range(self.n_samples), desc="Sampling A*"):
+        for _ in range(self.n_samples):
+        # for _ in tqdm(range(self.n_samples), desc="Sampling A*"):
             # Get a trace from the guide
             guide_trace = pyro.poutine.trace(self.guide).get_trace(self.x_df, self.triu_obs, self.N)
             # Run infer_discrete
@@ -181,7 +184,7 @@ class Network_SVI:
         with torch.no_grad():
             posterior_samples = predictive(self.x_df, None, self.N)
 
-        print(posterior_samples.keys())
+        # print(posterior_samples.keys())
 
         # Extract triu_obs samples
         if self.triu_obs.ndim == 1:
@@ -280,7 +283,8 @@ def linear_multistage(post_exposures, post_new_exposures, obs_trts, new_trts, sc
     num_net_samples = post_exposures.shape[0]
     n = obs_trts.shape[0]
     results = []
-    for i in tqdm(range(0, num_net_samples, N_CORES),desc="Multistage run"):
+    for i in range(0, num_net_samples, N_CORES):
+    # for i in tqdm(range(0, num_net_samples, N_CORES),desc="Multistage run"):
         i_results = parallel_linear_run(post_exposures[i:(i + N_CORES)],
                                         post_new_exposures[i:(i + N_CORES)],
                                         obs_trts, new_trts, sch_trts,
