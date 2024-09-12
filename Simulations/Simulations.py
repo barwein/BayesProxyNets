@@ -86,6 +86,8 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     print("Post abs zeigen estimator error:", np.mean(np.abs(np.mean(post_zeig,axis=0) - df_oracle["Zeigen"])))
     print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])))
 
+    # TODO: save MAE of posterior observed zeigen values
+
     print("Running Multistage")
     # Three-Stage
     i_range = np.random.choice(a=range(network_pred_samples.shape[0]), size=n_rep, replace=False)
