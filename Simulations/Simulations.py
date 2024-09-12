@@ -26,7 +26,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # Generate noisy network measurement
     # obs_network = aux.create_noisy_network(df_oracle["adj_mat"], gamma)
     # obs_network = aux.create_noisy_network(df_oracle["triu"], gamma, df_oracle["X2_equal"])
-    obs_network = aux.create_noisy_network(rng, df_oracle["triu"], gamma, df_oracle["X_diff"])
+    obs_network = aux.create_noisy_network(rng, df_oracle["triu"], gamma, df_oracle["X_diff"], df_oracle["X2_equal"])
     # save observed df and update A* and triu
     df_obs = df_oracle.copy()
     df_obs["adj_mat"] = obs_network["obs_mat"]
@@ -38,8 +38,8 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # print("Running network module")
     # --- network module ---
     # network_mcmc = aux.Network_MCMC(data=df_obs, rng_key=rng_key)
-    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=1000, n_samples=300)
-    # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=15000, n_samples=10000)
+    # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=600, n_samples=250)
+    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=20000, n_samples=10000)
     # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=100, n_samples=30)
     network_svi.train_model()
     # get posterior samples and predictive distributions
@@ -95,6 +95,7 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                             zeigen_h1_post = post_zeig_h1[i_range,],
                                             zeigen_stoch_post = post_zeig_stoch1[i_range,],
                                             x=df_obs["X"],
+                                            x2=df_obs["X2"],
                                             y=df_obs["Y"],
                                             z_obs=df_obs["Z"],
                                             z_h=df_obs["Z_h"],
