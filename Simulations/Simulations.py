@@ -78,10 +78,10 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     #                                         key=rng_key_)
 
     # Get posterior network stats
-    post_zeig, post_zeig_h1, post_zeig_stoch1 = aux.get_post_net_stats(network_pred_samples,
-                                                                       df_obs["Z"],
-                                                                       df_obs["Z_h"],
-                                                                       df_obs["Z_stoch"])
+    post_zeig, post_zeig_h1, post_zeig_h2, post_zeig_stoch1, post_zeig_stoch2 = aux.get_post_net_stats(network_pred_samples,
+                                                                                                       df_obs["Z"],
+                                                                                                       df_obs["Z_h"],
+                                                                                                       df_obs["Z_stoch"])
 
     print("Post abs zeigen estimator error:", np.mean(np.abs(np.mean(post_zeig,axis=0) - df_oracle["Zeigen"])))
     print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])))
@@ -95,7 +95,9 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # threestage_multi_nets = network_pred_samples[i_range,]
     threestage_results = aux.multistage_run(zeigen_post = post_zeig[i_range,],
                                             zeigen_h1_post = post_zeig_h1[i_range,],
+                                            zeigen_h2_post=post_zeig_h2[i_range,],
                                             zeigen_stoch_post = post_zeig_stoch1[i_range,],
+                                            zeigen_stoch2_post=post_zeig_stoch2[i_range,],
                                             x=df_obs["X"],
                                             x2=df_obs["X2"],
                                             y=df_obs["Y"],
@@ -133,7 +135,9 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     #
     mean_post_zeig = post_zeig.mean(axis=0)
     mean_post_zeigen_h1 = post_zeig_h1.mean(axis=0)
+    mean_post_zeigen_h2 = post_zeig_h2.mean(axis=0)
     mean_post_zeigen_stoch1 = post_zeig_stoch1.mean(axis=0)
+    mean_post_zeigen_stoch2 = post_zeig_stoch2.mean(axis=0)
 
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
@@ -145,9 +149,9 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                               estimand_stoch=df_obs["estimand_stoch"],
                                               zeigen=mean_post_zeig,
                                               h1_zeigen=mean_post_zeigen_h1,
-                                              # h2_zeigen=post_zeig_h2,
+                                              h2_zeigen=mean_post_zeigen_h2,
                                               stoch1_zeigen=mean_post_zeigen_stoch1,
-                                              # stoch2_zeigen=post_zeig_stoch2,
+                                              stoch2_zeigen=mean_post_zeigen_stoch2,
                                               rng_key=rng_key,
                                               iter=idx)
     onestage_results = onestage_outcome_mcmc.get_results()
@@ -173,7 +177,8 @@ vectorized_simulations = vmap(one_simuation_iter, in_axes = (0,) + (None,) * 8)
 # vectorized_simulations = vmap(run_one_iter, in_axes=(0,None,None,None,None,None,None,None,None,None,None))
 
 COLUMNS = ["idx", "mean", "median", "true", "bias",
-           "std", "RMSE", "RMSE_all", "MAE", "MAE_all", "MAPE",
+           "std", "RMSE", "RMSE_all", "MAE", "MAE_all",
+           # "MAPE",
            # "std", "RMSE", "MAE", "MAPE",
            "q025", "q975", "covering", "mean_ind_cover"]
            # "std", "RMSE", "MAE", "MAPE", "q025", "q975", "covering"]

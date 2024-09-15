@@ -3,6 +3,8 @@ import pandas as pd
 import jax.numpy as jnp
 import torch
 from pandas import DataFrame
+import gc
+
 
 import utils_for_inference as util
 import data_wrangle as dw
