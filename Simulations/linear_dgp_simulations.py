@@ -28,7 +28,6 @@ THETA = [-2, 1.5]
 # GAMMA = jnp.array([0.75, -1])
 # GAMMA = [1.1, 0.2,  -1]
 GAMMA = [1.1, 0.2,  -1, 1]
-# GAMMA = [2.5, -1.5]
 # GAMMA = [1.5, -1.5]
 # ETA = jnp.array([-1, 3, -0.25, 2.5])
 ETA = jnp.array([-1, 3, -0.25, 0, 3])
