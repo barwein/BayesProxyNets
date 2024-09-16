@@ -144,11 +144,12 @@ class DataGeneration:
             # mean_nonlin = 2*self.eta[4] / (1+jnp.exp(-5*zeig + 7.5))
             # mean_nonlin = self.f_zeigen(zeig, self.eta[4])
             # mean_nonlin = jnp.maximum(-2*self.eta[4]*jnp.power(zeig-1.2,2) + 2*self.eta[4]*zeig, 0)
-            mean_nonlin = jnp.maximum(0, jnp.minimum(4*self.eta[4]*(zeig-.4), 4*self.eta[4]*0.3))
-            mean_nonlin += 4 * z * zeig
+            mean_nonlin = jnp.maximum(0, jnp.minimum(2*self.eta[4]*(zeig-.1), 2*self.eta[4]*0.3))
+            mean_nonlin += 5*jnp.sqrt(z*zeig)
+            # mean_nonlin += 5 * z * zeig
             # mean_nonlin += self.eta[4] * z * zeig
             mean_lin = jnp.dot(df_lin, self.eta[0:4])
-            mean_y = mean_lin + mean_nonlin + 0.25*jnp.power(z*self.X,2)
+            mean_y = mean_lin + mean_nonlin
         if with_epsi:
             # epsi = jnp.array(rng.normal(loc=0, scale=self.sig_y, size=self.n))
             epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))

@@ -17,7 +17,7 @@ from hsgp.spectral_densities import diag_spectral_density_squared_exponential
 
 # --- Global variables ---
 
-NUM_SCHOOLS = 3
+NUM_SCHOOLS = 28
 # NUM_SCHOOLS = 56
 NUM_GRADES = 3
 
