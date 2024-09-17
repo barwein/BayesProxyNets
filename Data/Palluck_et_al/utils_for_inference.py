@@ -76,6 +76,7 @@ def zeigen_value(Z, adj_mat):
 
 def stochastic_intervention(alpha, n, n_approx=1000):
     z_stoch = rng.binomial(n=1, p=alpha, size=(n_approx, n))
+    # z_stoch shape is (n_approx, n)
     return z_stoch
 
 def trt_and_exposures_of_elig(new_trts_arr, new_exposures_arr, df):
@@ -89,7 +90,7 @@ def trt_and_exposures_of_elig(new_trts_arr, new_exposures_arr, df):
 def linear_model_samples_parallel(key, trts, exposures, sch_treat, fixed_df, grade, school, Y):
     """Run the parallel MCMC for the linear model"""
     kernel_outcome = NUTS(models.outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=2500,num_chains=4, progress_bar=True)
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=2500,num_chains=4, progress_bar=False)
     lin_mcmc.run(key, trts=trts, exposures=exposures, sch_treat=sch_treat,
                  fixed_df=fixed_df, grade=grade, school=school, Y=Y)
     lin_mcmc.print_summary()
@@ -268,9 +269,11 @@ def one_linear_run(post_exposures, post_new_exposures, obs_trts, new_trts, sch_t
         lin_pred = linear_pred(new_trts[i], post_new_exposures[i], sch_trts, fixed_df,
                                grade, school,
                                lin_samples, key)
+        # lin_pred shape is (B, N)
         preds.append(lin_pred)
 
     res = jnp.stack(preds)
+    # res shape is (G, B, N) where G = num_new_trts, B = num_post_samples, N = n
     # print(res.shape)
     return res
     # return jnp.array(preds)
@@ -330,6 +333,7 @@ class Onestage_MCMC:
             predictions = linear_pred(trts=trts, exposures=exposures, sch_treat=self.sch_trts,
                                       fixed_df=self.fixed_df, grade=self.grade, school=self.school,
                                       post_samples=self.linear_post_samples, key=self.rng_key)
+            # prediction shape is (B, N) where B is the number of post samples and N is the number of nodes
             return predictions
         elif trts.ndim == 3:
             preds_list = []
@@ -337,6 +341,7 @@ class Onestage_MCMC:
                 preds_list.append(linear_pred(trts=trts[i], exposures=exposures[i], sch_treat=self.sch_trts,
                                               fixed_df=self.fixed_df, grade=self.grade, school=self.school,
                                               post_samples=self.linear_post_samples, key=self.rng_key))
+                #  prediction shape is (B, N) where B is the number of post samples and N is the number of nodes
             return jnp.stack(preds_list)
         # return predictions
         else:

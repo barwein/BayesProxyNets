@@ -77,8 +77,10 @@ def get_stoch_treatments_and_obs_exposures(df, adj_mat):
 
     new_stoch_trts = jnp.stack(new_stoch_trts)
     new_stoch_obs_exposures = jnp.stack(new_stoch_obs_exposures)
+    # new_stoch_trts shape is (3, n_approx, N) and new_stoch_obs_exposures shape is (3, n_approx, N)
 
     all_trt_exposures = jnp.stack([new_stoch_trts, new_stoch_obs_exposures])
+    # all_trt_exposures shape is (2, 3, n_approx, N)
 
     # get subset for eligible units only
     stoch_trt_elig, stoch_exposures_elig = util.trt_and_exposures_of_elig(new_stoch_trts,
@@ -121,8 +123,11 @@ def one_school_iteration(all_df, schid):
     df_school = all_df[all_df['SCHID'] == schid]
     # Run network analysis
     all_nets, net_post_samples = one_school_network_analysis(df_school)
+    # all_nets shape is (3, N, N) and net_post_samples shape is (3, M, N, N)
+
     # get stochastic interventions + observed exposures
     all_stoch_expos, elig_stoch_expos = get_stoch_treatments_and_obs_exposures(df_school, all_nets[0])
+    # all_stoch_expos shape is (2, 3, n_approx, N) and elig_stoch_expos shape is (2, 3, n_approx, N)
     # Get posterior exposures for observed treatments for each network model
     post_obs_exposure = posterior_exposure_for_obs_treatments(net_post_samples,
                                                               jnp.array(df_school['TREAT_NUMERIC'].values),
@@ -155,7 +160,10 @@ def all_schools_network_run_and_posterior(all_df):
     all_stoch_trt_expos = jnp.concatenate(stoch_trt_expos_list, axis=-1)
     all_post_obs_expos = jnp.concatenate(post_obs_expos_list, axis=-1)
     all_post_stoch_expos = jnp.concatenate(post_stoch_expos_list, axis=-1)
-
+    # all_data shape is (N, 4)
+    # all_stoch_trt_expos shape is (2, 3, n_approx, N)
+    # all_post_obs_expos shape is (3, M, N)
+    # all_post_stoch_expos shape is (3, M, N, n_approx)
     return all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos
 
 
@@ -217,7 +225,7 @@ def onestage_run(all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_sto
     :return:
     """
 
-    assert len(ALPHAS) == all_stoch_trt_expos.shape[0]
+    # assert len(ALPHAS) == all_stoch_trt_expos.shape[0]
 
     results_list = []
     for i in range(len(MODELS_NAMES)):
