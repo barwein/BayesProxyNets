@@ -14,7 +14,7 @@ import models_for_data_analysis as models
 ### Global variables ###
 ALPHAS = [0.3, 0.5, 0.7]
 # ALPHAS = [0.3, 0.7]
-MODELS_NAMES = ['one_noisy', 'repeated_noisy', 'multilayer']
+MODELS_NAMES = ['Noise (single)', 'Noise (repeated)', 'Multilayer']
 
 ### Functions ###
 def one_school_network_analysis(df: pd.DataFrame):
@@ -36,8 +36,10 @@ def one_school_network_analysis(df: pd.DataFrame):
     one_noisy_net = util.Network_SVI(x_df = cov_for_net,
                                       triu_obs = dw.adj_to_triu(ST_net),
                                       network_model=models.one_noisy_networks_model,
-                                      n_iter = 20000,
-                                      n_samples = 10000)
+                                      n_iter = 100,
+                                      # n_iter = 20000,
+                                      n_samples = 100)
+                                      # n_samples = 10000)
     one_noisy_net.train_model()
     post_one_noisy_net = one_noisy_net.network_samples()
 
@@ -46,8 +48,10 @@ def one_school_network_analysis(df: pd.DataFrame):
                                      triu_obs = torch.stack([dw.adj_to_triu(ST_net),
                                                              dw.adj_to_triu(ST_W2_net)]),
                                      network_model=models.repeated_noisy_networks_model,
-                                     n_iter = 20000,
-                                     n_samples = 10000)
+                                     n_iter = 100,
+                                     # n_iter = 20000,
+                                     n_samples = 100)
+                                     # n_samples = 10000)
     two_noisy_net.train_model()
     post_two_noisy_net = two_noisy_net.network_samples()
 
@@ -56,8 +60,10 @@ def one_school_network_analysis(df: pd.DataFrame):
                                       triu_obs = torch.stack([dw.adj_to_triu(ST_net),
                                                               dw.adj_to_triu(BF_net)]),
                                       network_model=models.multilayer_networks_model,
-                                      n_iter = 20000,
-                                      n_samples = 10000)
+                                      n_iter = 100,
+                                      # n_iter = 20000,
+                                      n_samples = 100)
+                                      # n_samples = 10000)
     multilayer_net.train_model()
     post_multilayer_net = multilayer_net.network_samples()
 
@@ -149,7 +155,7 @@ def all_schools_network_run_and_posterior(all_df):
     post_stoch_expos_list = []
     # run for each school
     for schid in school_ids:
-        # print("running for schid: ", schid)
+        print("running for schid: ", schid)
         obs_data, stoch_trt_expos, post_obs_expos, post_stoch_expos = one_school_iteration(all_df, schid)
         obs_data_list.append(obs_data)
         stoch_trt_expos_list.append(stoch_trt_expos)
@@ -209,8 +215,8 @@ def observed_network_run(all_data, all_stoch_trt_expos, key):
         trt_name = 'stoch_' + str(int(ALPHAS[i]*100))
         results.append(compute_summary_of_predictions(pred_values[i],
                                                     trt_name,
-                                                    'observed',
-                                                    'observed'))
+                                                    'Observed',
+                                                    'Observed'))
     return pd.concat(results)
 
 
@@ -247,7 +253,7 @@ def onestage_run(all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_sto
             results_df = compute_summary_of_predictions(pred[j],
                                                         trt_name,
                                                         MODELS_NAMES[i],
-                                                        'onestage')
+                                                        'Plug-in')
             results_list.append(results_df)
         # Get the results in a DataFrame
     return pd.concat(results_list)

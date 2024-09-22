@@ -12,10 +12,13 @@ rng_key = random.PRNGKey(0)
 _, rng_key = random.split(rng_key)
 
 
-NUM_REP_MS = 1500
+NUM_REP_MS = 8
+# NUM_REP_MS = 1500
 # NUM_REP_MS = 321
 
 ### Run analysis ###
+# TODO: check the outcome model. maybe replace Zeigen with prop-treated-neighbors or add degree as covariate
+# TODO: also can use two exposures: Zeigen and indicator if at least one treat neighbor
 
 # Load data
 full_df = pyreadr.read_r('37070-0001-Data.rda')

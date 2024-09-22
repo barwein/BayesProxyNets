@@ -166,8 +166,8 @@ def group_indicators_to_indices(df):
     jax.numpy.ndarray: N x 1 array of indices.
     """
     # Check if each row sums to 1
-    if not (df.sum(axis=1) == 1).all():
-        raise ValueError("Each row in the DataFrame must sum to 1")
+    # if not (df.sum(axis=1) == 1).all():
+    #     raise ValueError("Each row in the DataFrame must sum to 1")
     indices = jnp.argmax(df.values, axis=1)
     return indices
 

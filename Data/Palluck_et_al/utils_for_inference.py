@@ -20,8 +20,9 @@ from tqdm import tqdm
 from src.Aux_functions import N_CORES
 
 # --- Global variables ---
-# N_CORES = 4
-N_CORES = 10
+N_CORES = 4
+# N_CORES = 10
+os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 rng = np.random.default_rng(151)
 
 # --- Utility functions ---
@@ -74,7 +75,7 @@ def zeigen_value(Z, adj_mat):
     #     return zeigen
 
 
-def stochastic_intervention(alpha, n, n_approx=1000):
+def stochastic_intervention(alpha, n, n_approx=500):
     z_stoch = rng.binomial(n=1, p=alpha, size=(n_approx, n))
     # z_stoch shape is (n_approx, n)
     return z_stoch
@@ -131,7 +132,8 @@ def linear_pred(trts, exposures, sch_treat, fixed_df, grade, school, post_sample
 
 class Network_SVI:
     """Class for training the network module and obtaining samples"""
-    def __init__(self, x_df, triu_obs, n_iter=20000, n_samples=10000, network_model=models.one_noisy_networks_model):
+    def __init__(self, x_df, triu_obs, n_iter=100, n_samples=100, network_model=models.one_noisy_networks_model):
+    # def __init__(self, x_df, triu_obs, n_iter=20000, n_samples=10000, network_model=models.one_noisy_networks_model):
         self.x_df = x_df
         self.triu_obs = triu_obs
         self.N_edges = self.x_df.shape[0]
