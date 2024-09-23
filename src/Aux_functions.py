@@ -283,7 +283,9 @@ def compute_hdi(samples, cred_mass):
 # def compute_error_stats(esti_post_draws, true_estimand, method="TEST", estimand = "h", idx=None):
 def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     # esti_post_draws has shape (M, N)
+    print("esti_post_draws has shape", esti_post_draws.shape)
     # true_estimand has shape (N,)
+    print("true_estimand has shape", true_estimand.shape)
     mean_estimand = jnp.mean(true_estimand)  # scalar
     mean_units = jnp.mean(esti_post_draws, axis=1)  # shape (M,)
     mean_samples = jnp.mean(esti_post_draws, axis=0)  # shape (N,)
@@ -295,7 +297,11 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     RMSE = jnp.round(jnp.sqrt(jnp.mean(jnp.power(mean_samples - true_estimand, 2))),3)
     MAE_all = jnp.round(jnp.mean(jnp.abs(esti_post_draws - true_estimand)), 3)
     MAE = jnp.round(jnp.mean(jnp.abs(mean_samples - true_estimand)),3)
-    # MAPE = jnp.round(jnp.mean(jnp.abs((mean_samples - true_estimand) / true_estimand)), 3)
+    MAPE = jnp.round(jnp.mean(jnp.abs((mean_samples - true_estimand) / (true_estimand + 1e-5))), 3)
+
+    MAPE_all = jnp.round(jnp.mean(jnp.abs((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
+    rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_samples - true_estimand) / (true_estimand + 1e-5))), 3)
+    rel_RMSE_all = jnp.round(jnp.mean(jnp.square((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
     q025 = jnp.quantile(mean_units, 0.025)
     q025_ind = jnp.quantile(esti_post_draws, 0.025, axis=0)
     q975 = jnp.quantile(mean_units, 0.975)
@@ -307,7 +313,7 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     return jnp.array([idx, mean_all, medi, jnp.round(mean_estimand,3),
                       jnp.round(mean_all - mean_estimand,3), std,
                       RMSE,RMSE_all, MAE,  MAE_all,
-                      # MAPE,
+                      MAPE, MAPE_all, rel_RMSE, rel_RMSE_all,
                       jnp.round(q025,3), jnp.round(q975,3),
                       cover, jnp.mean(mean_cover)])
                       # , jnp.round(hdi_lower,3), jnp.round(hdi_upper,3)])
@@ -475,8 +481,8 @@ def outcome_jit_pred(post_samples, df_arr, key):
 def HSGP_model_samples_parallel(key, Y, df, ell):
 # def HSGP_model_samples_parallel(key, Y, df1, df2, ell1, ell2):
     kernel_hsgp = NUTS(HSGP_model, target_accept_prob=0.9)
-    # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=1000, num_samples=2000,num_chains=4, progress_bar=False)
-    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=4000, num_samples=2500,num_chains=4, progress_bar=True)
+    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=1000, num_samples=2000,num_chains=4, progress_bar=True)
+    # hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=4000, num_samples=2500,num_chains=4, progress_bar=True)
     hsgp_mcmc.run(key, df=df, ell=ell, m=M, Y=Y)
     # hsgp_mcmc.run(key, df1=df1, df2=df2, ell1=ell1, ell2=ell2 ,m=M, Y=Y)
     return hsgp_mcmc.get_samples()
@@ -565,7 +571,7 @@ def linear_pred(z, zeigen, post_samples, x, x2, key):
         return linear_model_pred(z.reshape((1, n_z)), zeigen.reshape((1, n_z)), post_samples, x, x2, key).squeeze()
 
 @jit
-def hsgp_model_outcome_pred(z, zeigen, post_samples, x, x2, ell):
+def hsgp_model_outcome_pred(z, zeigen, post_samples, x, x2, ell, key):
 # def hsgp_model_outcome_pred(z, zeigen, post_samples, x, x2, ell1, ell2):
     # ell_ = jnp.array(c*jnp.max(jnp.abs(zeigen))).reshape(1,1)
     # df = jnp.transpose(jnp.array([[1] * x.shape[0], z, x, x2, zeigen]))
@@ -579,22 +585,23 @@ def hsgp_model_outcome_pred(z, zeigen, post_samples, x, x2, ell):
     # pred = HSGP_jit_pred(post_samples, Xgp=df[:, 3:], Xlin=df[:, 0:3], ell=ell, key=key)
     # pred = HSGP_jit_pred(post_samples, Xgp=df[:, 2:], Xlin=df[:, 0:2], ell=ell, key=key)
     # return jnp.mean(pred["Y"], axis=1)
-    return manual_gp_f_star_pred(df, ell, post_samples)
+    return HSGP_jit_pred(post_samples, df, ell, key)["Y"]
+    # return manual_gp_f_star_pred(df, ell, post_samples)
     # return manual_gp_f_star_pred(df1, df2,ell1, ell2, post_samples)
 
-hsgp_model_pred = vmap(hsgp_model_outcome_pred, in_axes=(0, 0, None, None, None, None))
+hsgp_model_pred = vmap(hsgp_model_outcome_pred, in_axes=(0, 0, None, None, None, None, None))
 # hsgp_model_pred = vmap(hsgp_model_outcome_pred, in_axes=(0, 0, None, None, None, None, None))
 
-def hsgp_pred(z, zeigen, post_samples, x, x2, ell):
+def hsgp_pred(z, zeigen, post_samples, x, x2, ell, key):
 # def hsgp_pred(z, zeigen, post_samples, x, x2, ell1, ell2):
     if z.ndim == 2:
         # return hsgp_model_pred(z, zeigen, post_samples, x, x2, ell, key)
-        return jnp.mean(hsgp_model_pred(z, zeigen, post_samples, x, x2, ell), axis=0)
+        return jnp.mean(hsgp_model_pred(z, zeigen, post_samples, x, x2, ell, key), axis=0)
         # return jnp.mean(hsgp_model_pred(z, zeigen, post_samples, x, x2, ell1, ell2), axis=0)
     if z.ndim == 1:
         n_z = z.shape[0]
         # return hsgp_model_pred(z.reshape((1, n_z)), zeigen.reshape((1, n_z)), post_samples, x, x2, ell, key)
-        return hsgp_model_pred(z.reshape((1, n_z)), zeigen.reshape((1, n_z)), post_samples, x, x2, ell).squeeze()
+        return hsgp_model_pred(z.reshape((1, n_z)), zeigen.reshape((1, n_z)), post_samples, x, x2, ell, key).squeeze()
         # return hsgp_model_pred(z.reshape((1, n_z)), zeigen.reshape((1, n_z)), post_samples, x, x2, ell1, ell2).squeeze()
 
 
@@ -763,9 +770,9 @@ class Outcome_MCMC:
         linear_h_stats = compute_error_stats(linear_h, self.estimand_h, idx=self.iter)
 
         hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], h1_zeigen, self.hsgp_post_samples,
-                                self.X, self.X2, self.ell)
+                                self.X, self.X2, self.ell, self.rng_key)
         hsgp_h2_pred = hsgp_pred(self.Z_h[1,:], h2_zeigen, self.hsgp_post_samples,
-                                self.X, self.X2, self.ell)
+                                self.X, self.X2, self.ell, self.rng_key)
                                 # self.X, self.X2, self.ell1, self.ell2)
         # hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], h1_zeigen, self.hsgp_post_samples,
         #                         self.X, self.X2,self.ell, self.rng_key)
@@ -797,9 +804,9 @@ class Outcome_MCMC:
         linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
 
         hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], stoch_zeigen1, self.hsgp_post_samples,
-                                    self.X, self.X2, self.ell)
+                                    self.X, self.X2, self.ell, self.rng_key)
         hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], stoch_zeigen2, self.hsgp_post_samples,
-                                    self.X, self.X2, self.ell)
+                                    self.X, self.X2, self.ell, self.rng_key)
                                     # self.X, self.X2, self.ell1, self.ell2)
         # hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], stoch_zeigen1, self.hsgp_post_samples,
         #                             self.X, self.X2, self.ell, self.rng_key)
@@ -1022,7 +1029,7 @@ def get_predicted_values(key, z, zeigen, x, x2, lin_samples, hsgp_samples,  ell)
     # each has shape (#lin_samples, n)
     cur_lin_pred = linear_pred(z, zeigen, lin_samples, x, x2, key)
     # cur_gp_pred = gpr_model.predict(z, zeigen)
-    cur_hsgp_pred = hsgp_pred(z, zeigen, hsgp_samples, x, x2, ell)
+    cur_hsgp_pred = hsgp_pred(z, zeigen, hsgp_samples, x, x2, ell, key)
     # cur_hsgp_pred = hsgp_pred(z, zeigen, hsgp_samples, x, x2, ell_x, ell_zeig)
     # get estimands for each sample (sample mean across units)
     # lin_estimates = jnp.mean(cur_lin_pred, axis=0)
@@ -1102,13 +1109,13 @@ def single_stage_run(zeigen, zeigen_h1, zeigen_h2, zeigen_stoch, zeigen_stoch2, 
     hsgp_samples = HSGP_model_samples_vectorized(key, Y=y, df=df_gp, ell=ell)
     # hsgp_samples = HSGP_model_samples_vectorized(key, Y=y, df1=df1_gp, df2=df2_gp, ell1=ell_x, ell2=ell_zeig)
     # Get HSGP predictions
-    hsgp_h1_pred = hsgp_pred(z_h[0,:], zeigen_h1, hsgp_samples, x, x2, ell)
-    hsgp_h2_pred = hsgp_pred(z_h[1,:], zeigen_h2, hsgp_samples, x, x2, ell)
+    hsgp_h1_pred = hsgp_pred(z_h[0,:], zeigen_h1, hsgp_samples, x, x2, ell, key)
+    hsgp_h2_pred = hsgp_pred(z_h[1,:], zeigen_h2, hsgp_samples, x, x2, ell, key)
     hsgp_h_pred = hsgp_h1_pred - hsgp_h2_pred
     # hsgp_h1_pred = hsgp_pred(z_h[0,:], zeigen_h1, hsgp_samples, x, x2, ell_x, ell_zeig)
     # print("hsgp h1 pred shape: ", hsgp_h1_pred.shape)
-    hsgp_stoch1_pred = hsgp_pred(z_stoch[0,:,:], zeigen_stoch, hsgp_samples, x, x2, ell)
-    hsgp_stoch2_pred = hsgp_pred(z_stoch[1,:,:], zeigen_stoch2, hsgp_samples, x, x2, ell)
+    hsgp_stoch1_pred = hsgp_pred(z_stoch[0,:,:], zeigen_stoch, hsgp_samples, x, x2, ell, key)
+    hsgp_stoch2_pred = hsgp_pred(z_stoch[1,:,:], zeigen_stoch2, hsgp_samples, x, x2, ell, key)
     hsgp_stoch_pred = hsgp_stoch1_pred - hsgp_stoch2_pred
     # hsgp_stoch1_pred = hsgp_pred(z_stoch[0,:,:], zeigen_stoch, hsgp_samples, x, x2, ell_x, ell_zeig)
     # print("hsgp stoch1 pred shape: ", hsgp_stoch1_pred.shape)
@@ -1376,9 +1383,9 @@ class Onestage_MCMC:
         linear_h_stats = compute_error_stats(linear_h, self.estimand_h, idx=self.iter)
 
         hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], self.h1_zeigen, self.hsgp_post_samples,
-                                self.X, self.X2, self.ell)
+                                self.X, self.X2, self.ell, self.rng_key)
         hsgp_h2_pred = hsgp_pred(self.Z_h[1,:], self.h2_zeigen, self.hsgp_post_samples,
-                                 self.X, self.X2, self.ell)
+                                 self.X, self.X2, self.ell, self.rng_key)
         # hsgp_h = jnp.mean(hsgp_h1_pred, axis=0) - jnp.mean(hsgp_h2_pred, axis=0)
         hsgp_h = hsgp_h1_pred - hsgp_h2_pred
         # hsgp_h = hsgp_h1_pred
@@ -1402,9 +1409,9 @@ class Onestage_MCMC:
         linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
 
         hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], self.stoch1_zeigen, self.hsgp_post_samples,
-                                    self.X, self.X2, self.ell)
+                                    self.X, self.X2, self.ell, self.rng_key)
         hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], self.stoch2_zeigen, self.hsgp_post_samples,
-                                     self.X, self.X2, self.ell)
+                                     self.X, self.X2, self.ell, self.rng_key)
         # hsgp_stoch_pred = jnp.mean(hsgp_stoch_pred1, axis=0) - jnp.mean(hsgp_stoch_pred2, axis=0)
         hsgp_stoch_pred = hsgp_stoch_pred1 - hsgp_stoch_pred2
         # hsgp_stoch_pred = hsgp_stoch_pred1
