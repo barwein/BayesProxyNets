@@ -30,14 +30,14 @@ def n_edges_to_n_nodes(n_edges):
     """Compute the number of nodes from the number of edges"""
     return int((1 + jnp.sqrt(1 + 8*n_edges))/2)
 
-@jit
-def prop_treated_neighbors(trts, adj_mat):
-    """Compute the proportion of treated neighbors"""
-    n_treated = jnp.dot(adj_mat, trts)
-    degs = jnp.sum(adj_mat, axis=1)
-    non_zero_mask = (degs != 0)
-    prop_treated = jnp.where(non_zero_mask, n_treated / degs, 0.0)
-    return prop_treated
+# @jit
+# def prop_treated_neighbors(trts, adj_mat):
+#     """Compute the proportion of treated neighbors"""
+#     n_treated = jnp.dot(adj_mat, trts)
+#     degs = jnp.sum(adj_mat, axis=1)
+#     non_zero_mask = (degs != 0)
+#     prop_treated = jnp.where(non_zero_mask, n_treated / degs, 0.0)
+#     return prop_treated
 
 def Triu_to_mat(triu_v, n):
     """Convert a vector of the upper triangular part of a matrix to a symmetric matrix"""
@@ -74,6 +74,21 @@ def zeigen_value(Z, adj_mat):
     # else:
     #     return zeigen
 
+@jit
+def prop_treated_neighbors(Z, adj_mat):
+    # degrees = jnp.sum(adj_mat, axis=1)
+    if Z.ndim == 1:  # Case when Z has shape (N,)
+        # Compute sum of treated neighbors
+        treated_sum = jnp.dot(adj_mat, Z)
+        # Compute proportion, avoiding division by zero
+        # return jnp.where(degrees != 0, treated_sum / degrees, 0.0)
+        return (treated_sum > 0).astype(jnp.int32)
+    elif Z.ndim == 2:  # Case when Z has shape (M, N)
+        # Compute sum of treated neighbors for each set of treatments
+        treated_sum = jnp.dot(Z, adj_mat.T)  # Shape: (M, N)
+        # Compute proportion, avoiding division by zero
+        # return jnp.where(degrees != 0, treated_sum / degrees, 0.0)
+        return (treated_sum > 0).astype(jnp.int32)
 
 def stochastic_intervention(alpha, n, n_approx=500):
     z_stoch = rng.binomial(n=1, p=alpha, size=(n_approx, n))
@@ -244,9 +259,11 @@ class Outcome_MCMC:
 def posterior_exposures(triu_sample, trts, n):
     """Compute the posterior exposures values"""
     curr_Astar = Triu_to_mat(triu_sample, n=n)
-    # exposures = prop_treated_neighbors(trts, curr_Astar)
-    exposures = zeigen_value(trts, curr_Astar)
-    return exposures
+    prop_trt = prop_treated_neighbors(trts, curr_Astar)
+    # zeigen = zeigen_value(trts, curr_Astar)
+    # return (prop_trt + zeigen)/2
+    # return zeigen
+    return prop_trt
 
 parallel_post_exposures = pmap(posterior_exposures, in_axes=(0, None, None))
 vectorized_post_exposures = vmap(posterior_exposures, in_axes=(0, None, None))

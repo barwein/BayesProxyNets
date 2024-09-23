@@ -175,11 +175,15 @@ def data_for_outcome_regression(df, adj_mat):
     """Get the school data for the outcome regression"""
     school_df_elig = df[df['ELIGIBLE'] == 1]
     fixed_df = jnp.array(school_df_elig[["GENC", "ETHW", "ETHH", "GAME"]].values)
-    all_trts = jnp.array(df['TREAT_NUMERIC'].values == 2, dtype=int)
-    elig_trts = jnp.array(school_df_elig['TREAT_NUMERIC'].values == 2, dtype=int)
+    all_trts = jnp.array(df['TREAT_NUMERIC'].values == 1, dtype=int)
+    elig_trts = jnp.array(school_df_elig['TREAT_NUMERIC'].values == 1, dtype=int)
     Y = jnp.array(school_df_elig['WRISTOW2_NUMERIC'].values)
     sch_trt = jnp.array(school_df_elig['SCHTREAT_NUMERIC'].values)
+
+    # TODO: change
     exposures_all = util.zeigen_value(all_trts, adj_mat)
+    # exposures_all = util.prop_treated_neighbors(all_trts, adj_mat)
+
     exposures_elig = exposures_all[(df['ELIGIBLE'] == 1).values]
     grades = group_indicators_to_indices(school_df_elig[['GRC_6', 'GRC_7', 'GRC_8']])
     school = jnp.array(school_df_elig['SCHID'].values, dtype = int)

@@ -36,9 +36,9 @@ def one_school_network_analysis(df: pd.DataFrame):
     one_noisy_net = util.Network_SVI(x_df = cov_for_net,
                                       triu_obs = dw.adj_to_triu(ST_net),
                                       network_model=models.one_noisy_networks_model,
-                                      n_iter = 100,
+                                      n_iter = 20,
                                       # n_iter = 20000,
-                                      n_samples = 100)
+                                      n_samples = 20)
                                       # n_samples = 10000)
     one_noisy_net.train_model()
     post_one_noisy_net = one_noisy_net.network_samples()
@@ -48,9 +48,9 @@ def one_school_network_analysis(df: pd.DataFrame):
                                      triu_obs = torch.stack([dw.adj_to_triu(ST_net),
                                                              dw.adj_to_triu(ST_W2_net)]),
                                      network_model=models.repeated_noisy_networks_model,
-                                     n_iter = 100,
+                                     n_iter = 20,
                                      # n_iter = 20000,
-                                     n_samples = 100)
+                                     n_samples = 20)
                                      # n_samples = 10000)
     two_noisy_net.train_model()
     post_two_noisy_net = two_noisy_net.network_samples()
@@ -60,9 +60,9 @@ def one_school_network_analysis(df: pd.DataFrame):
                                       triu_obs = torch.stack([dw.adj_to_triu(ST_net),
                                                               dw.adj_to_triu(BF_net)]),
                                       network_model=models.multilayer_networks_model,
-                                      n_iter = 100,
+                                      n_iter = 20,
                                       # n_iter = 20000,
-                                      n_samples = 100)
+                                      n_samples = 20)
                                       # n_samples = 10000)
     multilayer_net.train_model()
     post_multilayer_net = multilayer_net.network_samples()
@@ -135,8 +135,9 @@ def one_school_iteration(all_df, schid):
     all_stoch_expos, elig_stoch_expos = get_stoch_treatments_and_obs_exposures(df_school, all_nets[0])
     # all_stoch_expos shape is (2, 3, n_approx, N) and elig_stoch_expos shape is (2, 3, n_approx, N)
     # Get posterior exposures for observed treatments for each network model
+    obs_treatments = jnp.array(df_school['TREAT_NUMERIC'].values == 1, dtype=int)
     post_obs_exposure = posterior_exposure_for_obs_treatments(net_post_samples,
-                                                              jnp.array(df_school['TREAT_NUMERIC'].values),
+                                                              obs_treatments,
                                                               df_school)
     # Posterior exposures for stochastic interventions
     post_stoch_expos = posterior_stoch_exposures(net_post_samples, all_stoch_expos, df_school)
