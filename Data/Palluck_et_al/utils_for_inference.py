@@ -259,11 +259,11 @@ class Outcome_MCMC:
 def posterior_exposures(triu_sample, trts, n):
     """Compute the posterior exposures values"""
     curr_Astar = Triu_to_mat(triu_sample, n=n)
-    prop_trt = prop_treated_neighbors(trts, curr_Astar)
-    # zeigen = zeigen_value(trts, curr_Astar)
+    # prop_trt = prop_treated_neighbors(trts, curr_Astar)
+    zeigen = zeigen_value(trts, curr_Astar)
     # return (prop_trt + zeigen)/2
-    # return zeigen
-    return prop_trt
+    return zeigen
+    # return prop_trt
 
 parallel_post_exposures = pmap(posterior_exposures, in_axes=(0, None, None))
 vectorized_post_exposures = vmap(posterior_exposures, in_axes=(0, None, None))
