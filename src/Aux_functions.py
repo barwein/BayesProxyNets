@@ -743,7 +743,8 @@ class Outcome_MCMC:
 
     def print_zeig_error(self, data):
         if self.type == "observed":
-            print("Obs. mape zeigen: ",jnp.mean(jnp.abs(self.zeigen - data["Zeigen"])))
+            obs_mae_error = jnp.mean(jnp.abs(self.zeigen - data["Zeigen"]))
+            print("Obs. mape zeigen: ",obs_mae_error)
 
     def get_df(self):
         # return jnp.transpose(jnp.array([[1]*self.n, self.Z, self.X, self.X2, self.zeigen]))

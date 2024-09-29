@@ -83,8 +83,9 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
                                                                                                        df_obs["Z_h"],
                                                                                                        df_obs["Z_stoch"])
 
-    print("Post abs zeigen estimator error:", np.mean(np.abs(np.mean(post_zeig,axis=0) - df_oracle["Zeigen"])))
-    print("Post abs zeigen error:", np.mean(np.abs(post_zeig - df_oracle["Zeigen"])))
+    # print("Post abs zeigen estimator error:", np.mean(np.abs(np.mean(post_zeig,axis=0) - df_oracle["Zeigen"])))
+    post_zeig_error = np.mean(np.abs(post_zeig - df_oracle["Zeigen"]))
+    print("Post abs zeigen error:", post_zeig_error)
 
     # TODO: save MAE of posterior observed zeigen values
 
