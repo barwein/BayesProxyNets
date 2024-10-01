@@ -283,9 +283,7 @@ def compute_hdi(samples, cred_mass):
 # def compute_error_stats(esti_post_draws, true_estimand, method="TEST", estimand = "h", idx=None):
 def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     # esti_post_draws has shape (M, N)
-    print("esti_post_draws has shape", esti_post_draws.shape)
     # true_estimand has shape (N,)
-    print("true_estimand has shape", true_estimand.shape)
     mean_estimand = jnp.mean(true_estimand)  # scalar
     mean_units = jnp.mean(esti_post_draws, axis=1)  # shape (M,)
     mean_samples = jnp.mean(esti_post_draws, axis=0)  # shape (N,)
@@ -294,14 +292,18 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     medi = jnp.round(jnp.median(mean_units),3)
     std = jnp.round(jnp.std(mean_units),3)
     RMSE_all = jnp.round(jnp.sqrt(jnp.mean(jnp.power(esti_post_draws - true_estimand, 2))),3)
-    RMSE = jnp.round(jnp.sqrt(jnp.mean(jnp.power(mean_samples - true_estimand, 2))),3)
+    # RMSE = jnp.round(jnp.sqrt(jnp.mean(jnp.power(mean_samples - true_estimand, 2))),3)
+    RMSE = jnp.round(jnp.sqrt(jnp.mean(jnp.power(mean_units - mean_estimand, 2))),3)
     MAE_all = jnp.round(jnp.mean(jnp.abs(esti_post_draws - true_estimand)), 3)
-    MAE = jnp.round(jnp.mean(jnp.abs(mean_samples - true_estimand)),3)
-    MAPE = jnp.round(jnp.mean(jnp.abs((mean_samples - true_estimand) / (true_estimand + 1e-5))), 3)
-
+    MAE = jnp.round(jnp.mean(jnp.abs(mean_units - mean_estimand)),3)
+    # MAE = jnp.round(jnp.mean(jnp.abs(mean_samples - true_estimand)),3)
+    MAPE = jnp.round(jnp.mean(jnp.abs((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
+    # MAPE = jnp.round(jnp.mean(jnp.abs((mean_samples - true_estimand) / (true_estimand + 1e-5))), 3)
     MAPE_all = jnp.round(jnp.mean(jnp.abs((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
-    rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_samples - true_estimand) / (true_estimand + 1e-5))), 3)
+
+    rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
     rel_RMSE_all = jnp.round(jnp.mean(jnp.square((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
+
     q025 = jnp.quantile(mean_units, 0.025)
     q025_ind = jnp.quantile(esti_post_draws, 0.025, axis=0)
     q975 = jnp.quantile(mean_units, 0.975)
@@ -546,7 +548,7 @@ def manual_gp_f_star_pred(df, ell, post_samples):
     # print('eta_0 shape:', intercept.shape, 'eta_1 shape:', x_eta.shape, "df x shape:", df[:,0].shape, "fh shape:", f_hat.shape)
     return intercept[:, jnp.newaxis]*ones[jnp.newaxis,:] + x_eta[:,jnp.newaxis]*df[:,0][jnp.newaxis,:] + jnp.array(f_hat)
     # return f_1 + f_2
-    return f_hat
+    # return f_hat
 
 @jit
 def linear_model_outcome_pred(z, zeigen, post_samples, x, x2, key):
@@ -574,20 +576,9 @@ def linear_pred(z, zeigen, post_samples, x, x2, key):
 def hsgp_model_outcome_pred(z, zeigen, post_samples, x, x2, ell, key):
 # def hsgp_model_outcome_pred(z, zeigen, post_samples, x, x2, ell1, ell2):
     # ell_ = jnp.array(c*jnp.max(jnp.abs(zeigen))).reshape(1,1)
-    # df = jnp.transpose(jnp.array([[1] * x.shape[0], z, x, x2, zeigen]))
-    # df1 = jnp.array(x)
-    # df1 = jnp.transpose(jnp.array([x, x2]))
-    # df1 = jnp.transpose(jnp.array([z, x]))
-    # df2 = jnp.transpose(jnp.array([z, zeigen]))
-    # df = jnp.transpose(jnp.array([[1] * N, z, zeigen]))
     df = jnp.transpose(jnp.array([x, z, zeigen]))
-    # pred = HSGP_jit_pred(post_samples, Xgp=df[:, 4:], Xlin=df[:, 0:4], ell=ell, key=key)
-    # pred = HSGP_jit_pred(post_samples, Xgp=df[:, 3:], Xlin=df[:, 0:3], ell=ell, key=key)
-    # pred = HSGP_jit_pred(post_samples, Xgp=df[:, 2:], Xlin=df[:, 0:2], ell=ell, key=key)
-    # return jnp.mean(pred["Y"], axis=1)
-    return HSGP_jit_pred(post_samples, df, ell, key)["Y"]
-    # return manual_gp_f_star_pred(df, ell, post_samples)
-    # return manual_gp_f_star_pred(df1, df2,ell1, ell2, post_samples)
+    # return HSGP_jit_pred(post_samples, df, ell, key)["Y"]
+    return manual_gp_f_star_pred(df, ell, post_samples)
 
 hsgp_model_pred = vmap(hsgp_model_outcome_pred, in_axes=(0, 0, None, None, None, None, None))
 # hsgp_model_pred = vmap(hsgp_model_outcome_pred, in_axes=(0, 0, None, None, None, None, None))

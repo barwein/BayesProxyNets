@@ -86,8 +86,8 @@ def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
     # print("Post abs zeigen estimator error:", np.mean(np.abs(np.mean(post_zeig,axis=0) - df_oracle["Zeigen"])))
     post_zeig_error = np.mean(np.abs(post_zeig - df_oracle["Zeigen"]))
     print("Post abs zeigen error:", post_zeig_error)
-    rand_post_zeig_error = jnp.mean(np.abs(post_zeig[idx] - df_oracle["Zeigen"][idx]))
-    print("Rand post abs zeigen error:", rand_post_zeig_error)
+    esti_post_zeig_error = jnp.mean(np.abs(post_zeig.mean(axis=0) - df_oracle["Zeigen"]))
+    print("Rand post abs zeigen error:", esti_post_zeig_error)
 
     # TODO: save MAE of posterior observed zeigen values
 
