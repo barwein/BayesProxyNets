@@ -30,34 +30,39 @@ cleaned_df = dw.clean_data(full_df)
 #  keep only treated schools
 cleaned_df = cleaned_df[cleaned_df['SCHTREAT_NUMERIC'] == 1]
 
+
+print("Number of students in total:", cleaned_df.shape)
+print("Number of unique schools:", len(cleaned_df['SCHID'].unique()))
+print("Number of eligible schools:", cleaned_df['ELIGIBLE'].sum())
+
 # run network analysis by school
-all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos = wrap.all_schools_network_run_and_posterior(cleaned_df)
-# all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos = wrap.all_schools_network_run_and_posterior(cleaned_df[cleaned_df['SCHID'].isin([1.0,3.0,6.0])])
-all_data['school'] = dw.transform_schid(all_data['school'])
+# all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos = wrap.all_schools_network_run_and_posterior(cleaned_df)
+# all_data['school'] = dw.transform_schid(all_data['school'])
 
 # run outcome regression with observed (ST) network
-observed_network_results = wrap.observed_network_run(all_data, all_stoch_trt_expos, rng_key)
+# observed_network_results = wrap.observed_network_run(all_data, all_stoch_trt_expos, rng_key)
 
 # onestage inference
-onestage_results = wrap.onestage_run(all_data,
-                                     all_stoch_trt_expos,
-                                     all_post_obs_expos,
-                                     all_post_stoch_expos,
-                                     rng_key)
+# onestage_results = wrap.onestage_run(all_data,
+#                                      all_stoch_trt_expos,
+#                                      all_post_obs_expos,
+#                                      all_post_stoch_expos,
+#                                      rng_key)
 
 # multistage inference
-multistage_results = wrap.multistage_run(all_data,
-                                            all_stoch_trt_expos,
-                                            all_post_obs_expos,
-                                            all_post_stoch_expos,
-                                            NUM_REP_MS,
-                                            rng_key)
+# multistage_results = wrap.multistage_run(all_data,
+#                                             all_stoch_trt_expos,
+#                                             all_post_obs_expos,
+#                                             all_post_stoch_expos,
+#                                             NUM_REP_MS,
+#                                             rng_key)
 
 # save results
-results_combined = pd.concat([observed_network_results, onestage_results, multistage_results])
-w_path = 'results/'
-res_file_name = w_path + 'palluck_et_al_analysis_results.csv'
-results_combined.to_csv(res_file_name, index=False)
+# results_combined = pd.concat([observed_network_results, onestage_results, multistage_results])
+# w_path = 'results/'
+# res_file_name = w_path + 'palluck_et_al_analysis_results.csv'
+# results_combined.to_csv(res_file_name, index=False)
+
 
 
 
