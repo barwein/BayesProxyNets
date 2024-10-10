@@ -79,7 +79,6 @@ def network_by_school(df: pd.DataFrame, cols: list[str], plot_network = False) -
     """
     Create network adjacency matrix for a given school.
     :param df: data frame
-    :param school_id: SCHID value
     :param cols: list of columns that defines the network
     :return: adj matrix
     """

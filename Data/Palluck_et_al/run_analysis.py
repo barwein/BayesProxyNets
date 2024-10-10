@@ -34,7 +34,7 @@ print("Number of unique schools:", len(cleaned_df['SCHID'].unique()))
 print("Number of eligible schools:", cleaned_df['ELIGIBLE'].sum())
 
 # run network analysis by school
-# all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos = wrap.all_schools_network_run_and_posterior(cleaned_df)
+all_data, all_stoch_trt_expos, all_post_obs_expos, all_post_stoch_expos = wrap.all_schools_network_run_and_posterior(cleaned_df)
 # all_data['school'] = dw.transform_schid(all_data['school'])
 
 # run outcome regression with observed (ST) network
