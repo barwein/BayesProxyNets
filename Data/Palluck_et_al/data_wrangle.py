@@ -103,6 +103,13 @@ def network_by_school(df: pd.DataFrame, cols: list[str], plot_network = False) -
            and int(a) in valid_ids and int(b) in valid_ids
            and int(a) != int(b)
     ]
+    # Remove duplicates
+    school_edgelist = [
+        (a, b)
+        for a, b in school_edgelist
+        if (b, a) not in set(school_edgelist)
+    ]
+
     # Add selfloops
     for id in valid_ids:
         school_edgelist.append((id, id))
