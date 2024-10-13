@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 import jax.numpy as jnp
 import torch
-from pandas import DataFrame
-import gc
 
 
 import utils_for_inference as util
@@ -13,7 +11,6 @@ import models_for_data_analysis as models
 
 ### Global variables ###
 ALPHAS = [0.3, 0.5, 0.7]
-# ALPHAS = [0.3, 0.7]
 MODELS_NAMES = ['Noise (single)', 'Noise (repeated)', 'Multilayer']
 
 ### Functions ###
@@ -36,10 +33,8 @@ def one_school_network_analysis(df: pd.DataFrame):
     one_noisy_net = util.Network_SVI(x_df = cov_for_net,
                                       triu_obs = dw.adj_to_triu(ST_net),
                                       network_model=models.one_noisy_networks_model,
-                                      n_iter = 20,
-                                      # n_iter = 20000,
-                                      n_samples = 20)
-                                      # n_samples = 10000)
+                                      n_iter = 20000,
+                                      n_samples = 10000)
     one_noisy_net.train_model()
     post_one_noisy_net = one_noisy_net.network_samples()
 
@@ -48,10 +43,8 @@ def one_school_network_analysis(df: pd.DataFrame):
                                      triu_obs = torch.stack([dw.adj_to_triu(ST_net),
                                                              dw.adj_to_triu(ST_W2_net)]),
                                      network_model=models.repeated_noisy_networks_model,
-                                     n_iter = 20,
-                                     # n_iter = 20000,
-                                     n_samples = 20)
-                                     # n_samples = 10000)
+                                     n_iter = 20000,
+                                     n_samples = 10000)
     two_noisy_net.train_model()
     post_two_noisy_net = two_noisy_net.network_samples()
 
@@ -60,10 +53,8 @@ def one_school_network_analysis(df: pd.DataFrame):
                                       triu_obs = torch.stack([dw.adj_to_triu(ST_net),
                                                               dw.adj_to_triu(BF_net)]),
                                       network_model=models.multilayer_networks_model,
-                                      n_iter = 20,
-                                      # n_iter = 20000,
-                                      n_samples = 20)
-                                      # n_samples = 10000)
+                                      n_iter = 20000,
+                                      n_samples = 10000)
     multilayer_net.train_model()
     post_multilayer_net = multilayer_net.network_samples()
 

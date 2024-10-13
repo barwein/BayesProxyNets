@@ -1,27 +1,17 @@
 import numpy as np
-import pandas as pd
 import os
 import jax.numpy as jnp
 from jax import random, jit, vmap, pmap
-from jax.scipy.special import expit, logit
-import numpyro.distributions as dist
-import numpyro
-from numpyro.contrib.funsor import config_enumerate
-# import
 from numpyro.infer import MCMC, NUTS, Predictive, SVI, TraceEnum_ELBO, TraceGraph_ELBO
-from numpyro.infer.autoguide import AutoNormal
 import pyro
 import torch
-from hsgp.approximation import hsgp_squared_exponential, eigenfunctions
-from hsgp.spectral_densities import diag_spectral_density_squared_exponential
-import models_for_data_analysis as models
 from tqdm import tqdm
-
+import models_for_data_analysis as models
 from src.Aux_functions import N_CORES
 
 # --- Global variables ---
-N_CORES = 4
-# N_CORES = 10
+N_CORES = 8
+# N_CORES = 20
 os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 rng = np.random.default_rng(151)
 
@@ -29,15 +19,6 @@ rng = np.random.default_rng(151)
 def n_edges_to_n_nodes(n_edges):
     """Compute the number of nodes from the number of edges"""
     return int((1 + jnp.sqrt(1 + 8*n_edges))/2)
-
-# @jit
-# def prop_treated_neighbors(trts, adj_mat):
-#     """Compute the proportion of treated neighbors"""
-#     n_treated = jnp.dot(adj_mat, trts)
-#     degs = jnp.sum(adj_mat, axis=1)
-#     non_zero_mask = (degs != 0)
-#     prop_treated = jnp.where(non_zero_mask, n_treated / degs, 0.0)
-#     return prop_treated
 
 def Triu_to_mat(triu_v, n):
     """Convert a vector of the upper triangular part of a matrix to a symmetric matrix"""
@@ -65,32 +46,10 @@ def zeigen_value(Z, adj_mat):
     eig_cen = eigen_centrality(adj_mat)
     if Z.ndim == 1:  # Case when Z has shape (N,)
         return jnp.dot(adj_mat, Z * eig_cen)
-        # zeigen = jnp.dot(adj_mat, Z * eig_cen)
     elif Z.ndim == 2:  # Case when Z has shape (M, N)
         return jnp.dot(Z * eig_cen, adj_mat.T)  # Transpose A_mat for correct dimensions
-        # zeigen = jnp.dot(Z * eig_cen, adj_mat.T)  # Transpose A_mat for correct dimensions
-    # if subset is not None:
-    #     return zeigen[subset]
-    # else:
-    #     return zeigen
 
-@jit
-def prop_treated_neighbors(Z, adj_mat):
-    # degrees = jnp.sum(adj_mat, axis=1)
-    if Z.ndim == 1:  # Case when Z has shape (N,)
-        # Compute sum of treated neighbors
-        treated_sum = jnp.dot(adj_mat, Z)
-        # Compute proportion, avoiding division by zero
-        # return jnp.where(degrees != 0, treated_sum / degrees, 0.0)
-        return (treated_sum > 0).astype(jnp.int32)
-    elif Z.ndim == 2:  # Case when Z has shape (M, N)
-        # Compute sum of treated neighbors for each set of treatments
-        treated_sum = jnp.dot(Z, adj_mat.T)  # Shape: (M, N)
-        # Compute proportion, avoiding division by zero
-        # return jnp.where(degrees != 0, treated_sum / degrees, 0.0)
-        return (treated_sum > 0).astype(jnp.int32)
-
-def stochastic_intervention(alpha, n, n_approx=500):
+def stochastic_intervention(alpha, n, n_approx=1000):
     z_stoch = rng.binomial(n=1, p=alpha, size=(n_approx, n))
     # z_stoch shape is (n_approx, n)
     return z_stoch
@@ -147,8 +106,7 @@ def linear_pred(trts, exposures, sch_treat, fixed_df, grade, school, post_sample
 
 class Network_SVI:
     """Class for training the network module and obtaining samples"""
-    def __init__(self, x_df, triu_obs, n_iter=100, n_samples=100, network_model=models.one_noisy_networks_model):
-    # def __init__(self, x_df, triu_obs, n_iter=20000, n_samples=10000, network_model=models.one_noisy_networks_model):
+    def __init__(self, x_df, triu_obs, n_iter=20000, n_samples=10000, network_model=models.one_noisy_networks_model):
         self.x_df = x_df
         self.triu_obs = triu_obs
         self.N_edges = self.x_df.shape[0]
@@ -170,16 +128,16 @@ class Network_SVI:
         optimzer = pyro.optim.ClippedAdam({"lr": 0.001})
         svi = pyro.infer.SVI(self.network_model, self.guide, optimzer, loss=loss_func)
         # losses_full = []
-        for _ in range(self.n_iter):
-        # for _ in tqdm(range(self.n_iter), desc="Training network model"):
+        # for _ in range(self.n_iter):
+        for _ in tqdm(range(self.n_iter), desc="Training network model"):
             svi.step(self.x_df, self.triu_obs, self.N)
             # loss = svi.step(self.X_diff, self.X2_eq, self.triu, self.n)
             # losses_full.append(loss)
 
     def network_samples(self):
         triu_star_samples = []
-        for _ in range(self.n_samples):
-        # for _ in tqdm(range(self.n_samples), desc="Sampling A*"):
+        # for _ in range(self.n_samples):
+        for _ in tqdm(range(self.n_samples), desc="Sampling A*"):
             # Get a trace from the guide
             guide_trace = pyro.poutine.trace(self.guide).get_trace(self.x_df, self.triu_obs, self.N)
             # Run infer_discrete
@@ -191,18 +149,13 @@ class Network_SVI:
             triu_star_samples.append(model_trace.nodes['triu_star']['value'])
         # Convert to jnp array
         return jnp.stack(jnp.array(triu_star_samples))
-        # triu_star_samples = torch.stack(triu_star_samples)
-        # return jnp.array(triu_star_samples)
 
     def sample_triu_obs_predictive(self, num_samples=1000):
         """Sample triu_obs for posterior predictive checks"""
         predictive = pyro.infer.Predictive(self.network_model, guide=self.guide, num_samples=num_samples)
-
         # Generate samples
         with torch.no_grad():
             posterior_samples = predictive(self.x_df, None, self.N)
-
-        # print(posterior_samples.keys())
 
         # Extract triu_obs samples
         if self.triu_obs.ndim == 1:
@@ -224,10 +177,6 @@ class Outcome_MCMC:
         self.sch_trts = data["sch_trts"]
         self.exposures = data["exposures"]
         self.Y = data["Y"]
-        # self.triu_v = data["triu_v"]
-        # self.adj_mat = Triu_to_mat(self.triu_v, self.fixed_df.shape[0])
-        # self.exposures = prop_treated_neighbors(self.trts, self.adj_mat)
-        # self.exposures = zeigen_value(self.trts, self.adj_mat)
         self.rng_key = rng_key
         self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, trts=self.trts, exposures=self.exposures,
                                                                  sch_treat=self.sch_trts, fixed_df=self.fixed_df,
@@ -259,11 +208,8 @@ class Outcome_MCMC:
 def posterior_exposures(triu_sample, trts, n):
     """Compute the posterior exposures values"""
     curr_Astar = Triu_to_mat(triu_sample, n=n)
-    # prop_trt = prop_treated_neighbors(trts, curr_Astar)
     zeigen = zeigen_value(trts, curr_Astar)
-    # return (prop_trt + zeigen)/2
     return zeigen
-    # return prop_trt
 
 parallel_post_exposures = pmap(posterior_exposures, in_axes=(0, None, None))
 vectorized_post_exposures = vmap(posterior_exposures, in_axes=(0, None, None))
@@ -293,9 +239,7 @@ def one_linear_run(post_exposures, post_new_exposures, obs_trts, new_trts, sch_t
 
     res = jnp.stack(preds)
     # res shape is (G, B, N) where G = num_new_trts, B = num_post_samples, N = n
-    # print(res.shape)
     return res
-    # return jnp.array(preds)
 
 parallel_linear_run = pmap(one_linear_run, in_axes=(0, 0, None, None, None, None, None, None, None, None))
 
@@ -314,20 +258,11 @@ def linear_multistage(post_exposures, post_new_exposures, obs_trts, new_trts, sc
                                         Y, key)
         results.append(i_results)
     results_arr = jnp.concatenate(results, axis=0)
-    # print("result_c shape: ", results_arr.shape)
     result_arr = jnp.transpose(results_arr, axes=(1, 0, 2, 3))
-    # print("result transposed shape: ", result_arr.shape)
     num_new_trts = new_trts.shape[0]
     num_post_samples = result_arr.shape[-2]
     result_arr = result_arr.reshape((num_new_trts, num_net_samples*num_post_samples , n))
     return result_arr
-    # results_c = vectorized_multistage(multi_samp_nets, Y, Z_obs, Z_new, X, key)
-    # n_samples = results_c.shape[2]
-    # save error stats
-    # results_lin_h = results_c[:, 0, :, :]
-    # results_lin_h = results_c
-    # results_lin_h_long = results_lin_h.reshape((B * n_samples, n))
-    # return results_lin_h_long
 
 
 class Onestage_MCMC:

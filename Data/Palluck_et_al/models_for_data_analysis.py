@@ -1,24 +1,11 @@
-import jax.lax
-import numpy as np
-import pandas as pd
-import os
 import jax.numpy as jnp
-from jax import random, jit, vmap, pmap
-from jax.scipy.special import expit, logit
 import numpyro.distributions as dist
 import numpyro
-from numpyro.contrib.funsor import config_enumerate
 import pyro
 import torch
-# import
-from numpyro.infer import MCMC, NUTS, Predictive
-from hsgp.approximation import hsgp_squared_exponential, eigenfunctions
-from hsgp.spectral_densities import diag_spectral_density_squared_exponential
-
 # --- Global variables ---
 
 NUM_SCHOOLS = 28
-# NUM_SCHOOLS = 56
 NUM_GRADES = 3
 
 # --- Network models ---
@@ -32,13 +19,9 @@ def one_noisy_networks_model(x_df, triu_v, N, K=2, eps=1e-3):
     :param N: number of units
     :param K: latent variables dimension
     """
-    # log_sigma_sq = pyro.sample("log_sigma_sq", dist.Normal(0, 5))
-    # sigma_sq = torch.exp(log_sigma_sq)
     with pyro.plate("Latent_dim", N):
         nu = pyro.sample("nu",
                          pyro.distributions.MultivariateNormal(torch.zeros(K) + eps, torch.eye(K)))
-        # nu_standard = pyro.sample("nu_standard", dist.MultivariateNormal(torch.zeros(K), torch.eye(K)))
-    # nu = pyro.deterministic("nu", nu_standard * torch.sqrt(sigma_sq))
 
     idx = torch.triu_indices(N, N, offset=1)
     nu_diff = nu[idx[0]] - nu[idx[1]]
@@ -50,8 +33,8 @@ def one_noisy_networks_model(x_df, triu_v, N, K=2, eps=1e-3):
                             pyro.distributions.Normal(0, 5))
 
     mu_net = theta_intercept + torch.matmul(x_df, theta) - nu_diff_norm_val
-    # mu_net = theta_intercept + x_df @ theta - nu_diff_norm_val
     mu_net = torch.clamp(mu_net, min=-30, max=30)
+
     with pyro.plate("gamma_i", 2 + x_df.shape[1]):
         gamma = pyro.sample("gamma",
                             pyro.distributions.Normal(0, 5))
@@ -78,13 +61,10 @@ def repeated_noisy_networks_model(x_df, triu_v, N, K=2, eps=1e-3):
     :param N: number of units
     :param K: latent variables dimension
     """
-    # log_sigma_sq = pyro.sample("log_sigma_sq", dist.Normal(0, 5))
-    # sigma_sq = torch.exp(log_sigma_sq)
+
     with pyro.plate("Latent_dim", N):
         nu = pyro.sample("nu",
                          pyro.distributions.MultivariateNormal(torch.zeros(K) + eps, torch.eye(K)))
-        # nu_standard = pyro.sample("nu_standard", dist.MultivariateNormal(torch.zeros(K), torch.eye(K)))
-    # nu = pyro.deterministic("nu", nu_standard * torch.sqrt(sigma_sq))
 
     idx = torch.triu_indices(N, N, offset=1)
     nu_diff = nu[idx[0]] - nu[idx[1]]
@@ -96,8 +76,8 @@ def repeated_noisy_networks_model(x_df, triu_v, N, K=2, eps=1e-3):
                             pyro.distributions.Normal(0, 5))
 
     mu_net = theta_intercept + torch.matmul(x_df, theta) - nu_diff_norm_val
-    # mu_net = theta_intercept + x_df @ theta - nu_diff_norm_val
     mu_net = torch.clamp(mu_net, min=-30, max=30)
+
     with pyro.plate("gamma_A1", 2):
         gamma_a1 = pyro.sample("gamma_1",
                                pyro.distributions.Normal(0, 5))
@@ -136,13 +116,9 @@ def multilayer_networks_model(x_df, triu_v, N, K=2, eps=1e-3):
     :param N: number of units
     :param K: latent variables dimension
     """
-    # log_sigma_sq = pyro.sample("log_sigma_sq", dist.Normal(0, 5))
-    # sigma_sq = torch.exp(log_sigma_sq)
     with pyro.plate("Latent_dim", N):
         nu = pyro.sample("nu",
                          pyro.distributions.MultivariateNormal(torch.zeros(K) + eps, torch.eye(K)))
-        # nu_standard = pyro.sample("nu_standard", dist.MultivariateNormal(torch.zeros(K), torch.eye(K)))
-    # nu = pyro.deterministic("nu", nu_standard * torch.sqrt(sigma_sq))
 
     idx = torch.triu_indices(N, N, offset=1)
     nu_diff = nu[idx[0]] - nu[idx[1]]
@@ -154,7 +130,6 @@ def multilayer_networks_model(x_df, triu_v, N, K=2, eps=1e-3):
                             pyro.distributions.Normal(0, 5))
 
     mu_net = theta_intercept + torch.matmul(x_df, theta) - nu_diff_norm_val
-    # mu_net = theta_intercept + x_df @ theta - nu_diff_norm_val
     mu_net = torch.clamp(mu_net, min=-30, max=30)
 
     with pyro.plate("gamma_A1", 2 + x_df.shape[1]):
@@ -173,8 +148,7 @@ def multilayer_networks_model(x_df, triu_v, N, K=2, eps=1e-3):
         logit_misspec_A1 = torch.where(triu_star == 1.0,
                                        gamma_a1[0],
                                        gamma_a1[1] + x_df @ gamma_a1[2:])
-        # logit_misspec_A1 = gamma_a1[0] + gamma_a1[1] * triu_star + torch.matmul(x_df, gamma_a1[2:])
-        # logit_misspec_A2 = gamma_a2[0] + gamma_a2[1] * triu_star + torch.matmul(x_df, gamma_a2[2:])
+
         logit_misspec_A2 = torch.where(triu_star == 1.0,
                                        gamma_a2[0],
                                        gamma_a2[1] + x_df @ gamma_a2[2:])
@@ -211,12 +185,11 @@ def outcome_model(trts, exposures, sch_treat, fixed_df, grade, school, Y=None):
     # --- treatment effect ---
     eta_trt = numpyro.sample("eta_trt", dist.Normal(0, 5))
     eta_exposures = numpyro.sample("eta_exposures", dist.Normal(0, 5))
-    # eta_interaction = numpyro.sample("eta_interaction", dist.Normal(0, 5))
-    # treat_effect = sch_treat*(eta_trt*trts + eta_exposures*exposures + eta_interaction*trts*exposures)
-    # treat_effect = eta_trt*trts + eta_exposures*exposures + eta_interaction*trts*exposures
     treat_effect = eta_trt*trts + eta_exposures*exposures
+
     # --- outcome model ---
     mu_y = fixed_effects + eta_sch[school] + eta_grade[grade] + treat_effect
+
     # --- likelihood --
     with numpyro.plate("obs", fixed_df.shape[0]):
         numpyro.sample("Y", dist.Bernoulli(logits=mu_y),

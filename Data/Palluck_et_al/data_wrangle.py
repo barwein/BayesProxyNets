@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pyreadr
 import re
 import jax.numpy as jnp
 from itertools import combinations
@@ -21,6 +20,9 @@ COV_FOR_NETWORK = [["GENC"],
                    ["GAME"],
                    ["GRC_6", "GRC_7", "GRC_8"]]
 
+
+### Aux functions for data wrangling ###
+
 def extract_numeric(x):
     match = re.search(r'\(?([0-9,.]+)\)?', str(x))
     return float(match.group(1)) if match else np.nan
@@ -36,7 +38,6 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     data_cleaned = data.copy()
     data_cleaned['ID'] = pd.to_numeric(data_cleaned['ID'], errors='coerce').fillna(0.0)
     data_cleaned['SCHRB'] = pd.to_numeric(data_cleaned['SCHRB'], errors='coerce')
-    # all_schools = all_schools[~all_schools['SCHRB'].isna() & (all_schools['ID'] != 999.0)]
     data_cleaned = data_cleaned[~data_cleaned['SCHRB'].isna() &
                               (data_cleaned['ID'] != 999.0) &
                               (data_cleaned['ID'] != 0.0) &
@@ -61,10 +62,8 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     for cov in COV_LIST:
         if type(data_cleaned[cov].iloc[1]) == str:
             val = data_cleaned[cov].apply(extract_numeric).fillna(0.0).astype(int)
-            # df_subset.loc[:,cov] = val
             data_subset = data_subset.assign(**{cov: val})
         else:
-            # df_subset.loc[:,cov] = all_schools[cov]
             data_subset = data_subset.assign(**{cov: data_cleaned[cov]})
 
     # Get dummies of 'GRC' (grade) variable
@@ -88,7 +87,6 @@ def network_by_school(df: pd.DataFrame, cols: list[str], plot_network = False) -
         df.loc[row_mask, col] = np.nan
     # Add SCHID * 1000 to survey data (to obtain edge list with `unique_id` values)
     for col in cols:
-        # df[col] += df['SCHID'] * 1000
         df.loc[:,col] += df['SCHID'] * 1000
     # Save edgelists
     school_edgelist = []
@@ -171,9 +169,6 @@ def group_indicators_to_indices(df):
     Returns:
     jax.numpy.ndarray: N x 1 array of indices.
     """
-    # Check if each row sums to 1
-    # if not (df.sum(axis=1) == 1).all():
-    #     raise ValueError("Each row in the DataFrame must sum to 1")
     indices = jnp.argmax(df.values, axis=1)
     return indices
 
@@ -188,12 +183,10 @@ def data_for_outcome_regression(df, adj_mat):
 
     # TODO: change
     exposures_all = util.zeigen_value(all_trts, adj_mat)
-    # exposures_all = util.prop_treated_neighbors(all_trts, adj_mat)
 
     exposures_elig = exposures_all[(df['ELIGIBLE'] == 1).values]
     grades = group_indicators_to_indices(school_df_elig[['GRC_6', 'GRC_7', 'GRC_8']])
     school = jnp.array(school_df_elig['SCHID'].values, dtype = int)
-    # school = jnp.array(school_df_elig['SCHID'].values)
 
     return {'X' : fixed_df, 'school' : school,  'grade' : grades,
             'trts' : elig_trts, 'sch_trts' : sch_trt ,

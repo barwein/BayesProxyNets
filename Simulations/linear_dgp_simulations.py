@@ -27,6 +27,7 @@ N = 500
 N_SIM = 500
 N_REP = 2000
 
+### Note: this script is intended to run in a power-cluster and may take a while to finish ###
 ### Consider reducing N or N_SIM before running the simulation ###
 
 if __name__ == "__main__":
