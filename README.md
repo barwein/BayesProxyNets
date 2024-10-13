@@ -8,7 +8,7 @@ The code is organized as follows:
 - `src/Aux_functions.py`: contains auxiliary functions used in the simulations and data analysis.
 - `Simulations/`: contains the code to run the simulations.
 - `hsgp/`: contains the code to run the HSGP algorithm based on [NumPyro implementation](https://github.com/pyro-ppl/numpyro/tree/master/numpyro/contrib/hsgp).
-- `Data_analysis/`: contains the code to run the data analysis on the Paluck et el. (2016) study.
+- `Data_analysis/`: contains the code to run the data analysis on the [Paluck et el. (2016) study](https://www.pnas.org/doi/abs/10.1073/pnas.1514483113#data-availability).
 
 ## Software Requirements
 The code is written in Python 3.11. The following packages are required to run the code:
