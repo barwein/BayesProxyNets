@@ -1,3 +1,11 @@
+
+# files:
+
+Data_analysis.ipynb
+TEST.ipynb
+test_cores.py
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

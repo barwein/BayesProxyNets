@@ -8,7 +8,6 @@ from jax.scipy.special import expit
 import numpyro.distributions as dist
 import numpyro
 from numpyro.contrib.funsor import config_enumerate
-# import
 from numpyro.infer import MCMC, NUTS, Predictive
 from hsgp.approximation import hsgp_squared_exponential, eigenfunctions
 from hsgp.spectral_densities import diag_spectral_density_squared_exponential
@@ -18,7 +17,6 @@ import torch
 from tqdm import tqdm
 from torch.utils.data import TensorDataset, DataLoader
 from joblib import Parallel, delayed
-
 
 # --- Set cores and seed ---
 N_CORES = 8
