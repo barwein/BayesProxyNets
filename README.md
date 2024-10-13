@@ -10,9 +10,6 @@ The code is organized as follows:
 - `hsgp/`: contains the code to run the HSGP algorithm based on NumPyro implementation.
 - `Data_analysis/`: contains the code to run the data analysis on the Paluck et el. (2016) study.
 
-## Data Availability
-The data used in the data analysis is available at the following link: https://www.icpsr.umich.edu/web/ICPSR/studies/37070
-
 ## Software Requirements
 The code is written in Python 3.11. The following packages are required to run the code:
 - numpy, jax, torch, numpyro, pyro, scipy, pandas, matplotlib, seaborn, networkx, tqdm, os, itertools, time, pyreadr
@@ -24,3 +21,6 @@ The code is written in Python 3.11. The following packages are required to run t
 
 
 Both scripts were executed in a power-cluster with multiple cores. Running them in a PC might take a while. Adjust parameters accordingly!
+
+## Data Availability
+The data used in the data analysis is available at the following link: https://www.icpsr.umich.edu/web/ICPSR/studies/37070
