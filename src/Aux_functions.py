@@ -145,7 +145,7 @@ C = 3
 #                 "estimand_h" : self.estimand_h,
 #                 "estimand_stoch" : self.estimand_stoch}
 
-# class that generate covariates (X) and true network (A*)
+# class that fixed data across all simulations (covariates X, true network A*, and estimands)
 class GenerateFixedData:
     def __init__(self, rng, theta, eta, sig_y, lin, alphas, n=N):
         self.n = n
