@@ -11,14 +11,15 @@ import src.Aux_functions as aux
 # eta, sig_y: p(Y | Z, X, A*, eta, sig_y)
 # alpha: pi_alpha(z) ---> stochastic intervention
 
-def one_simuation_iter(idx, theta, gamma, eta, sig_y, pz, n_rep, lin_y, alphas):
+def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
     rng_key = random.PRNGKey(1)
     _, rng_key = random.split(rng_key)
 
     rng = np.random.default_rng(idx)
 
     # --- Get data ---
-    df_oracle = aux.DataGeneration(rng=rng, theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
+    # df_oracle = aux.DataGeneration(rng=rng, theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
+    df_oracle = aux.SampleTreatmentsOutcomes(rng=rng, fixed_data=fixed_df, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y).get_data()
     # Generate noisy network measurement
     obs_network = aux.create_noisy_network(rng, df_oracle["triu"], gamma, df_oracle["X_diff"], df_oracle["X2_equal"])
     # save observed df and update A* and triu

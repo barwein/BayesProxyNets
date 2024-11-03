@@ -30,8 +30,124 @@ M = 20
 C = 3
 
 # --- data generation for each iteration ---
-class DataGeneration:
-    def __init__(self, rng, theta, eta, sig_y, pz, lin, alphas, n=N):
+# class DataGeneration:
+#     def __init__(self, rng, theta, eta, sig_y, pz, lin, alphas, n=N):
+#         self.n = n
+#         self.theta = theta
+#         self.eta = eta
+#         self.sig_y = sig_y
+#         self.lin = lin
+#         self.alphas = alphas
+#         self.rng = rng
+#         self.X = self.generate_X()
+#         self.X2 = self.generate_X2()
+#         self.U_latent = self.generate_U_latent()
+#         self.Z = self.generate_Z(p=pz)
+#         self.X_diff = self.x_diff()
+#         self.X2_equal = self.x2_equal()
+#         self.U_diff_norm = self.latent_to_norm_of_diff()
+#         self.triu_dim = int(self.n*(self.n-1)/2)
+#         self.triu = self.generate_triu()
+#         self.adj_mat = self.generate_adj_matrix()
+#         self.eig_cen = eigen_centrality(self.adj_mat)
+#         self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)
+#         self.Y, self.epsi = self.gen_outcome(self.Z, self.zeigen, with_epsi=True)
+#         self.Z_h = self.dynamic_intervention()
+#         self.Z_stoch = self.stochastic_intervention()
+#         self.estimand_h = self.get_true_estimand(self.Z_h)
+#         self.estimand_stoch = self.get_true_estimand(self.Z_stoch)
+#
+#     def generate_X(self, loc=0, scale=3):
+#         return jnp.array(self.rng.normal(loc=loc, scale=scale, size=self.n))
+#
+#     def generate_X2(self,p=0.1):
+#         return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
+#
+#     def generate_U_latent(self, loc=0, scale=1, K=2):
+#         return jnp.array(self.rng.normal(loc=loc, scale=scale, size=(self.n, K)))
+#
+#     def generate_Z(self, p):
+#         return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
+#
+#     def x_diff(self):
+#         idx_pairs = list(combinations(range(self.n), 2))
+#         x_d = jnp.array([abs(self.X[i] - self.X[j]) for i, j in idx_pairs])
+#         return x_d
+#
+#     def x2_equal(self):
+#         idx_pairs = list(combinations(range(self.n), 2))
+#         x2_equal = jnp.array([1 if (self.X2[i] + self.X2[j] == 1) else 0 for i, j in idx_pairs])
+#         return x2_equal
+#
+#     def latent_to_norm_of_diff(self):
+#         idx = jnp.triu_indices(n=self.n, k=1)
+#         U_diff = self.U_latent[idx[0]] - self.U_latent[idx[1]]
+#         return jnp.linalg.norm(U_diff, axis=1)
+#
+#     def generate_triu(self):
+#         probs = expit(self.theta[0] + self.theta[1]*self.X2_equal - self.U_diff_norm)
+#         return self.rng.binomial(n=1, p=probs, size=self.triu_dim)
+#
+#     def generate_adj_matrix(self):
+#         mat = np.zeros((self.n, self.n))
+#         idx_upper_tri = np.triu_indices(n=self.n, k=1)
+#         mat[idx_upper_tri] = self.triu
+#         return mat + mat.T
+#
+#     def gen_outcome(self, z, zeig, with_epsi):
+#         df_lin = jnp.transpose(np.array([[1]*self.n, z, self.X, self.X2]))
+#         if self.lin:
+#             mean_y = jnp.dot(jnp.column_stack((df_lin, zeig)), self.eta)
+#         else:
+#             return "Non-linear not implemented"
+#         if with_epsi:
+#             epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
+#             Y = jnp.array(mean_y + epsi)
+#             return Y, epsi
+#         else:
+#             return mean_y
+#
+#     def dynamic_intervention(self, thresholds=(1.5, 2)):
+#         Z_h1 = jnp.where((self.X > thresholds[0]) | (self.X < -thresholds[0]), 1, 0)
+#         Z_h2 = jnp.where((self.X > thresholds[1]) | (self.X < -thresholds[1]), 1, 0)
+#         return jnp.array([Z_h1, Z_h2])
+#
+#     def stochastic_intervention(self, n_approx=1000):
+#         z_stoch1 = self.rng.binomial(n=1, p=self.alphas[0], size=(n_approx, self.n))
+#         z_stoch2 = self.rng.binomial(n=1, p=self.alphas[1], size=(n_approx, self.n))
+#         return jnp.array([z_stoch1, z_stoch2])
+#
+#     def get_true_estimand(self, z_new):
+#         if z_new.ndim == 3:
+#             zeigen_new1 = zeigen_value(z_new[0,:,:], self.eig_cen, self.adj_mat)
+#             zeigen_new2 = zeigen_value(z_new[1,:,:], self.eig_cen, self.adj_mat)
+#             n_stoch = z_new.shape[1]
+#             results = np.zeros((n_stoch, N))
+#             for i in range(n_stoch):
+#                 y1 = self.gen_outcome(z_new[0,i,], zeigen_new1[i,], with_epsi=False)
+#                 y2 = self.gen_outcome(z_new[1,i,], zeigen_new2[i,], with_epsi=False)
+#                 results[i,] = y1 - y2
+#             return jnp.mean(results, axis=0).squeeze()
+#         else:
+#             zeigen_new1 = zeigen_value(z_new[0,:], self.eig_cen, self.adj_mat)
+#             zeigen_new2 = zeigen_value(z_new[1,:], self.eig_cen, self.adj_mat)
+#             y1 = self.gen_outcome(z_new[0,], zeigen_new1, with_epsi=False)
+#             y2 = self.gen_outcome(z_new[1,], zeigen_new2, with_epsi=False)
+#             return y1 - y2
+#
+#     def get_data(self):
+#         return {"Z" : self.Z, "X" : self.X,
+#                 "X2" : self.X2, "Y" : self.Y,
+#                 "triu" : self.triu, "Zeigen" : self.zeigen,
+#                 "eig_cen" : self.eig_cen, "adj_mat" : self.adj_mat,
+#                 "X_diff" : self.X_diff, "X2_equal" : self.X2_equal,
+#                 "Z_h" : self.Z_h, "Z_stoch" : self.Z_stoch,
+#                 "estimand_h" : self.estimand_h,
+#                 "estimand_stoch" : self.estimand_stoch}
+
+# class that generate covariates (X) and true network (A*)
+class GenerateFixedData:
+    def __init__(self, rng, theta, eta, sig_y, lin, alphas, n=N):
         self.n = n
         self.theta = theta
         self.eta = eta
@@ -42,7 +158,6 @@ class DataGeneration:
         self.X = self.generate_X()
         self.X2 = self.generate_X2()
         self.U_latent = self.generate_U_latent()
-        self.Z = self.generate_Z(p=pz)
         self.X_diff = self.x_diff()
         self.X2_equal = self.x2_equal()
         self.U_diff_norm = self.latent_to_norm_of_diff()
@@ -50,8 +165,6 @@ class DataGeneration:
         self.triu = self.generate_triu()
         self.adj_mat = self.generate_adj_matrix()
         self.eig_cen = eigen_centrality(self.adj_mat)
-        self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)
-        self.Y, self.epsi = self.gen_outcome(self.Z, self.zeigen, with_epsi=True)
         self.Z_h = self.dynamic_intervention()
         self.Z_stoch = self.stochastic_intervention()
         self.estimand_h = self.get_true_estimand(self.Z_h)
@@ -66,8 +179,8 @@ class DataGeneration:
     def generate_U_latent(self, loc=0, scale=1, K=2):
         return jnp.array(self.rng.normal(loc=loc, scale=scale, size=(self.n, K)))
 
-    def generate_Z(self, p):
-        return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
+    # def generate_Z(self, p):
+    #     return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
 
     def x_diff(self):
         idx_pairs = list(combinations(range(self.n), 2))
@@ -136,6 +249,54 @@ class DataGeneration:
             return y1 - y2
 
     def get_data(self):
+        return {"X" : self.X, "X2" : self.X2,
+                "triu" : self.triu, "eig_cen" : self.eig_cen,
+                "adj_mat" : self.adj_mat,
+                "X_diff" : self.X_diff, "X2_equal" : self.X2_equal,
+                "Z_h" : self.Z_h, "Z_stoch" : self.Z_stoch,
+                "estimand_h" : self.estimand_h,
+                "estimand_stoch" : self.estimand_stoch}
+
+
+class SampleTreatmentsOutcomes:
+    def __init__(self, rng, fixed_data, eta, sig_y, pz, lin, n=N):
+        self.n = n
+        self.eta = eta
+        self.sig_y = sig_y
+        self.lin = lin
+        self.rng = rng
+        self.X = fixed_data["X"]
+        self.X2 = fixed_data["X2"]
+        self.Z = self.generate_Z(p=pz)
+        self.X_diff = fixed_data["X_diff"]
+        self.X2_equal = fixed_data["X2_equal"]
+        self.triu = fixed_data["triu"]
+        self.adj_mat = fixed_data["adj_mat"]
+        self.eig_cen = fixed_data["eig_cen"]
+        self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)
+        self.Y, self.epsi = self.gen_outcome(self.Z, self.zeigen, with_epsi=True)
+        self.Z_h = fixed_data["Z_h"]
+        self.Z_stoch = fixed_data["Z_stoch"]
+        self.estimand_h = fixed_data["estimand_h"]
+        self.estimand_stoch = fixed_data["estimand_stoch"]
+
+    def generate_Z(self, p):
+        return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
+
+    def gen_outcome(self, z, zeig, with_epsi):
+        df_lin = jnp.transpose(np.array([[1]*self.n, z, self.X, self.X2]))
+        if self.lin:
+            mean_y = jnp.dot(jnp.column_stack((df_lin, zeig)), self.eta)
+        else:
+            return "Non-linear not implemented"
+        if with_epsi:
+            epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
+            Y = jnp.array(mean_y + epsi)
+            return Y, epsi
+        else:
+            return mean_y
+
+    def get_data(self):
         return {"Z" : self.Z, "X" : self.X,
                 "X2" : self.X2, "Y" : self.Y,
                 "triu" : self.triu, "Zeigen" : self.zeigen,
@@ -144,6 +305,8 @@ class DataGeneration:
                 "Z_h" : self.Z_h, "Z_stoch" : self.Z_stoch,
                 "estimand_h" : self.estimand_h,
                 "estimand_stoch" : self.estimand_stoch}
+
+
 
 
 # --- General aux functions ---
