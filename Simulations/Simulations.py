@@ -32,7 +32,8 @@ def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
 
     print("Running network module")
     # --- network module ---
-    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=20000, n_samples=10000)
+    network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=10000, n_samples=1000)
+    # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=20000, n_samples=10000)
     network_svi.train_model()
     network_pred_samples = network_svi.network_samples()
 
@@ -54,6 +55,8 @@ def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
                                                                                                        df_obs["Z_h"],
                                                                                                        df_obs["Z_stoch"])
 
+    post_Q_mat = aux.get_post_Q_mat(network_pred_samples)
+
     post_zeig_error = np.mean(np.abs(post_zeig - df_oracle["Zeigen"]))
     print("Post abs zeigen error:", post_zeig_error)
     esti_post_zeig_error = jnp.mean(np.abs(post_zeig.mean(axis=0) - df_oracle["Zeigen"]))
@@ -68,6 +71,7 @@ def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
                                             zeigen_h2_post=post_zeig_h2[i_range,],
                                             zeigen_stoch_post = post_zeig_stoch1[i_range,],
                                             zeigen_stoch2_post=post_zeig_stoch2[i_range,],
+                                            Q_post_mat= post_Q_mat[i_range,],
                                             x=df_obs["X"],
                                             x2=df_obs["X2"],
                                             y=df_obs["Y"],
@@ -86,6 +90,7 @@ def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
     mean_post_zeigen_h2 = post_zeig_h2.mean(axis=0)
     mean_post_zeigen_stoch1 = post_zeig_stoch1.mean(axis=0)
     mean_post_zeigen_stoch2 = post_zeig_stoch2.mean(axis=0)
+    mean_post_Q = post_Q_mat.mean(axis=0)
 
     onestage_outcome_mcmc = aux.Onestage_MCMC(Y=df_obs["Y"],
                                               X=df_obs["X"],
@@ -100,6 +105,7 @@ def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
                                               h2_zeigen=mean_post_zeigen_h2,
                                               stoch1_zeigen=mean_post_zeigen_stoch1,
                                               stoch2_zeigen=mean_post_zeigen_stoch2,
+                                              Q_post=mean_post_Q,
                                               rng_key=rng_key,
                                               iter=idx)
     onestage_results = onestage_outcome_mcmc.get_results()
@@ -108,6 +114,7 @@ def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
     results_all = jnp.vstack([oracle_results, obs_results,
                              threestage_results,
                              onestage_results])
+    print("results shape: ", results_all.shape)
     return results_all
 
 
@@ -119,10 +126,15 @@ COLUMNS = ["idx", "mean", "median", "true", "bias",
            "MAPE", 'MAPE_all', 'rel_RMSE', 'rel_RMSE_all',
            "q025", "q975", "covering", "mean_ind_cover"]
 
-METHODS = ['Linear_oracle', 'GP_oracle', 'Linear_oracle', 'GP_oracle',
-             'Linear_observed', 'GP_observed', 'Linear_observed', 'GP_observed',
-             'Linear_3S','Linear_3S', 'GP_3S', 'GP_3S',
-             'Linear_1S', 'GP_1S', 'Linear_1S', 'GP_1S']
+# METHODS = ['Linear_oracle', 'GP_oracle', 'Linear_oracle', 'GP_oracle',
+#              'Linear_observed', 'GP_observed', 'Linear_observed', 'GP_observed',
+#              'Linear_3S','Linear_3S', 'GP_3S', 'GP_3S',
+#              'Linear_1S', 'GP_1S', 'Linear_1S', 'GP_1S']
+
+METHODS = ['Linear_oracle', 'BYM_oracle', 'Linear_oracle', 'BYM_oracle',
+             'Linear_observed', 'BYM_observed', 'Linear_observed', 'BYM_observed',
+             'Linear_3S','Linear_3S', 'BYM_3S', 'BYM_3S',
+             'Linear_1S', 'BYM_1S', 'Linear_1S', 'BYM_1S']
 
 ESTIMANDS = ['dynamic', 'dynamic', 'stoch', 'stoch',
             'dynamic', 'dynamic', 'stoch', 'stoch',

@@ -2,6 +2,7 @@
 import numpy as np
 import os
 from itertools import combinations
+import scipy as sp
 import jax.numpy as jnp
 from jax import random, jit, vmap, pmap
 from jax.scipy.special import expit
@@ -24,7 +25,8 @@ N_CORES = 8
 os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 
 # --- Set global variables and values ---
-N = 500
+N = 100
+# N = 500
 TRIL_DIM = int(N*(N-1)/2)
 M = 20
 C = 3
@@ -206,26 +208,34 @@ class GenerateFixedData:
         idx_upper_tri = np.triu_indices(n=self.n, k=1)
         mat[idx_upper_tri] = self.triu
         return mat + mat.T
+    #
+    # def gen_outcome(self, z, zeig, with_epsi):
+    #     df_lin = jnp.transpose(np.array([[1]*self.n, z, self.X, self.X2]))
+    #     if self.lin:
+    #         mean_y = jnp.dot(jnp.column_stack((df_lin, zeig)), self.eta)
+    #     else:
+    #         return "Non-linear not implemented"
+    #     if with_epsi:
+    #         epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
+    #         Y = jnp.array(mean_y + epsi)
+    #         return Y, epsi
+    #     else:
+    #         return mean_y
 
-    def gen_outcome(self, z, zeig, with_epsi):
-        df_lin = jnp.transpose(np.array([[1]*self.n, z, self.X, self.X2]))
-        if self.lin:
-            mean_y = jnp.dot(jnp.column_stack((df_lin, zeig)), self.eta)
+    def get_odds_ratio(self, z_diff, zeigen_diff, log_scale=True):
+        log_or = self.eta[1]*z_diff + self.eta[3]*zeigen_diff
+        if log_scale:
+            return log_or
         else:
-            return "Non-linear not implemented"
-        if with_epsi:
-            epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
-            Y = jnp.array(mean_y + epsi)
-            return Y, epsi
-        else:
-            return mean_y
+            return jnp.exp(log_or)
 
     def dynamic_intervention(self, thresholds=(1.5, 2)):
         Z_h1 = jnp.where((self.X > thresholds[0]) | (self.X < -thresholds[0]), 1, 0)
         Z_h2 = jnp.where((self.X > thresholds[1]) | (self.X < -thresholds[1]), 1, 0)
         return jnp.array([Z_h1, Z_h2])
 
-    def stochastic_intervention(self, n_approx=1000):
+    def stochastic_intervention(self, n_approx=50):
+    # def stochastic_intervention(self, n_approx=1000):
         z_stoch1 = self.rng.binomial(n=1, p=self.alphas[0], size=(n_approx, self.n))
         z_stoch2 = self.rng.binomial(n=1, p=self.alphas[1], size=(n_approx, self.n))
         return jnp.array([z_stoch1, z_stoch2])
@@ -237,16 +247,20 @@ class GenerateFixedData:
             n_stoch = z_new.shape[1]
             results = np.zeros((n_stoch, N))
             for i in range(n_stoch):
-                y1 = self.gen_outcome(z_new[0,i,], zeigen_new1[i,], with_epsi=False)
-                y2 = self.gen_outcome(z_new[1,i,], zeigen_new2[i,], with_epsi=False)
-                results[i,] = y1 - y2
+                # y1 = self.gen_outcome(z_new[0,i,], zeigen_new1[i,], with_epsi=False)
+                # y2 = self.gen_outcome(z_new[1,i,], zeigen_new2[i,], with_epsi=False)
+                # results[i,] = y1 - y2
+                results[i,] = self.get_odds_ratio(z_new[0,i,] - z_new[1,i,],
+                                                  zeigen_new1[i,] - zeigen_new2[i,])
+
             return jnp.mean(results, axis=0).squeeze()
         else:
             zeigen_new1 = zeigen_value(z_new[0,:], self.eig_cen, self.adj_mat)
             zeigen_new2 = zeigen_value(z_new[1,:], self.eig_cen, self.adj_mat)
-            y1 = self.gen_outcome(z_new[0,], zeigen_new1, with_epsi=False)
-            y2 = self.gen_outcome(z_new[1,], zeigen_new2, with_epsi=False)
-            return y1 - y2
+            # y1 = self.gen_outcome(z_new[0,], zeigen_new1, with_epsi=False)
+            # y2 = self.gen_outcome(z_new[1,], zeigen_new2, with_epsi=False)
+            # return y1 - y2
+            return self.get_odds_ratio(z_new[0,] - z_new[1,], zeigen_new1 - zeigen_new2)
 
     def get_data(self):
         return {"X" : self.X, "X2" : self.X2,
@@ -274,7 +288,10 @@ class SampleTreatmentsOutcomes:
         self.adj_mat = fixed_data["adj_mat"]
         self.eig_cen = fixed_data["eig_cen"]
         self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)
-        self.Y, self.epsi = self.gen_outcome(self.Z, self.zeigen, with_epsi=True)
+        self.Q_matrix = scale_adjacency(self.adj_mat)
+        self.df_array = jnp.transpose(jnp.array([[1]*self.n, self.Z, self.X, self.zeigen]))
+        self.Y = simulate_outcome_bym2(self.df_array, self.Q_matrix, self.eta, self.sig_y, self.rng)
+        # self.Y, self.epsi = self.gen_outcome(self.Z, self.zeigen, with_epsi=True)
         self.Z_h = fixed_data["Z_h"]
         self.Z_stoch = fixed_data["Z_stoch"]
         self.estimand_h = fixed_data["estimand_h"]
@@ -283,18 +300,18 @@ class SampleTreatmentsOutcomes:
     def generate_Z(self, p):
         return jnp.array(self.rng.binomial(n=1, p=p, size=self.n))
 
-    def gen_outcome(self, z, zeig, with_epsi):
-        df_lin = jnp.transpose(np.array([[1]*self.n, z, self.X, self.X2]))
-        if self.lin:
-            mean_y = jnp.dot(jnp.column_stack((df_lin, zeig)), self.eta)
-        else:
-            return "Non-linear not implemented"
-        if with_epsi:
-            epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
-            Y = jnp.array(mean_y + epsi)
-            return Y, epsi
-        else:
-            return mean_y
+    # def gen_outcome(self, z, zeig, with_epsi):
+    #     df_lin = jnp.transpose(np.array([[1]*self.n, z, self.X, self.X2]))
+    #     if self.lin:
+    #         mean_y = jnp.dot(jnp.column_stack((df_lin, zeig)), self.eta)
+    #     else:
+    #         return "Non-linear not implemented"
+    #     if with_epsi:
+    #         epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
+    #         Y = jnp.array(mean_y + epsi)
+    #         return Y, epsi
+    #     else:
+    #         return mean_y
 
     def get_data(self):
         return {"Z" : self.Z, "X" : self.X,
@@ -307,6 +324,128 @@ class SampleTreatmentsOutcomes:
                 "estimand_stoch" : self.estimand_stoch}
 
 
+# --- function for BYM simulation ---
+
+def scale_precision(Q, eps=np.sqrt(np.finfo(float).eps)):
+    """
+    Scale ICAR precision matrix following R-INLA implementation
+
+    Args:
+        Q: precision matrix (sparse or dense)
+        constraint: constraint matrix (e.g., sum-to-zero)
+        eps: small constant for numerical stability
+
+    Returns:
+        Q_scaled: scaled precision matrix
+        marginal_var: marginal variances
+    """
+    # N = Q.shape[0]
+
+    # Convert to LIL format for efficient matrix modification
+    Q_sparse = sp.sparse.lil_matrix(Q)
+
+    # Get connected components
+    # Convert to CSR temporarily for connected_components operation
+    Q_csr = Q_sparse.tocsr()
+    n_components, labels = sp.sparse.csgraph.connected_components(Q_csr, directed=False)
+
+    # Initialize output matrix in LIL format
+    Q_scaled = sp.sparse.lil_matrix(Q_sparse.shape)
+
+    # Q_sparse = sp.sparse.csr_matrix(Q)
+
+    # Get connected components
+    # n_components, labels = sp.sparse.csgraph.connected_components(Q_sparse, directed=False)
+
+    # Q_scaled = Q_sparse.copy()
+
+    for k in range(n_components):
+        idx = np.where(labels == k)[0]
+        n_comp = len(idx)
+        if n_comp == 1:
+            Q_scaled[idx, idx] = 1
+            continue
+
+        # Extract submatrix - converting to array since it's a small submatrix
+        Q_sub = Q_sparse[idx][:, idx].toarray()
+
+        # Sum-to-zero constraint
+        A = np.ones((1, n_comp))
+
+        # Apply constraint through projection
+        Q_const = Q_sub + eps * np.eye(n_comp) * np.max(np.diag(Q_sub))
+        M = np.eye(n_comp) - A.T @ np.linalg.solve(A @ A.T, A)
+        Q_const = M @ Q_const @ M.T
+
+        # Scale
+        Sigma = sp.linalg.pinv(Q_const)
+        scaling_factor = np.exp(np.mean(np.log(np.diag(Sigma))))
+
+        # Update the LIL matrix
+        Q_scaled[np.ix_(idx, idx)] = scaling_factor * Q_sub
+
+    return Q_scaled.toarray()
+
+
+def scale_adjacency(adj_mat):
+    """
+    Scale adjacency matrix for BYM2 model
+
+    Args:
+        adj_mat: binary adjacency matrix (symmetric)
+    Returns:
+        Q_scaled: scaled precision matrix
+        scale: scaling factor used
+    """
+    # Construct precision matrix
+    D = np.diag(adj_mat.sum(axis=1))
+    Q = D - adj_mat
+    # Add small constant to diagonal for numerical stability
+    Q = Q + np.eye(adj_mat.shape[0]) * 1e-6
+    # Scale Q
+    Q_scaled = scale_precision(Q)
+    return Q_scaled
+
+
+def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rng):
+    """
+    Simulate from BYM2 model
+
+    Y = fixed_df @ eta + (sqrt(rho) * u + sqrt(1-rho) * v)/sqrt(sigma)
+    where:
+    u ~ ICAR(Q_scaled)  # Q_scaled ensures unit variance
+    v ~ N(0, 1)
+
+    we fixed \rho=1 to have only network/spatial random effect
+
+    Args:
+        fixed_df: fixed treatments + covaraites matrix (N x p)
+        Q_scaled: scaled precision matrix from scale_adjacency()
+        eta: coefficient vector for fixed effect
+        sigma : overall precision
+        rng: random number generator
+    Returns:
+         Y: simulated outcomes
+    """
+    N = fixed_df.shape[0]
+
+    # Fixed effects
+    mu = fixed_df @ eta
+
+    # Simulate network random effect (u)
+    Sigma = np.linalg.pinv(Q_scaled)
+    u = rng.multivariate_normal(mean=np.zeros(N), cov=Sigma)
+    u = u - np.mean(u)
+
+    # Combine random effects according to BYM2 parameterization
+    # random_effects = (np.sqrt(rho) * u + np.sqrt(1-rho) * v) * sigma
+    random_effects = u * sigma
+
+    # Generate outcome
+    Y_probs = expit(mu + random_effects)
+    Y = rng.binomial(n=1, p=Y_probs)
+
+    return Y
 
 
 # --- General aux functions ---
@@ -374,12 +513,16 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     medi = jnp.round(jnp.median(mean_units),3)
     std = jnp.round(jnp.std(mean_units),3)
     RMSE_all = jnp.round(jnp.sqrt(jnp.mean(jnp.power(esti_post_draws - true_estimand, 2))),3)
-    RMSE = jnp.round(jnp.sqrt(jnp.mean(jnp.power(mean_units - mean_estimand, 2))),3)
+    # RMSE = jnp.round(jnp.sqrt(jnp.mean(jnp.power(mean_units - mean_estimand, 2))),3)
+    RMSE = jnp.round(jnp.sqrt(jnp.mean(jnp.power(mean_samples - true_estimand, 2))),3)
     MAE_all = jnp.round(jnp.mean(jnp.abs(esti_post_draws - true_estimand)), 3)
-    MAE = jnp.round(jnp.mean(jnp.abs(mean_units - mean_estimand)),3)
-    MAPE = jnp.round(jnp.mean(jnp.abs((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
+    # MAE = jnp.round(jnp.mean(jnp.abs(mean_units - mean_estimand)),3)
+    MAE = jnp.round(jnp.mean(jnp.abs(mean_samples - true_estimand)),3)
+    # MAPE = jnp.round(jnp.mean(jnp.abs((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
+    MAPE = jnp.round(jnp.mean(jnp.abs((mean_samples - true_estimand) / (mean_estimand + 1e-5))), 3)
     MAPE_all = jnp.round(jnp.mean(jnp.abs((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
-    rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
+    # rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
+    rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_samples - true_estimand) / (mean_estimand + 1e-5))), 3)
     rel_RMSE_all = jnp.round(jnp.mean(jnp.square((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
     q025 = jnp.quantile(mean_units, 0.025)
     q025_ind = jnp.quantile(esti_post_draws, 0.025, axis=0)
@@ -461,12 +604,65 @@ def network_model(X_d, X2_eq, triu_v):
 def outcome_model(df, Y=None):
     # --- priors ---
     with numpyro.plate("Lin coef.", df.shape[1]):
-        eta = numpyro.sample("eta", dist.Normal(0, 5))
-    sig = numpyro.sample("sig", dist.LogNormal(scale=2.0))
+        # eta = numpyro.sample("eta", dist.Normal(0, 5))
+        eta = numpyro.sample("eta", dist.Normal(0, 3))
+    # sig = numpyro.sample("sig", dist.LogNormal(scale=2.0))
     mu_y = jnp.dot(df, eta)
     # --- likelihood --
     with numpyro.plate("obs", df.shape[0]):
-        numpyro.sample("Y", dist.Normal(loc=mu_y, scale=sig), obs=Y)
+        # numpyro.sample("Y", dist.Normal(loc=mu_y, scale=sig), obs=Y)
+        numpyro.sample("Y", dist.Bernoulli(logits=mu_y), obs=Y)
+
+
+def bym2_model(df, Q_scaled, Y=None, constraint_scale=0.001):
+    """
+    BYM2 model with specified priors
+
+    Args:
+        df: data matrix (N x p)
+        Q_scaled: scaled precision matrix
+        Y: observed outcomes (if None, prior predictive)
+        constraint_scale:  for sum-to-zero soft constraint
+
+    Priors:
+        eta (fixed effects) ~ Normal(0, 3)
+        sigma (precision) ~ LogNormal(1)
+    """
+    N = df.shape[0]
+
+    # Fixed effects priors
+    with numpyro.plate("Lin coef.", df.shape[1]):
+        eta = numpyro.sample("eta", dist.Normal(0, 3))
+    sigma = numpyro.sample("sigma", dist.LogNormal(scale=1))
+
+    # Fixed effects
+    mu = jnp.dot(df, eta)
+
+    # Sample network/spatial component (u)
+    u = numpyro.sample('u',
+                       dist.MultivariateNormal(
+                           loc=jnp.zeros(N),
+                           precision_matrix=Q_scaled))
+
+
+    # Soft sum-to-zero constraint
+    # equivalent to mean(u) ~ normal(0, constraint_scale)
+    # or sum(u) ~ normal(0, constraint_scale * N)
+    numpyro.factor('u_constraint',
+                   (-0.5 * (jnp.sum(u) ** 2)) / ((constraint_scale * N) ** 2))
+
+    # Combine components (BYM2 parameterization)
+    # random_effects = numpyro.deterministic(
+    #     'random_effects',
+    #     u * sigma)
+
+    # Expected value
+    mu_y = numpyro.deterministic('mu_y', mu + u*sigma)
+
+    # Likelihood
+    with numpyro.plate('observations', N):
+        # numpyro.sample('Y', dist.Normal(loc=mu_y, scale=epsilon),obs=Y)
+        numpyro.sample("Y", dist.Bernoulli(logits=mu_y), obs=Y)
 
 
 def HSGP_model(df, ell, m, Y=None):
@@ -493,7 +689,7 @@ def HSGP_model(df, ell, m, Y=None):
 # @jit
 def linear_model_samples_parallel(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=2500,num_chains=4, progress_bar=True)
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=4000,num_chains=4, progress_bar=True)
     lin_mcmc.run(key, df=df, Y=Y)
     return lin_mcmc.get_samples()
 
@@ -514,7 +710,7 @@ def outcome_jit_pred(post_samples, df_arr, key):
 # @jit
 def HSGP_model_samples_parallel(key, Y, df, ell):
     kernel_hsgp = NUTS(HSGP_model, target_accept_prob=0.9)
-    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=4000, num_samples=2500,num_chains=4, progress_bar=True)
+    hsgp_mcmc = MCMC(kernel_hsgp, num_warmup=4000, num_samples=4000,num_chains=4, progress_bar=True)
     hsgp_mcmc.run(key, df=df, ell=ell, m=M, Y=Y)
     return hsgp_mcmc.get_samples()
 
@@ -530,6 +726,22 @@ def HSGP_model_samples_vectorized(key, Y, df, ell):
 def HSGP_jit_pred(post_samples, df, ell, key):
     pred_func = Predictive(HSGP_model, post_samples)
     return pred_func(key, df=df, ell=ell, m=M)
+
+
+def bym_model_samples_parallel(key, Y, df, Q_scaled):
+    kernel_bym2 = NUTS(bym2_model)
+    bym2_mcmc = MCMC(kernel_bym2, num_warmup=4000, num_samples=4000,num_chains=4, progress_bar=True)
+    bym2_mcmc.run(key, df=df, Q_scaled=Q_scaled, Y=Y)
+    return bym2_mcmc.get_samples()
+
+@jit
+def bym_model_samples_vectorized(key, Y, df, Q_scaled):
+    kernel_bym2 = NUTS(bym2_model)
+    bym2_mcmc = MCMC(kernel_bym2, num_warmup=2000, num_samples=250,num_chains=1,
+                     progress_bar=False, chain_method="vectorized")
+    bym2_mcmc.run(key, df=df, Q_scaled=Q_scaled, Y=Y)
+    return bym2_mcmc.get_samples()
+
 
 @jit
 def manual_linear_pred(samples, df):
@@ -593,6 +805,53 @@ def hsgp_pred(z, zeigen, post_samples, x, x2, ell, key):
     if z.ndim == 1:
         n_z = z.shape[0]
         return hsgp_model_pred(z.reshape((1, n_z)), zeigen.reshape((1, n_z)), post_samples, x, x2, ell, key).squeeze()
+
+
+def get_predicted_odds_ratio(post_samples, z_diff, zeigen_diff, log_scale=True):
+    """
+    Get predicted odds ratio for new data using posterior samples
+
+    Args:
+        post_samples: posterior samples of parameters
+        z_diff: differences of Z_i for two treatments, shape (n,) or (k,n)
+        zeigen_diff: difference of exposure values for two treatments, shape (n,) or (k,n)
+        log_scale: whether to return log odds ratio (default: True)
+    Returns:
+        odds_ratio: shape (m,n) where:
+            m = number of posterior samples
+            n = number of units
+            If input differences have shape (k,n), returns mean across k samples
+    """
+    multi_treatments = z_diff.ndim > 1 or zeigen_diff.ndim > 1
+
+    # Reshape posterior samples to (m,1)
+    coef_z = post_samples[:, 1].reshape(-1, 1)  # Shape: (m, 1)
+    coef_zeigen = post_samples[:, 3].reshape(-1, 1)  # Shape: (m, 1)
+
+    if multi_treatments:
+        # For (k,n) inputs, reshape to allow broadcasting
+        z_diff = z_diff.T[None, :, :]  # Shape: (1, n, k)
+        zeigen_diff = zeigen_diff.T[None, :, :]  # Shape: (1, n, k)
+        coef_z = coef_z[:, :, None]  # Shape: (m, 1, 1)
+        coef_zeigen = coef_zeigen[:, :, None]  # Shape: (m, 1, 1)
+
+    else:
+        # For (n,) inputs, keep original reshaping
+        z_diff = z_diff.reshape(1, -1)  # Shape: (1, n)
+        zeigen_diff = zeigen_diff.reshape(1, -1)  # Shape: (1, n)
+
+    # Calculate odds ratio
+    if log_scale:
+        odds_ratio = coef_z * z_diff + coef_zeigen * zeigen_diff
+    else:
+        odds_ratio = jnp.exp(coef_z * z_diff + coef_zeigen * zeigen_diff)
+
+    # Take mean across k samples (axis=2) if we have multiple samples
+    if multi_treatments:
+        odds_ratio = odds_ratio.mean(axis=2)
+
+    return odds_ratio
+
 
 
 @jit
@@ -700,10 +959,11 @@ class Outcome_MCMC:
         self.adj_mat = data["adj_mat"]
         self.eig_cen = eigen_centrality(self.adj_mat)
         self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)
+        self.Q_mat = scale_adjacency(self.adj_mat)
         self.n = N
-        self.ell = [C, C*jnp.max(jnp.abs(self.zeigen))]
+        # self.ell = [C, C*jnp.max(jnp.abs(self.zeigen))]
         self.df_lin = self.get_df()
-        self.df_gp = jnp.transpose(jnp.array([self.X, self.Z, self.zeigen]))
+        # self.df_gp = jnp.transpose(jnp.array([self.X, self.Z, self.zeigen]))
         self.Z_h = data["Z_h"]
         self.Z_stoch = data["Z_stoch"]
         self.estimand_h = data["estimand_h"]
@@ -712,8 +972,10 @@ class Outcome_MCMC:
         self.rng_key = rng_key
         self.iter = iter
         self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, Y=self.Y, df=self.df_lin)
-        self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y,
-                                                             df=self.df_gp, ell=self.ell)
+        self.bym_post_samples = bym_model_samples_parallel(key=self.rng_key, Y=self.Y,
+                                                           df=self.df_lin, Q_scaled=self.Q_mat)
+        # self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y,
+        #                                                      df=self.df_gp, ell=self.ell)
         self.print_zeig_error(data)
 
     def print_zeig_error(self, data):
@@ -729,40 +991,63 @@ class Outcome_MCMC:
         h1_zeigen = zeigen_value(self.Z_h[0,:], self.eig_cen, self.adj_mat)
         h2_zeigen = zeigen_value(self.Z_h[1,:], self.eig_cen, self.adj_mat)
 
-        linear_h1_pred = linear_pred(self.Z_h[0,:], h1_zeigen, self.linear_post_samples,
-                                    self.X, self.X2, self.rng_key)
-        linear_h2_pred = linear_pred(self.Z_h[1,:], h2_zeigen, self.linear_post_samples,
-                                      self.X, self.X2, self.rng_key)
-        linear_h = linear_h1_pred - linear_h2_pred
-        linear_h_stats = compute_error_stats(linear_h, self.estimand_h, idx=self.iter)
+        h_zeigen_diff = h1_zeigen - h2_zeigen
+        z_h_diff = self.Z_h[0,:] - self.Z_h[1,:]
 
-        hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], h1_zeigen, self.hsgp_post_samples,
-                                self.X, self.X2, self.ell, self.rng_key)
-        hsgp_h2_pred = hsgp_pred(self.Z_h[1,:], h2_zeigen, self.hsgp_post_samples,
-                                self.X, self.X2, self.ell, self.rng_key)
-        hsgp_h = hsgp_h1_pred - hsgp_h2_pred
-        hsgp_h_stats = compute_error_stats(hsgp_h, self.estimand_h, idx=self.iter)
+        linear_h_pred_or = get_predicted_odds_ratio(self.linear_post_samples['eta'],
+                                                  z_h_diff, h_zeigen_diff)
+        linear_h_stats = compute_error_stats(linear_h_pred_or, self.estimand_h, idx=self.iter)
+
+        # linear_h1_pred = linear_pred(self.Z_h[0,:], h1_zeigen, self.linear_post_samples,
+        #                             self.X, self.X2, self.rng_key)
+        # linear_h2_pred = linear_pred(self.Z_h[1,:], h2_zeigen, self.linear_post_samples,
+        #                               self.X, self.X2, self.rng_key)
+        # linear_h = linear_h1_pred - linear_h2_pred
+        # linear_h_stats = compute_error_stats(linear_h, self.estimand_h, idx=self.iter)
+
+        bym_h_pred_or = get_predicted_odds_ratio(self.bym_post_samples['eta'],
+                                               z_h_diff, h_zeigen_diff)
+        bym_h_stats = compute_error_stats(bym_h_pred_or, self.estimand_h, idx=self.iter)
+
+        # hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], h1_zeigen, self.hsgp_post_samples,
+        #                         self.X, self.X2, self.ell, self.rng_key)
+        # hsgp_h2_pred = hsgp_pred(self.Z_h[1,:], h2_zeigen, self.hsgp_post_samples,
+        #                         self.X, self.X2, self.ell, self.rng_key)
+        # hsgp_h = hsgp_h1_pred - hsgp_h2_pred
+        # hsgp_h_stats = compute_error_stats(hsgp_h, self.estimand_h, idx=self.iter)
 
         # stochastic intervention
         stoch_zeigen1 = zeigen_value(self.Z_stoch[0,:,:], self.eig_cen, self.adj_mat)
         stoch_zeigen2 = zeigen_value(self.Z_stoch[1,:,:], self.eig_cen, self.adj_mat)
 
-        linear_stoch_pred1 = linear_pred(self.Z_stoch[0,:,:], stoch_zeigen1,
-                                        self.linear_post_samples, self.X, self.X2, self.rng_key)
-        linear_stoch_pred2 = linear_pred(self.Z_stoch[1,:,:], stoch_zeigen2,
-                                         self.linear_post_samples, self.X, self.X2, self.rng_key)
-        linear_stoch_pred = linear_stoch_pred1 - linear_stoch_pred2
-        linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
+        Z_stoch_diff = self.Z_stoch[0,:,:] - self.Z_stoch[1,:,:]
+        zeigen_stoch_diff = stoch_zeigen1 - stoch_zeigen2
 
-        hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], stoch_zeigen1, self.hsgp_post_samples,
-                                    self.X, self.X2, self.ell, self.rng_key)
-        hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], stoch_zeigen2, self.hsgp_post_samples,
-                                    self.X, self.X2, self.ell, self.rng_key)
-        hsgp_stoch_pred = hsgp_stoch_pred1 - hsgp_stoch_pred2
-        hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
-                                           self.estimand_stoch, idx=self.iter)
+        linear_stoch_pred_or = get_predicted_odds_ratio(self.linear_post_samples['eta'],
+                                                        Z_stoch_diff, zeigen_stoch_diff)
+        linear_stoch_stats = compute_error_stats(linear_stoch_pred_or, self.estimand_stoch, idx=self.iter)
 
-        return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
+        # linear_stoch_pred1 = linear_pred(self.Z_stoch[0,:,:], stoch_zeigen1,
+        #                                 self.linear_post_samples, self.X, self.X2, self.rng_key)
+        # linear_stoch_pred2 = linear_pred(self.Z_stoch[1,:,:], stoch_zeigen2,
+        #                                  self.linear_post_samples, self.X, self.X2, self.rng_key)
+        # linear_stoch_pred = linear_stoch_pred1 - linear_stoch_pred2
+        # linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
+
+        # hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], stoch_zeigen1, self.hsgp_post_samples,
+        #                             self.X, self.X2, self.ell, self.rng_key)
+        # hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], stoch_zeigen2, self.hsgp_post_samples,
+        #                             self.X, self.X2, self.ell, self.rng_key)
+        # hsgp_stoch_pred = hsgp_stoch_pred1 - hsgp_stoch_pred2
+        # hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
+        #                                    self.estimand_stoch, idx=self.iter)
+
+        bym_stoch_pred_or = get_predicted_odds_ratio(self.bym_post_samples['eta'],
+                                                    Z_stoch_diff, zeigen_stoch_diff)
+        bym_stoch_stats = compute_error_stats(bym_stoch_pred_or, self.estimand_stoch, idx=self.iter)
+
+        return jnp.vstack([linear_h_stats, bym_h_stats, linear_stoch_stats, bym_stoch_stats])
+        # return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
 
 
 def robust_cholesky(matrix, max_tries=5, initial_jitter=1e-6):
@@ -915,40 +1200,58 @@ def get_predicted_values(key, z, zeigen, x, x2, lin_samples, hsgp_samples,  ell)
 
 
 @jit
-def single_stage_run(zeigen, zeigen_h1, zeigen_h2, zeigen_stoch, zeigen_stoch2, x, x2, y, z_obs, z_h, z_stoch, key):
+def single_stage_run(zeigen, zeigen_h1, zeigen_h2, zeigen_stoch, zeigen_stoch2, Q_mat, x, x2, y, z_obs, z_h, z_stoch, key):
     # get samples from linear outcome model
     df_lin = jnp.transpose(jnp.array([[1] * N, z_obs, x, zeigen]))
     lin_samples = linear_model_samples_vectorized(key, y, df_lin)
     # get prediction for z_h1 and z_stoch
-    lin_h1_pred = linear_pred(z_h[0,:], zeigen_h1, lin_samples, x, x2, key)
-    lin_h2_pred = linear_pred(z_h[1,:], zeigen_h2, lin_samples, x, x2, key)
-    lin_h_pred = lin_h1_pred - lin_h2_pred
+    # lin_h1_pred = linear_pred(z_h[0,:], zeigen_h1, lin_samples, x, x2, key)
+    # lin_h2_pred = linear_pred(z_h[1,:], zeigen_h2, lin_samples, x, x2, key)
+    # lin_h_pred = lin_h1_pred - lin_h2_pred
+    lin_h_pred_or = get_predicted_odds_ratio(lin_samples["eta"],
+                                             z_h[0,:] - z_h[1,:],
+                                             zeigen_h1 - zeigen_h2)
 
-    lin_stoch1_pred = linear_pred(z_stoch[0,:,:], zeigen_stoch, lin_samples, x, x2, key)
-    lin_stoch2_pred = linear_pred(z_stoch[1,:,:], zeigen_stoch2, lin_samples, x, x2, key)
-    lin_stoch_pred = lin_stoch1_pred - lin_stoch2_pred
+    # lin_stoch1_pred = linear_pred(z_stoch[0,:,:], zeigen_stoch, lin_samples, x, x2, key)
+    # lin_stoch2_pred = linear_pred(z_stoch[1,:,:], zeigen_stoch2, lin_samples, x, x2, key)
+    # lin_stoch_pred = lin_stoch1_pred - lin_stoch2_pred
+    lin_stoch_pred_or = get_predicted_odds_ratio(lin_samples["eta"],
+                                                 z_stoch[0,:,:] - z_stoch[1,:,:],
+                                                 zeigen_stoch - zeigen_stoch2)
 
     # Repeat for HSGP model
-    df_gp = jnp.transpose(jnp.array([x, z_obs, zeigen]))
-    ell = [C, C*jnp.max(jnp.abs(zeigen))]
-    hsgp_samples = HSGP_model_samples_vectorized(key, Y=y, df=df_gp, ell=ell)
+    # df_gp = jnp.transpose(jnp.array([x, z_obs, zeigen]))
+    # ell = [C, C*jnp.max(jnp.abs(zeigen))]
+    # hsgp_samples = HSGP_model_samples_vectorized(key, Y=y, df=df_gp, ell=ell)
     # Get HSGP predictions
-    hsgp_h1_pred = hsgp_pred(z_h[0,:], zeigen_h1, hsgp_samples, x, x2, ell, key)
-    hsgp_h2_pred = hsgp_pred(z_h[1,:], zeigen_h2, hsgp_samples, x, x2, ell, key)
-    hsgp_h_pred = hsgp_h1_pred - hsgp_h2_pred
+    # hsgp_h1_pred = hsgp_pred(z_h[0,:], zeigen_h1, hsgp_samples, x, x2, ell, key)
+    # hsgp_h2_pred = hsgp_pred(z_h[1,:], zeigen_h2, hsgp_samples, x, x2, ell, key)
+    # hsgp_h_pred = hsgp_h1_pred - hsgp_h2_pred
 
-    hsgp_stoch1_pred = hsgp_pred(z_stoch[0,:,:], zeigen_stoch, hsgp_samples, x, x2, ell, key)
-    hsgp_stoch2_pred = hsgp_pred(z_stoch[1,:,:], zeigen_stoch2, hsgp_samples, x, x2, ell, key)
-    hsgp_stoch_pred = hsgp_stoch1_pred - hsgp_stoch2_pred
+    # hsgp_stoch1_pred = hsgp_pred(z_stoch[0,:,:], zeigen_stoch, hsgp_samples, x, x2, ell, key)
+    # hsgp_stoch2_pred = hsgp_pred(z_stoch[1,:,:], zeigen_stoch2, hsgp_samples, x, x2, ell, key)
+    # hsgp_stoch_pred = hsgp_stoch1_pred - hsgp_stoch2_pred
+
+    # BYM model
+    bym_samples = bym_model_samples_vectorized(key, y, df_lin, Q_mat)
+    bym_h_pred_or = get_predicted_odds_ratio(bym_samples["eta"],
+                                                z_h[0,:] - z_h[1,:],
+                                                zeigen_h1 - zeigen_h2)
+    bym_stoch_pred_or = get_predicted_odds_ratio(bym_samples["eta"],
+                                                z_stoch[0,:,:] - z_stoch[1,:,:],
+                                                zeigen_stoch - zeigen_stoch2)
 
     # return predictions
-    return jnp.array([lin_h_pred, lin_stoch_pred, hsgp_h_pred, hsgp_stoch_pred])
+    return jnp.array([lin_h_pred_or, lin_stoch_pred_or, bym_h_pred_or, bym_stoch_pred_or])
+    # return jnp.array([lin_h_pred, lin_stoch_pred, hsgp_h_pred, hsgp_stoch_pred])
 
-parallel_stage_run = pmap(single_stage_run, in_axes=(0,0,0,0,0, None, None, None, None, None, None, None))
+parallel_stage_run = pmap(single_stage_run, in_axes=(0,0,0,0,0,0, None, None, None, None, None, None, None))
 
 
 def multistage_run(zeigen_post, zeigen_h1_post, zeigen_h2_post, zeigen_stoch_post, zeigen_stoch2_post,
+                   Q_post_mat,
                    x, x2, y, z_obs, z_h, z_stoch, h_estimand, stoch_estimand, iter, key):
+
     B = zeigen_post.shape[0]
     results = []
     for i in tqdm(range(0, B, N_CORES), desc="Mutlistage run"):
@@ -957,6 +1260,7 @@ def multistage_run(zeigen_post, zeigen_h1_post, zeigen_h2_post, zeigen_stoch_pos
                                         zeigen_h2_post[i:(i + N_CORES), ],
                                         zeigen_stoch_post[i:(i + N_CORES), ],
                                         zeigen_stoch2_post[i:(i + N_CORES), ],
+                                        Q_post_mat[i:(i + N_CORES), ],
                                         x, x2, y, z_obs, z_h, z_stoch, key)
         results.append(i_results)
     results_c = jnp.concatenate(results, axis=0)
@@ -973,19 +1277,33 @@ def multistage_run(zeigen_post, zeigen_h1_post, zeigen_h2_post, zeigen_stoch_pos
     error_stats_lin_stoch = compute_error_stats(esti_post_draws=results_lin_stoch_long,
                                                true_estimand=stoch_estimand,
                                                idx=iter)
-    # error stats for HSGP
-    results_hsgp_h = results_c[:, 2, :, :]
-    results_hsgp_h_long = results_hsgp_h.reshape((B * n_samples, N))
-    error_stats_hsgp_h = compute_error_stats(esti_post_draws=results_hsgp_h_long,
+    # # error stats for HSGP
+    # results_hsgp_h = results_c[:, 2, :, :]
+    # results_hsgp_h_long = results_hsgp_h.reshape((B * n_samples, N))
+    # error_stats_hsgp_h = compute_error_stats(esti_post_draws=results_hsgp_h_long,
+    #                                         true_estimand=h_estimand,
+    #                                         idx=iter)
+    # results_hsgp_stoch = results_c[:, 3, :, :]
+    # results_hsgp_stoch_long = results_hsgp_stoch.reshape((B * n_samples, N))
+    # error_stats_hsgp_stoch = compute_error_stats(esti_post_draws=results_hsgp_stoch_long,
+    #                                            true_estimand=stoch_estimand,
+    #                                            idx=iter)
+
+    # error stats for BYM
+    results_bym_h = results_c[:, 2, :, :]
+    results_bym_h_long = results_bym_h.reshape((B * n_samples, N))
+    error_stats_bym_h = compute_error_stats(esti_post_draws=results_bym_h_long,
                                             true_estimand=h_estimand,
                                             idx=iter)
-    results_hsgp_stoch = results_c[:, 3, :, :]
-    results_hsgp_stoch_long = results_hsgp_stoch.reshape((B * n_samples, N))
-    error_stats_hsgp_stoch = compute_error_stats(esti_post_draws=results_hsgp_stoch_long,
-                                               true_estimand=stoch_estimand,
-                                               idx=iter)
+    results_bym_stoch = results_c[:, 3, :, :]
+    results_bym_stoch_long = results_bym_stoch.reshape((B * n_samples, N))
+    error_stats_bym_stoch = compute_error_stats(esti_post_draws=results_bym_stoch_long,
+                                                  true_estimand=stoch_estimand,
+                                                    idx=iter)
+
+    return jnp.vstack([error_stats_lin_h, error_stats_lin_stoch, error_stats_bym_h, error_stats_bym_stoch])
     # return results
-    return jnp.vstack([error_stats_lin_h, error_stats_lin_stoch, error_stats_hsgp_h, error_stats_hsgp_stoch])
+    # return jnp.vstack([error_stats_lin_h, error_stats_lin_stoch, error_stats_hsgp_h, error_stats_hsgp_stoch])
 
 
 @jit
@@ -998,17 +1316,42 @@ def network_posterior_stats(triu_sample, z):
 parallel_network_stats = pmap(network_posterior_stats, in_axes=(0, None))
 vectorized_network_stats = vmap(network_posterior_stats, in_axes=(0, None))
 
+
+def network_posterior_Q(triu_sample):
+    curr_Astar = Triu_to_mat(triu_sample)
+    return scale_adjacency(curr_Astar)
+
+def get_post_Q_mat(multi_triu_samples):
+    Q_post_list = []
+    for i in tqdm(range(multi_triu_samples.shape[0])):
+        Q_post_list.append(network_posterior_Q(multi_triu_samples[i]))
+
+    return jnp.array(Q_post_list)
+
 def get_post_net_stats(multi_triu_samples, Z_obs, Z_h, Z_stoch):
-    obs_zeigen = vectorized_network_stats(multi_triu_samples, Z_obs)
-    h1_zeigen = vectorized_network_stats(multi_triu_samples, Z_h[0])
-    h2_zeigen = vectorized_network_stats(multi_triu_samples, Z_h[1])
-    stoch1_zeigen = vectorized_network_stats(multi_triu_samples, Z_stoch[0,:,:])
-    stoch2_zeigen = vectorized_network_stats(multi_triu_samples, Z_stoch[1,:,:])
-    return obs_zeigen, h1_zeigen, h2_zeigen, stoch1_zeigen, stoch2_zeigen
+    # obs_zeigen = vectorized_network_stats(multi_triu_samples, Z_obs)
+    # h1_zeigen = vectorized_network_stats(multi_triu_samples, Z_h[0])
+    # h2_zeigen = vectorized_network_stats(multi_triu_samples, Z_h[1])
+    # stoch1_zeigen = vectorized_network_stats(multi_triu_samples, Z_stoch[0,:,:])
+    # stoch2_zeigen = vectorized_network_stats(multi_triu_samples, Z_stoch[1,:,:])
+    # return obs_zeigen, h1_zeigen, h2_zeigen, stoch1_zeigen, stoch2_zeigen
+    post_zeigen = []
+    post_z_h1 = []
+    post_z_h2 = []
+    post_z_stoch1 = []
+    post_z_stoch2 = []
+    for i in tqdm(range(multi_triu_samples.shape[0])):
+        post_zeigen.append(network_posterior_stats(multi_triu_samples[i], Z_obs))
+        post_z_h1.append(network_posterior_stats(multi_triu_samples[i], Z_h[0]))
+        post_z_h2.append(network_posterior_stats(multi_triu_samples[i], Z_h[1]))
+        post_z_stoch1.append(network_posterior_stats(multi_triu_samples[i], Z_stoch[0,:,:]))
+        post_z_stoch2.append(network_posterior_stats(multi_triu_samples[i], Z_stoch[1,:,:]))
+
+    return jnp.array(post_zeigen), jnp.array(post_z_h1), jnp.array(post_z_h2), jnp.array(post_z_stoch1), jnp.array(post_z_stoch2)
 
 class Onestage_MCMC:
     def __init__(self, Y, X, X2, Z_obs, Z_h, Z_stoch, estimand_h, estimand_stoch,
-                 zeigen, h1_zeigen, h2_zeigen, stoch1_zeigen, stoch2_zeigen, rng_key, iter):
+                 zeigen, h1_zeigen, h2_zeigen, stoch1_zeigen, stoch2_zeigen, Q_post, rng_key, iter):
         self.Y = Y
         self.X = X
         self.X2 = X2
@@ -1023,47 +1366,76 @@ class Onestage_MCMC:
         self.h2_zeigen = h2_zeigen
         self.stoch1_zeigen = stoch1_zeigen
         self.stoch2_zeigen = stoch2_zeigen
+        self.Q_mat = Q_post
         self.rng_key = rng_key
         self.iter = iter
         self.df_lin = self.get_df()
-        self.ell = [C, C*jnp.max(jnp.abs(self.zeigen))]
-        self.df_gp = jnp.transpose(jnp.array([self.X, self.Z_obs, self.zeigen]))
-        self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, Y=self.Y, df=self.df_lin)
-        self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y,
-                                                            df=self.df_gp, ell=self.ell)
+        # self.ell = [C, C*jnp.max(jnp.abs(self.zeigen))]
+        # self.df_gp = jnp.transpose(jnp.array([self.X, self.Z_obs, self.zeigen]))
+        self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, Y=self.Y,
+                                                                 df=self.df_lin)
+        # self.hsgp_post_samples = HSGP_model_samples_parallel(key=self.rng_key, Y=self.Y,
+        #                                                     df=self.df_gp, ell=self.ell)
+        self.bym_post_samples = bym_model_samples_parallel(key=self.rng_key, Y=self.Y,
+                                                              df=self.df_lin, Q_scaled=self.Q_mat)
 
     def get_df(self):
         return jnp.transpose(jnp.array([[1]*self.n, self.Z_obs, self.X, self.zeigen]))
 
     def get_results(self):
         # dynamic (h) intervention
-        linear_h1_pred = linear_pred(self.Z_h[0,:], self.h1_zeigen, self.linear_post_samples,
-                                    self.X, self.X2, self.rng_key)
-        linear_h2_pred = linear_pred(self.Z_h[1,:], self.h2_zeigen, self.linear_post_samples,
-                                     self.X, self.X2, self.rng_key)
-        linear_h = linear_h1_pred - linear_h2_pred
-        linear_h_stats = compute_error_stats(linear_h, self.estimand_h, idx=self.iter)
+        # linear_h1_pred = linear_pred(self.Z_h[0,:], self.h1_zeigen, self.linear_post_samples,
+        #                             self.X, self.X2, self.rng_key)
+        # linear_h2_pred = linear_pred(self.Z_h[1,:], self.h2_zeigen, self.linear_post_samples,
+        #                              self.X, self.X2, self.rng_key)
+        # linear_h = linear_h1_pred - linear_h2_pred
+        # linear_h_stats = compute_error_stats(linear_h, self.estimand_h, idx=self.iter)
 
-        hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], self.h1_zeigen, self.hsgp_post_samples,
-                                self.X, self.X2, self.ell, self.rng_key)
-        hsgp_h2_pred = hsgp_pred(self.Z_h[1,:], self.h2_zeigen, self.hsgp_post_samples,
-                                 self.X, self.X2, self.ell, self.rng_key)
-        hsgp_h = hsgp_h1_pred - hsgp_h2_pred
-        hsgp_h_stats = compute_error_stats(hsgp_h, self.estimand_h, idx=self.iter)
+        z_h_diff = self.Z_h[0,:] - self.Z_h[1,:]
+        h_zeigen_diff = self.h1_zeigen - self.h2_zeigen
+
+        linear_h_pred_or = get_predicted_odds_ratio(self.linear_post_samples['eta'],
+                                                    z_h_diff, h_zeigen_diff)
+        linear_h_stats = compute_error_stats(linear_h_pred_or, self.estimand_h, idx=self.iter)
+
+        bym_h_pred_or = get_predicted_odds_ratio(self.bym_post_samples['eta'],
+                                               z_h_diff, h_zeigen_diff)
+        bym_h_stats = compute_error_stats(bym_h_pred_or, self.estimand_h, idx=self.iter)
+
+        # hsgp_h1_pred = hsgp_pred(self.Z_h[0,:], self.h1_zeigen, self.hsgp_post_samples,
+        #                         self.X, self.X2, self.ell, self.rng_key)
+        # hsgp_h2_pred = hsgp_pred(self.Z_h[1,:], self.h2_zeigen, self.hsgp_post_samples,
+        #                          self.X, self.X2, self.ell, self.rng_key)
+        # hsgp_h = hsgp_h1_pred - hsgp_h2_pred
+        # hsgp_h_stats = compute_error_stats(hsgp_h, self.estimand_h, idx=self.iter)
 
         # stochastic intervention
-        linear_stoch_pred1 = linear_pred(self.Z_stoch[0,:,:], self.stoch1_zeigen,
-                                        self.linear_post_samples, self.X, self.X2, self.rng_key)
-        linear_stoch_pred2 = linear_pred(self.Z_stoch[1,:,:], self.stoch2_zeigen,
-                                         self.linear_post_samples, self.X, self.X2, self.rng_key)
-        linear_stoch_pred = linear_stoch_pred1 - linear_stoch_pred2
-        linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
+        # linear_stoch_pred1 = linear_pred(self.Z_stoch[0,:,:], self.stoch1_zeigen,
+        #                                 self.linear_post_samples, self.X, self.X2, self.rng_key)
+        # linear_stoch_pred2 = linear_pred(self.Z_stoch[1,:,:], self.stoch2_zeigen,
+        #                                  self.linear_post_samples, self.X, self.X2, self.rng_key)
+        # linear_stoch_pred = linear_stoch_pred1 - linear_stoch_pred2
+        # linear_stoch_stats = compute_error_stats(linear_stoch_pred, self.estimand_stoch, idx=self.iter)
 
-        hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], self.stoch1_zeigen, self.hsgp_post_samples,
-                                    self.X, self.X2, self.ell, self.rng_key)
-        hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], self.stoch2_zeigen, self.hsgp_post_samples,
-                                     self.X, self.X2, self.ell, self.rng_key)
-        hsgp_stoch_pred = hsgp_stoch_pred1 - hsgp_stoch_pred2
-        hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
-                                           self.estimand_stoch, idx=self.iter)
-        return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
+        z_stoch_diff = self.Z_stoch[0,:,:] - self.Z_stoch[1,:,:]
+        zeigen_stoch_diff = self.stoch1_zeigen - self.stoch2_zeigen
+
+        linear_stoch_pred_or = get_predicted_odds_ratio(self.linear_post_samples['eta'],
+                                                        z_stoch_diff, zeigen_stoch_diff)
+        linear_stoch_stats = compute_error_stats(linear_stoch_pred_or, self.estimand_stoch, idx=self.iter)
+
+
+        bym_stoch_pred_or = get_predicted_odds_ratio(self.bym_post_samples['eta'],
+                                                    z_stoch_diff, zeigen_stoch_diff)
+        bym_stoch_stats = compute_error_stats(bym_stoch_pred_or, self.estimand_stoch, idx=self.iter)
+
+        #
+        # hsgp_stoch_pred1 = hsgp_pred(self.Z_stoch[0,:,:], self.stoch1_zeigen, self.hsgp_post_samples,
+        #                             self.X, self.X2, self.ell, self.rng_key)
+        # hsgp_stoch_pred2 = hsgp_pred(self.Z_stoch[1,:,:], self.stoch2_zeigen, self.hsgp_post_samples,
+        #                              self.X, self.X2, self.ell, self.rng_key)
+        # hsgp_stoch_pred = hsgp_stoch_pred1 - hsgp_stoch_pred2
+        # hsgp_stoch_stats = compute_error_stats(hsgp_stoch_pred,
+        #                                    self.estimand_stoch, idx=self.iter)
+        # return jnp.vstack([linear_h_stats, hsgp_h_stats, linear_stoch_stats, hsgp_stoch_stats])
+        return jnp.vstack([linear_h_stats, bym_h_stats, linear_stoch_stats, bym_stoch_stats])
