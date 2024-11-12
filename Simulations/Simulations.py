@@ -12,7 +12,7 @@ import src.Aux_functions as aux
 # alpha: pi_alpha(z) ---> stochastic intervention
 
 def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
-    rng_key = random.PRNGKey(1)
+    rng_key = random.PRNGKey(idx)
     _, rng_key = random.split(rng_key)
 
     rng = np.random.default_rng(idx)
@@ -111,10 +111,11 @@ def one_simuation_iter(idx, fixed_df, gamma, eta, sig_y, pz, n_rep, lin_y):
     onestage_results = onestage_outcome_mcmc.get_results()
 
 
-    results_all = jnp.vstack([oracle_results, obs_results,
+    results_all = jnp.vstack([oracle_results,
+                              obs_results,
                              threestage_results,
                              onestage_results])
-    print("results shape: ", results_all.shape)
+
     return results_all
 
 

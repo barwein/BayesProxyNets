@@ -222,7 +222,7 @@ class GenerateFixedData:
     #     else:
     #         return mean_y
 
-    def get_odds_ratio(self, z_diff, zeigen_diff, log_scale=True):
+    def  get_odds_ratio(self, z_diff, zeigen_diff, log_scale=True):
         log_or = self.eta[1]*z_diff + self.eta[3]*zeigen_diff
         if log_scale:
             return log_or
