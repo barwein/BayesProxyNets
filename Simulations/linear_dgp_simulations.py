@@ -20,6 +20,7 @@ rng = np.random.default_rng(RANDOM_SEED)
 # parameters
 THETA = [-2, 1.5]
 GAMMA = [1.1, 0.2,  -1, 1]
+GAMMA_REP = [1 , 0.7, -1, 0.6]
 # ETA = jnp.array([-1, 3, -0.25, 0, 3])
 ETA = jnp.array([-1, 3, -0.25, 3])
 SIG_Y = 1.5
@@ -51,7 +52,7 @@ if __name__ == "__main__":
 
     # Run simulations
     for i in range(N_SIM):
-        sim_results = one_simuation_iter(idx=i, fixed_df=fixed_df, gamma=GAMMA,
+        sim_results = one_simuation_iter(idx=i, fixed_df=fixed_df, gamma=GAMMA, gamma_rep=GAMMA_REP,
                                          eta=ETA, sig_y=SIG_Y, pz=PZ, n_rep=N_REP, lin_y=LIN_Y)
         df_results = results_to_pd_df(sim_results, 1)
         w_path = "results"

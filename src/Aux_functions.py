@@ -449,15 +449,25 @@ def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rng):
 
 
 # --- General aux functions ---
-def create_noisy_network(rng, triu_vals, gamma, x_diff, x2_eq):
-    obs_mat = np.zeros((N, N))  # create nXn matrix of zeros
+def create_noisy_network(rng, triu_vals, gamma, gamma_rep, x_diff, x2_eq):
     triu_idx = np.triu_indices(n=N, k=1)
+    # First noisy net
+    obs_mat = np.zeros((N, N))  # create nXn matrix of zeros
     logit_nois = triu_vals*gamma[0] + (1-triu_vals)*(gamma[1] + gamma[2]*x_diff + gamma[3]*x2_eq)
     edges_noisy = rng.binomial(n=1, p=expit(logit_nois), size=TRIL_DIM)
     obs_mat[triu_idx] = edges_noisy
     obs_mat = obs_mat + obs_mat.T
+    # Repeated measured noisy net
+    logit_noisy_rep = triu_vals*(gamma_rep[0] + gamma_rep[1]*edges_noisy) + (1-triu_vals)*(gamma_rep[2] + gamma_rep[3]*edges_noisy)
+    edges_noisy_rep = rng.binomial(n=1, p=expit(logit_noisy_rep), size=TRIL_DIM)
+    obs_mat_rep = np.zeros((N, N))
+    obs_mat_rep[triu_idx] = edges_noisy_rep
+    obs_mat_rep = obs_mat_rep + obs_mat_rep.T
+    # return results
     return {"obs_mat" : obs_mat,
-            "triu_obs" : edges_noisy}
+            "obs_mat_rep" : obs_mat_rep,
+            "triu_obs" : edges_noisy,
+            "triu_obs_rep" : edges_noisy_rep}
 
 @jit
 def Triu_to_mat(triu_v):
@@ -518,11 +528,12 @@ def compute_error_stats(esti_post_draws, true_estimand, idx=None):
     MAE_all = jnp.round(jnp.mean(jnp.abs(esti_post_draws - true_estimand)), 3)
     # MAE = jnp.round(jnp.mean(jnp.abs(mean_units - mean_estimand)),3)
     MAE = jnp.round(jnp.mean(jnp.abs(mean_samples - true_estimand)),3)
-    # MAPE = jnp.round(jnp.mean(jnp.abs((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
-    MAPE = jnp.round(jnp.mean(jnp.abs((mean_samples - true_estimand) / (mean_estimand + 1e-5))), 3)
+    MAPE = jnp.round(jnp.mean(jnp.abs((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
+    # MAPE = jnp.round(jnp.mean(jnp.abs((mean_samples - true_estimand) / (true_estimand + 1e-5))), 3)
     MAPE_all = jnp.round(jnp.mean(jnp.abs((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
-    # rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
-    rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_samples - true_estimand) / (mean_estimand + 1e-5))), 3)
+    rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_units - mean_estimand) / (mean_estimand + 1e-5))), 3)
+    # rel_RMSE = jnp.round(jnp.mean(jnp.square((mean_samples - true_estimand) / (true_estimand + 1e-5))), 3)
+    # rel_RMSE_all = jnp.round(jnp.mean(jnp.square((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
     rel_RMSE_all = jnp.round(jnp.mean(jnp.square((esti_post_draws - true_estimand[None, :]) / (true_estimand[None, :] + 1e-5))), 3)
     q025 = jnp.quantile(mean_units, 0.025)
     q025_ind = jnp.quantile(esti_post_draws, 0.025, axis=0)
@@ -582,6 +593,60 @@ def pyro_noisy_networks_model(x, x2, triu_v, N, K=2, eps=1e-3):
                     pyro.distributions.Bernoulli(logits=logit_misspec),
                     obs=triu_v)
 
+@pyro.infer.config_enumerate
+def pyro_noisy_repeated_networks_model(x, x2, triu_v, triu_v_rep, N, K=2, eps=1e-3):
+    """
+    Network model for repeated noisy observed network. True network is genrated from LSM.
+    :param x: pairwise x-differences
+    :param x2: pariwise x2-equality
+    :param triu_v: observed triu values (upper triangular)
+    :param triu_v_rep: observed triu values for repeated network
+    :param N: number of units
+    :param K: latent variables dimension
+    """
+    with pyro.plate("Latent_dim", N):
+        nu = pyro.sample("nu",
+                         pyro.distributions.MultivariateNormal(torch.zeros(K) + eps, torch.eye(K)))
+
+    idx = torch.triu_indices(N, N, offset=1)
+    nu_diff = nu[idx[0]] - nu[idx[1]]
+    nu_diff_norm_val = torch.norm(nu_diff, dim=1)
+
+    with pyro.plate("theta_dim", 2):
+        theta = pyro.sample("theta",
+                            pyro.distributions.Normal(0, 5))
+
+    mu_net = theta[0] + x2 * theta[1] - nu_diff_norm_val
+    mu_net = torch.clamp(mu_net, min=-30, max=30)
+
+    with pyro.plate("gamma_i", 4):
+        gamma = pyro.sample("gamma",
+                            pyro.distributions.Normal(0, 5))
+
+    with pyro.plate("gamma_rep_i", 4):
+        gamma_rep = pyro.sample("gamma_rep",
+                                pyro.distributions.Normal(0, 5))
+
+    with pyro.plate("A* and A", x.shape[0]):
+        triu_star = pyro.sample("triu_star",
+                                pyro.distributions.Bernoulli(logits=mu_net),
+                                infer={"enumerate": "parallel"})
+
+        logit_misspec = torch.where(triu_star == 1.0,
+                                    gamma[0],
+                                    gamma[1] + gamma[2] * x + gamma[3]*x2)
+        logit_misspec_rep = torch.where(triu_star == 1.0,
+                                        gamma_rep[0] + gamma_rep[1]*triu_v,
+                                        gamma_rep[2] + gamma_rep[3]*triu_v)
+
+        pyro.sample("obs_triu",
+                    pyro.distributions.Bernoulli(logits=logit_misspec),
+                    obs=triu_v)
+
+        pyro.sample("obs_triu_rep",
+                    pyro.distributions.Bernoulli(logits=logit_misspec_rep),
+                    obs=triu_v_rep)
+
 
 @config_enumerate
 def network_model(X_d, X2_eq, triu_v):
@@ -605,7 +670,7 @@ def outcome_model(df, Y=None):
     # --- priors ---
     with numpyro.plate("Lin coef.", df.shape[1]):
         # eta = numpyro.sample("eta", dist.Normal(0, 5))
-        eta = numpyro.sample("eta", dist.Normal(0, 3))
+        eta = numpyro.sample("eta", dist.Normal(0, 5))
     # sig = numpyro.sample("sig", dist.LogNormal(scale=2.0))
     mu_y = jnp.dot(df, eta)
     # --- likelihood --
@@ -632,7 +697,7 @@ def bym2_model(df, Q_scaled, Y=None, constraint_scale=0.001):
 
     # Fixed effects priors
     with numpyro.plate("Lin coef.", df.shape[1]):
-        eta = numpyro.sample("eta", dist.Normal(0, 3))
+        eta = numpyro.sample("eta", dist.Normal(0, 5))
     sigma = numpyro.sample("sigma", dist.LogNormal(scale=1))
 
     # Fixed effects
@@ -870,19 +935,35 @@ def get_many_post_astars(K, post_pred_mean, x_diff, x2_eq, triu_v):
 
 
 class Network_SVI:
-    def __init__(self, data, rng_key, n_iter=20000, n_samples=10000, network_model=pyro_noisy_networks_model):
+    def __init__(self, data, rng_key, n_iter=20000, n_samples=10000, with_rep = False):
+        self.with_rep = with_rep
         self.X_diff = torch.tensor(np.array(data["X_diff"]), dtype=torch.float32)
         self.X2_eq = torch.tensor(np.array(data["X2_equal"]), dtype=torch.float32)
         self.triu = torch.tensor(np.array(data["triu"]), dtype=torch.float32)
+        self.triu_rep = torch.tensor(np.array(data["triu_rep"]), dtype=torch.float32)
         self.n = N
         self.rng_key = rng_key
         self.n_iter = n_iter
         self.n_samples = n_samples
-        self.network_model = network_model
+        self.network_model = self.network_model()
         self.guide = self.get_guide()
+        self.args = self.model_args()
+
+    def network_model(self):
+        if self.with_rep:
+            return pyro_noisy_repeated_networks_model
+        else:
+            return pyro_noisy_networks_model
+
+    def model_args(self):
+        model_args = [self.X_diff, self.X2_eq, self.triu]
+        if self.with_rep:
+            model_args.append(self.triu_rep)
+        model_args.append(self.n)
+        return model_args
 
     def get_guide(self):
-        return pyro.infer.autoguide.AutoLowRankMultivariateNormal(pyro.poutine.block(pyro_noisy_networks_model,
+        return pyro.infer.autoguide.AutoLowRankMultivariateNormal(pyro.poutine.block(self.network_model,
                                                               hide=["triu_star"]),
                                       init_loc_fn = pyro.infer.autoguide.init_to_median())
 
@@ -891,9 +972,11 @@ class Network_SVI:
         loss_func = pyro.infer.TraceEnum_ELBO(max_plate_nesting=1)
         optimzer = pyro.optim.ClippedAdam({"lr": 0.001})
         svi = pyro.infer.SVI(self.network_model, self.guide, optimzer, loss=loss_func)
+
         # losses_full = []
         for _ in tqdm(range(self.n_iter), desc="Training network model"):
-            svi.step(self.X_diff, self.X2_eq, self.triu, self.n)
+            svi.step(*self.args)
+            # svi.step(self.X_diff, self.X2_eq, self.triu, self.n)
             # loss = svi.step(self.X_diff, self.X2_eq, self.triu, self.n)
             # losses_full.append(loss)
 
@@ -901,12 +984,14 @@ class Network_SVI:
         triu_star_samples = []
         for _ in tqdm(range(self.n_samples), desc="Sampling A*"):
             # Get a trace from the guide
-            guide_trace = pyro.poutine.trace(self.guide).get_trace(self.X_diff, self.X2_eq, self.triu, self.n)
+            # guide_trace = pyro.poutine.trace(self.guide).get_trace(self.X_diff, self.X2_eq, self.triu, self.n)
+            guide_trace = pyro.poutine.trace(self.guide).get_trace(*self.args)
             # Run infer_discrete
             inferred_model = pyro.infer.infer_discrete(pyro.poutine.replay(self.network_model, guide_trace),
                                             first_available_dim=-2)
             # Get a trace from the inferred model
-            model_trace = pyro.poutine.trace(inferred_model).get_trace(self.X_diff, self.X2_eq, self.triu, self.n)
+            # model_trace = pyro.poutine.trace(inferred_model).get_trace(self.X_diff, self.X2_eq, self.triu, self.n)
+            model_trace = pyro.poutine.trace(inferred_model).get_trace(*self.args)
             # Extract triu_star from the trace
             triu_star_samples.append(model_trace.nodes['triu_star']['value'])
         # Convert to tensor
