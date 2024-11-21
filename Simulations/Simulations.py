@@ -68,7 +68,8 @@ def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, l
                                                                                                        df_obs["Z_h"],
                                                                                                        df_obs["Z_stoch"])
 
-    post_Q_mat = aux.get_post_Q_mat(network_pred_samples)
+    # post_Q_mat = aux.get_post_Q_mat(network_pred_samples)
+    post_Q_mat = aux.vectorized_Q_post(network_pred_samples)
 
     post_zeig_error = np.mean(np.abs(post_zeig - df_oracle["Zeigen"]))
     print("Post abs zeigen error:", post_zeig_error)

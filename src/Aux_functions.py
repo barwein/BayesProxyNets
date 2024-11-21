@@ -288,7 +288,7 @@ class SampleTreatmentsOutcomes:
         self.adj_mat = fixed_data["adj_mat"]
         self.eig_cen = fixed_data["eig_cen"]
         self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)
-        self.Q_matrix = scale_adjacency(self.adj_mat)
+        self.Q_matrix = scale_adjacency(jnp.array(self.adj_mat))
         self.df_array = jnp.transpose(jnp.array([[1]*self.n, self.Z, self.X, self.zeigen]))
         self.Y = simulate_outcome_bym2(self.df_array, self.Q_matrix, self.eta, self.sig_y, self.rng)
         # self.Y, self.epsi = self.gen_outcome(self.Z, self.zeigen, with_epsi=True)
@@ -326,85 +326,143 @@ class SampleTreatmentsOutcomes:
 
 # --- function for BYM simulation ---
 
-def scale_precision(Q, eps=np.sqrt(np.finfo(float).eps)):
+# def scale_precision(Q, eps=np.sqrt(np.finfo(float).eps)):
+#     """
+#     Scale ICAR precision matrix following R-INLA implementation
+#
+#     Args:
+#         Q: precision matrix (sparse or dense)
+#         constraint: constraint matrix (e.g., sum-to-zero)
+#         eps: small constant for numerical stability
+#
+#     Returns:
+#         Q_scaled: scaled precision matrix
+#         marginal_var: marginal variances
+#     """
+#     # N = Q.shape[0]
+#
+#     # Convert to LIL format for efficient matrix modification
+#     Q_sparse = sp.sparse.lil_matrix(Q)
+#
+#     # Get connected components
+#     # Convert to CSR temporarily for connected_components operation
+#     Q_csr = Q_sparse.tocsr()
+#     n_components, labels = sp.sparse.csgraph.connected_components(Q_csr, directed=False)
+#
+#     # Initialize output matrix in LIL format
+#     Q_scaled = sp.sparse.lil_matrix(Q_sparse.shape)
+#
+#     # Q_sparse = sp.sparse.csr_matrix(Q)
+#
+#     # Get connected components
+#     # n_components, labels = sp.sparse.csgraph.connected_components(Q_sparse, directed=False)
+#
+#     # Q_scaled = Q_sparse.copy()
+#
+#     for k in range(n_components):
+#         idx = np.where(labels == k)[0]
+#         n_comp = len(idx)
+#         if n_comp == 1:
+#             Q_scaled[idx, idx] = 1
+#             continue
+#
+#         # Extract submatrix - converting to array since it's a small submatrix
+#         Q_sub = Q_sparse[idx][:, idx].toarray()
+#
+#         # Sum-to-zero constraint
+#         A = np.ones((1, n_comp))
+#
+#         # Apply constraint through projection
+#         Q_const = Q_sub + eps * np.eye(n_comp) * np.max(np.diag(Q_sub))
+#         M = np.eye(n_comp) - A.T @ np.linalg.solve(A @ A.T, A)
+#         Q_const = M @ Q_const @ M.T
+#
+#         # Scale
+#         Sigma = sp.linalg.pinv(Q_const)
+#         scaling_factor = np.exp(np.mean(np.log(np.diag(Sigma))))
+#
+#         # Update the LIL matrix
+#         Q_scaled[np.ix_(idx, idx)] = scaling_factor * Q_sub
+#
+#     return Q_scaled.toarray()
+#
+#
+# def scale_adjacency(adj_mat):
+#     """
+#     Scale adjacency matrix for BYM2 model
+#
+#     Args:
+#         adj_mat: binary adjacency matrix (symmetric)
+#     Returns:
+#         Q_scaled: scaled precision matrix
+#         scale: scaling factor used
+#     """
+#     # Construct precision matrix
+#     D = np.diag(adj_mat.sum(axis=1))
+#     Q = D - adj_mat
+#     # Add small constant to diagonal for numerical stability
+#     Q = Q + np.eye(adj_mat.shape[0]) * 1e-6
+#     # Scale Q
+#     Q_scaled = scale_precision(Q)
+#     return Q_scaled
+
+
+# @jit
+def scale_precision(Q):
     """
-    Scale ICAR precision matrix following R-INLA implementation
+    Scale ICAR precision matrix using JAX for faster computation.
+    Assumes single connected component.
 
     Args:
-        Q: precision matrix (sparse or dense)
-        constraint: constraint matrix (e.g., sum-to-zero)
+        Q: precision matrix as JAX array
         eps: small constant for numerical stability
 
     Returns:
         Q_scaled: scaled precision matrix
-        marginal_var: marginal variances
     """
-    # N = Q.shape[0]
+    eps = 1e-8
+    # n_comp = Q.shape[0]
 
-    # Convert to LIL format for efficient matrix modification
-    Q_sparse = sp.sparse.lil_matrix(Q)
+    # Sum-to-zero constraint
+    # A = jnp.ones((1, n_comp))
+    A = jnp.ones((1, N))
 
-    # Get connected components
-    # Convert to CSR temporarily for connected_components operation
-    Q_csr = Q_sparse.tocsr()
-    n_components, labels = sp.sparse.csgraph.connected_components(Q_csr, directed=False)
+    # Apply constraint through projection
+    # Q_const = Q + eps * jnp.eye(n_comp) * jnp.max(jnp.diag(Q))
+    Q_const = Q + eps * jnp.eye(N) * jnp.max(jnp.diag(Q))
+    # M = jnp.eye(n_comp) - A.T @ jnp.linalg.solve(A @ A.T, A)
+    M = jnp.eye(N) - A.T @ jnp.linalg.solve(A @ A.T, A)
+    Q_const = M @ Q_const @ M.T
 
-    # Initialize output matrix in LIL format
-    Q_scaled = sp.sparse.lil_matrix(Q_sparse.shape)
+    # Scale using pseudo-inverse
+    Sigma = jnp.linalg.pinv(Q_const)
 
-    # Q_sparse = sp.sparse.csr_matrix(Q)
+    # Calculate scaling factor
+    scaling_factor = jnp.exp(jnp.mean(jnp.log(jnp.diag(Sigma))))
 
-    # Get connected components
-    # n_components, labels = sp.sparse.csgraph.connected_components(Q_sparse, directed=False)
+    return scaling_factor * Q
 
-    # Q_scaled = Q_sparse.copy()
-
-    for k in range(n_components):
-        idx = np.where(labels == k)[0]
-        n_comp = len(idx)
-        if n_comp == 1:
-            Q_scaled[idx, idx] = 1
-            continue
-
-        # Extract submatrix - converting to array since it's a small submatrix
-        Q_sub = Q_sparse[idx][:, idx].toarray()
-
-        # Sum-to-zero constraint
-        A = np.ones((1, n_comp))
-
-        # Apply constraint through projection
-        Q_const = Q_sub + eps * np.eye(n_comp) * np.max(np.diag(Q_sub))
-        M = np.eye(n_comp) - A.T @ np.linalg.solve(A @ A.T, A)
-        Q_const = M @ Q_const @ M.T
-
-        # Scale
-        Sigma = sp.linalg.pinv(Q_const)
-        scaling_factor = np.exp(np.mean(np.log(np.diag(Sigma))))
-
-        # Update the LIL matrix
-        Q_scaled[np.ix_(idx, idx)] = scaling_factor * Q_sub
-
-    return Q_scaled.toarray()
-
-
+# @jit
 def scale_adjacency(adj_mat):
     """
-    Scale adjacency matrix for BYM2 model
+    Scale adjacency matrix for BYM2 model using JAX
 
     Args:
-        adj_mat: binary adjacency matrix (symmetric)
+        adj_mat: binary adjacency matrix (symmetric) as JAX array
     Returns:
         Q_scaled: scaled precision matrix
-        scale: scaling factor used
     """
     # Construct precision matrix
-    D = np.diag(adj_mat.sum(axis=1))
+    D = jnp.diag(jnp.sum(adj_mat, axis=1))
     Q = D - adj_mat
     # Add small constant to diagonal for numerical stability
-    Q = Q + np.eye(adj_mat.shape[0]) * 1e-6
+    # Q = Q + jnp.eye(adj_mat.shape[0]) * 1e-6
+    Q = Q + jnp.eye(N) * 1e-6
+
     # Scale Q
     Q_scaled = scale_precision(Q)
     return Q_scaled
+
 
 
 def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rng):
@@ -1402,16 +1460,22 @@ parallel_network_stats = pmap(network_posterior_stats, in_axes=(0, None))
 vectorized_network_stats = vmap(network_posterior_stats, in_axes=(0, None))
 
 
-def network_posterior_Q(triu_sample):
-    curr_Astar = Triu_to_mat(triu_sample)
-    return scale_adjacency(curr_Astar)
+def post_Q_mat(triu_sample):
+    adj_mat = Triu_to_mat(triu_sample)
+    return scale_adjacency(adj_mat)
 
-def get_post_Q_mat(multi_triu_samples):
-    Q_post_list = []
-    for i in tqdm(range(multi_triu_samples.shape[0])):
-        Q_post_list.append(network_posterior_Q(multi_triu_samples[i]))
+vectorized_Q_post = vmap(post_Q_mat)
 
-    return jnp.array(Q_post_list)
+# def network_posterior_Q(triu_sample):
+#     curr_Astar = Triu_to_mat(triu_sample)
+#     return scale_adjacency(curr_Astar)
+#
+# def get_post_Q_mat(multi_triu_samples):
+#     Q_post_list = []
+#     for i in tqdm(range(multi_triu_samples.shape[0])):
+#         Q_post_list.append(network_posterior_Q(multi_triu_samples[i]))
+#
+#     return jnp.array(Q_post_list)
 
 def get_post_net_stats(multi_triu_samples, Z_obs, Z_h, Z_stoch):
     # obs_zeigen = vectorized_network_stats(multi_triu_samples, Z_obs)
