@@ -25,8 +25,8 @@ N_CORES = 8
 os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 
 # --- Set global variables and values ---
-N = 100
-# N = 500
+# N = 100
+N = 500
 TRIL_DIM = int(N*(N-1)/2)
 M = 20
 C = 3
@@ -207,6 +207,26 @@ class GenerateFixedData:
         mat = np.zeros((self.n, self.n))
         idx_upper_tri = np.triu_indices(n=self.n, k=1)
         mat[idx_upper_tri] = self.triu
+        adj_mat = mat + mat.T
+        print("min eig value of adj matrix is ", np.min(np.linalg.eigvals(adj_mat)))
+        # add small constant to diag
+        # adj_mat = adj_mat + np.eye(self.n) * 1e-5
+        # Q_mat = scale_adjacency(jnp.array(adj_mat))
+        Q_mat = scale_adjacency(adj_mat)
+        print("min eig value is ", np.min(np.linalg.eigvals(Q_mat)))
+        print("is Sigma PSD = ", np.all(np.linalg.eigvals(np.linalg.pinv(Q_mat)) >= 0))
+        # check if Q is postive semi-definite
+        # if not np.all(np.linalg.eigvals(Q_mat) >= 0):
+        #     raise ValueError("Q matrix is NOT positive semi-definite")
+        # else:
+        #     print("Q matrix is positive semi-definite")
+        # if not np.allclose(adj_mat, adj_mat.T) and np.all(np.linalg.eigvals(adj_mat) >= 0):
+        #     raise ValueError("Adjacency matrix is NOT symmetric but positive semi-definite")
+        # if not np.allclose(adj_mat, adj_mat.T) and not np.all(np.linalg.eigvals(adj_mat) >= 0):
+        #     raise ValueError("Adjacency matrix is NOT symmetric and NOT positive semi-definite")
+        # if np.allclose(adj_mat, adj_mat.T) and np.all(np.linalg.eigvals(adj_mat) >= 0):
+        #     print("Adjacency matrix is symmetric and positive semi-definite")
+        #     return adj_mat
         return mat + mat.T
     #
     # def gen_outcome(self, z, zeig, with_epsi):
@@ -222,7 +242,7 @@ class GenerateFixedData:
     #     else:
     #         return mean_y
 
-    def  get_odds_ratio(self, z_diff, zeigen_diff, log_scale=True):
+    def get_odds_ratio(self, z_diff, zeigen_diff, log_scale=True):
         log_or = self.eta[1]*z_diff + self.eta[3]*zeigen_diff
         if log_scale:
             return log_or
@@ -273,10 +293,11 @@ class GenerateFixedData:
 
 
 class SampleTreatmentsOutcomes:
-    def __init__(self, rng, fixed_data, eta, sig_y, pz, lin, n=N):
+    def __init__(self, rng, fixed_data, eta, sig_y, rho, pz, lin, n=N):
         self.n = n
         self.eta = eta
         self.sig_y = sig_y
+        self.rho = rho
         self.lin = lin
         self.rng = rng
         self.X = fixed_data["X"]
@@ -288,9 +309,10 @@ class SampleTreatmentsOutcomes:
         self.adj_mat = fixed_data["adj_mat"]
         self.eig_cen = fixed_data["eig_cen"]
         self.zeigen = zeigen_value(self.Z, self.eig_cen, self.adj_mat)
-        self.Q_matrix = scale_adjacency(jnp.array(self.adj_mat))
+        # self.Q_matrix = scale_adjacency(jnp.array(self.adj_mat))
+        self.Q_matrix = scale_adjacency(self.adj_mat)
         self.df_array = jnp.transpose(jnp.array([[1]*self.n, self.Z, self.X, self.zeigen]))
-        self.Y = simulate_outcome_bym2(self.df_array, self.Q_matrix, self.eta, self.sig_y, self.rng)
+        self.Y = simulate_outcome_bym2(self.df_array, self.Q_matrix, self.eta, self.sig_y, self.rho, self.rng)
         # self.Y, self.epsi = self.gen_outcome(self.Z, self.zeigen, with_epsi=True)
         self.Z_h = fixed_data["Z_h"]
         self.Z_stoch = fixed_data["Z_stoch"]
@@ -326,146 +348,194 @@ class SampleTreatmentsOutcomes:
 
 # --- function for BYM simulation ---
 
-# def scale_precision(Q, eps=np.sqrt(np.finfo(float).eps)):
+def scale_precision(Q, eps=np.sqrt(np.finfo(float).eps)):
+    """
+    Scale ICAR precision matrix following R-INLA implementation
+
+    Args:
+        Q: precision matrix (sparse or dense)
+        constraint: constraint matrix (e.g., sum-to-zero)
+        eps: small constant for numerical stability
+
+    Returns:
+        Q_scaled: scaled precision matrix
+        marginal_var: marginal variances
+    """
+    # N = Q.shape[0]
+
+    # Convert to LIL format for efficient matrix modification
+    Q_sparse = sp.sparse.lil_matrix(Q)
+
+    # Get connected components
+    # Convert to CSR temporarily for connected_components operation
+    Q_csr = Q_sparse.tocsr()
+    n_components, labels = sp.sparse.csgraph.connected_components(Q_csr, directed=False)
+    print("number of connected components is ", n_components)
+
+    # Initialize output matrix in LIL format
+    Q_scaled = sp.sparse.lil_matrix(Q_sparse.shape)
+
+    # Q_sparse = sp.sparse.csr_matrix(Q)
+
+    # Get connected components
+    # n_components, labels = sp.sparse.csgraph.connected_components(Q_sparse, directed=False)
+
+    # Q_scaled = Q_sparse.copy()
+
+    for k in range(n_components):
+        idx = np.where(labels == k)[0]
+        n_comp = len(idx)
+        if n_comp == 1:
+            Q_scaled[idx, idx] = 1
+            continue
+
+        # Extract submatrix - converting to array since it's a small submatrix
+        Q_sub = Q_sparse[idx][:, idx].toarray()
+
+        # Sum-to-zero constraint
+        A = np.ones((1, n_comp))
+
+        # Apply constraint through projection
+        Q_const = Q_sub + eps * np.eye(n_comp) * np.max(np.diag(Q_sub))
+        M = np.eye(n_comp) - A.T @ np.linalg.solve(A @ A.T, A)
+        Q_const = M @ Q_const @ M.T
+
+        # Scale
+        Sigma = sp.linalg.pinv(Q_const)
+        scaling_factor = np.exp(np.mean(np.log(np.diag(Sigma))))
+
+        # Update the LIL matrix
+        Q_scaled[np.ix_(idx, idx)] = scaling_factor * Q_sub
+
+    return Q_scaled.toarray()
+
+
+def scale_adjacency(adj_mat):
+    """
+    Scale adjacency matrix for BYM2 model
+
+    Args:
+        adj_mat: binary adjacency matrix (symmetric)
+    Returns:
+        Q_scaled: scaled precision matrix
+        scale: scaling factor used
+    """
+    # Construct precision matrix
+    D = np.diag(adj_mat.sum(axis=1))
+    Q = D - adj_mat
+    # Add small constant to diagonal for numerical stability
+    Q = Q + np.eye(adj_mat.shape[0]) * 1e-6
+    # Scale Q
+    Q_scaled = scale_precision(Q)
+    return Q_scaled
+
+
+# @jit
+# def scale_precision(Q):
 #     """
-#     Scale ICAR precision matrix following R-INLA implementation
+#     Scale ICAR precision matrix using JAX for faster computation.
+#     Assumes single connected component.
 #
 #     Args:
-#         Q: precision matrix (sparse or dense)
-#         constraint: constraint matrix (e.g., sum-to-zero)
+#         Q: precision matrix as JAX array
 #         eps: small constant for numerical stability
 #
 #     Returns:
 #         Q_scaled: scaled precision matrix
-#         marginal_var: marginal variances
 #     """
-#     # N = Q.shape[0]
+#     eps = 1e-8
+#     # n_comp = Q.shape[0]
 #
-#     # Convert to LIL format for efficient matrix modification
 #     Q_sparse = sp.sparse.lil_matrix(Q)
 #
 #     # Get connected components
 #     # Convert to CSR temporarily for connected_components operation
 #     Q_csr = Q_sparse.tocsr()
 #     n_components, labels = sp.sparse.csgraph.connected_components(Q_csr, directed=False)
-#
-#     # Initialize output matrix in LIL format
-#     Q_scaled = sp.sparse.lil_matrix(Q_sparse.shape)
-#
-#     # Q_sparse = sp.sparse.csr_matrix(Q)
-#
-#     # Get connected components
-#     # n_components, labels = sp.sparse.csgraph.connected_components(Q_sparse, directed=False)
-#
-#     # Q_scaled = Q_sparse.copy()
-#
-#     for k in range(n_components):
-#         idx = np.where(labels == k)[0]
-#         n_comp = len(idx)
-#         if n_comp == 1:
-#             Q_scaled[idx, idx] = 1
-#             continue
-#
-#         # Extract submatrix - converting to array since it's a small submatrix
-#         Q_sub = Q_sparse[idx][:, idx].toarray()
-#
-#         # Sum-to-zero constraint
-#         A = np.ones((1, n_comp))
-#
-#         # Apply constraint through projection
-#         Q_const = Q_sub + eps * np.eye(n_comp) * np.max(np.diag(Q_sub))
-#         M = np.eye(n_comp) - A.T @ np.linalg.solve(A @ A.T, A)
-#         Q_const = M @ Q_const @ M.T
-#
-#         # Scale
-#         Sigma = sp.linalg.pinv(Q_const)
-#         scaling_factor = np.exp(np.mean(np.log(np.diag(Sigma))))
-#
-#         # Update the LIL matrix
-#         Q_scaled[np.ix_(idx, idx)] = scaling_factor * Q_sub
-#
-#     return Q_scaled.toarray()
+#     print("number of connected components is ", n_components)
 #
 #
+#     # Sum-to-zero constraint
+#     # A = jnp.ones((1, n_comp))
+#     A = jnp.ones((1, N))
+#
+#     # Apply constraint through projection
+#     # Q_const = Q + eps * jnp.eye(n_comp) * jnp.max(jnp.diag(Q))
+#     Q_const = Q + eps * jnp.eye(N) * jnp.max(jnp.diag(Q))
+#     # M = jnp.eye(n_comp) - A.T @ jnp.linalg.solve(A @ A.T, A)
+#     M = jnp.eye(N) - A.T @ jnp.linalg.solve(A @ A.T, A)
+#     Q_const = M @ Q_const @ M.T
+#
+#     print("min eig value of Q_const is ", np.min(np.linalg.eigvals(Q_const)))
+#     # Scale using pseudo-inverse
+#     Sigma = jnp.linalg.pinv(Q_const)
+#     print("min eig value of Sigma is ", np.min(jnp.linalg.eigvals(Sigma)))
+#
+#     # Calculate scaling factor
+#     scaling_factor = jnp.exp(jnp.mean(jnp.log(jnp.diag(Sigma))))
+#     print("scaling factor is ", scaling_factor)
+#
+#     return scaling_factor * Q
+#
+# # @jit
 # def scale_adjacency(adj_mat):
 #     """
-#     Scale adjacency matrix for BYM2 model
+#     Scale adjacency matrix for BYM2 model using JAX
 #
 #     Args:
-#         adj_mat: binary adjacency matrix (symmetric)
+#         adj_mat: binary adjacency matrix (symmetric) as JAX array
 #     Returns:
 #         Q_scaled: scaled precision matrix
-#         scale: scaling factor used
 #     """
+#     print("scaling factor using PYMC func: ", compute_scaling_factor(adj_mat))
+#
 #     # Construct precision matrix
-#     D = np.diag(adj_mat.sum(axis=1))
+#     D = jnp.diag(jnp.sum(adj_mat, axis=1))
 #     Q = D - adj_mat
 #     # Add small constant to diagonal for numerical stability
-#     Q = Q + np.eye(adj_mat.shape[0]) * 1e-6
+#     # Q = Q + jnp.eye(adj_mat.shape[0]) * 1e-6
+#     Q = Q + jnp.eye(N) * 1e-6
+#
 #     # Scale Q
 #     Q_scaled = scale_precision(Q)
 #     return Q_scaled
 
+#
+# def compute_scaling_factor(adj_mat):
+#     """
+#     Compute the scaling factor for ICAR model from adjacency matrix
+#     following the method from Riebler et al. (2016).
+#
+#     Args:
+#         adj_mat: binary adjacency matrix (symmetric) as JAX array
+#     Returns:
+#         scaling_factor: scalar value for scaling precision matrix
+#     """
+#     # N = adj_mat.shape[0]
+#
+#     # Construct precision matrix Q
+#     num_neighbors = jnp.sum(adj_mat, axis=1)
+#     D = jnp.diag(num_neighbors)
+#     Q = D - adj_mat
+#
+#     # Add small perturbation to Q
+#     jitter = jnp.max(jnp.diag(Q)) * (1e-8)
+#     Q_perturbed = Q + jnp.eye(N) * jitter
+#
+#     # Compute pseudo-inverse
+#     Sigma = jnp.linalg.inv(Q_perturbed)
+#
+#     # Compute proper generalized inverse for ICAR
+#     ones = jnp.ones(N)
+#     W = Sigma @ ones
+#     Q_inv = Sigma - jnp.outer(W, W) / jnp.sum(W)
+#
+#     # Compute geometric mean of diagonal
+#     scaling_factor = jnp.exp(jnp.mean(jnp.log(jnp.diag(Q_inv))))
+#
+#     return scaling_factor
 
-# @jit
-def scale_precision(Q):
-    """
-    Scale ICAR precision matrix using JAX for faster computation.
-    Assumes single connected component.
-
-    Args:
-        Q: precision matrix as JAX array
-        eps: small constant for numerical stability
-
-    Returns:
-        Q_scaled: scaled precision matrix
-    """
-    eps = 1e-8
-    # n_comp = Q.shape[0]
-
-    # Sum-to-zero constraint
-    # A = jnp.ones((1, n_comp))
-    A = jnp.ones((1, N))
-
-    # Apply constraint through projection
-    # Q_const = Q + eps * jnp.eye(n_comp) * jnp.max(jnp.diag(Q))
-    Q_const = Q + eps * jnp.eye(N) * jnp.max(jnp.diag(Q))
-    # M = jnp.eye(n_comp) - A.T @ jnp.linalg.solve(A @ A.T, A)
-    M = jnp.eye(N) - A.T @ jnp.linalg.solve(A @ A.T, A)
-    Q_const = M @ Q_const @ M.T
-
-    # Scale using pseudo-inverse
-    Sigma = jnp.linalg.pinv(Q_const)
-
-    # Calculate scaling factor
-    scaling_factor = jnp.exp(jnp.mean(jnp.log(jnp.diag(Sigma))))
-
-    return scaling_factor * Q
-
-# @jit
-def scale_adjacency(adj_mat):
-    """
-    Scale adjacency matrix for BYM2 model using JAX
-
-    Args:
-        adj_mat: binary adjacency matrix (symmetric) as JAX array
-    Returns:
-        Q_scaled: scaled precision matrix
-    """
-    # Construct precision matrix
-    D = jnp.diag(jnp.sum(adj_mat, axis=1))
-    Q = D - adj_mat
-    # Add small constant to diagonal for numerical stability
-    # Q = Q + jnp.eye(adj_mat.shape[0]) * 1e-6
-    Q = Q + jnp.eye(N) * 1e-6
-
-    # Scale Q
-    Q_scaled = scale_precision(Q)
-    return Q_scaled
-
-
-
-def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rng):
+def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rho, rng):
     """
     Simulate from BYM2 model
 
@@ -492,13 +562,15 @@ def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rng):
 
     # Simulate network random effect (u)
     Sigma = np.linalg.pinv(Q_scaled)
+    print("Sim bym2 Sigma is PSD: ", np.all(np.linalg.eigvals(Sigma) >= 0))
     u = rng.multivariate_normal(mean=np.zeros(N), cov=Sigma)
     u = u - np.mean(u)
 
+    # simulate unit level effects
+    v = rng.normal(loc=0, scale=1, size=N)
     # Combine random effects according to BYM2 parameterization
-    # random_effects = (np.sqrt(rho) * u + np.sqrt(1-rho) * v) * sigma
-    random_effects = u * sigma
-
+    random_effects = (np.sqrt(rho) * u + np.sqrt(1-rho) * v) * sigma
+    # random_effects = u * sigma
     # Generate outcome
     Y_probs = expit(mu + random_effects)
     Y = rng.binomial(n=1, p=Y_probs)
@@ -729,8 +801,12 @@ def outcome_model(df, Y=None):
     with numpyro.plate("Lin coef.", df.shape[1]):
         # eta = numpyro.sample("eta", dist.Normal(0, 5))
         eta = numpyro.sample("eta", dist.Normal(0, 5))
-    # sig = numpyro.sample("sig", dist.LogNormal(scale=2.0))
-    mu_y = jnp.dot(df, eta)
+
+    # unit level random effects
+    v = numpyro.sample('v', dist.Normal(0., 1.), sample_shape=(N,))
+    sigma = numpyro.sample("sigma", dist.LogNormal(scale=1))
+    # mu_y = jnp.dot(df, eta)
+    mu_y = jnp.dot(df, eta) + v*sigma
     # --- likelihood --
     with numpyro.plate("obs", df.shape[0]):
         # numpyro.sample("Y", dist.Normal(loc=mu_y, scale=sig), obs=Y)
@@ -756,6 +832,8 @@ def bym2_model(df, Q_scaled, Y=None, constraint_scale=0.001):
     # Fixed effects priors
     with numpyro.plate("Lin coef.", df.shape[1]):
         eta = numpyro.sample("eta", dist.Normal(0, 5))
+
+
     sigma = numpyro.sample("sigma", dist.LogNormal(scale=1))
 
     # Fixed effects
@@ -767,20 +845,32 @@ def bym2_model(df, Q_scaled, Y=None, constraint_scale=0.001):
                            loc=jnp.zeros(N),
                            precision_matrix=Q_scaled))
 
-
     # Soft sum-to-zero constraint
     # equivalent to mean(u) ~ normal(0, constraint_scale)
     # or sum(u) ~ normal(0, constraint_scale * N)
     numpyro.factor('u_constraint',
                    (-0.5 * (jnp.sum(u) ** 2)) / ((constraint_scale * N) ** 2))
 
+    # unit level random effects
+    v = numpyro.sample('v', dist.Normal(0., 1.), sample_shape=(N,))
+
+    # BYM2 mixing parameter
+    rho = numpyro.sample('rho',
+                dist.Beta(0.5, 0.5))
+
+    # Combine components (BYM2 parameterization)
+    random_effects = numpyro.deterministic(
+        'random_effects',
+            (jnp.sqrt(rho) * u + jnp.sqrt(1-rho) * v) * sigma)
+
     # Combine components (BYM2 parameterization)
     # random_effects = numpyro.deterministic(
     #     'random_effects',
     #     u * sigma)
 
-    # Expected value
-    mu_y = numpyro.deterministic('mu_y', mu + u*sigma)
+    # Expected link value
+    mu_y = numpyro.deterministic('mu_y', mu + random_effects)
+    # mu_y = numpyro.deterministic('mu_y', mu + u*sigma)
 
     # Likelihood
     with numpyro.plate('observations', N):
@@ -812,14 +902,14 @@ def HSGP_model(df, ell, m, Y=None):
 # @jit
 def linear_model_samples_parallel(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=4000,num_chains=4, progress_bar=True)
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=3000, num_samples=4000,num_chains=4, progress_bar=True)
     lin_mcmc.run(key, df=df, Y=Y)
     return lin_mcmc.get_samples()
 
 @jit
 def linear_model_samples_vectorized(key, Y, df):
     kernel_outcome = NUTS(outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=1000, num_samples=250, num_chains=1,
+    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=250, num_chains=1,
                     progress_bar=False, chain_method="vectorized")
     lin_mcmc.run(key, df=df, Y=Y)
     return lin_mcmc.get_samples()
@@ -1466,16 +1556,16 @@ def post_Q_mat(triu_sample):
 
 vectorized_Q_post = vmap(post_Q_mat)
 
-# def network_posterior_Q(triu_sample):
-#     curr_Astar = Triu_to_mat(triu_sample)
-#     return scale_adjacency(curr_Astar)
-#
-# def get_post_Q_mat(multi_triu_samples):
-#     Q_post_list = []
-#     for i in tqdm(range(multi_triu_samples.shape[0])):
-#         Q_post_list.append(network_posterior_Q(multi_triu_samples[i]))
-#
-#     return jnp.array(Q_post_list)
+def network_posterior_Q(triu_sample):
+    curr_Astar = Triu_to_mat(triu_sample)
+    return scale_adjacency(curr_Astar)
+
+def get_post_Q_mat(multi_triu_samples):
+    Q_post_list = []
+    for i in tqdm(range(multi_triu_samples.shape[0])):
+        Q_post_list.append(network_posterior_Q(multi_triu_samples[i]))
+
+    return jnp.array(Q_post_list)
 
 def get_post_net_stats(multi_triu_samples, Z_obs, Z_h, Z_stoch):
     # obs_zeigen = vectorized_network_stats(multi_triu_samples, Z_obs)
