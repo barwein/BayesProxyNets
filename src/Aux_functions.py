@@ -700,15 +700,15 @@ def pyro_noisy_networks_model(x, x2, triu_v, N, K=2, eps=1e-3):
     nu_diff_norm_val = torch.norm(nu_diff, dim=1)
 
     with pyro.plate("theta_dim", 2):
-        theta = pyro.sample("theta",
-                            pyro.distributions.Normal(0, 5))
+        theta = pyro.sample("theta", pyro.distributions.Normal(0, 5))
+        # theta = pyro.sample("theta", pyro.distributions.StudentT(df=5, loc=0, scale=2))
 
     mu_net = theta[0] + x2 * theta[1] - nu_diff_norm_val
     mu_net = torch.clamp(mu_net, min=-30, max=30)
 
     with pyro.plate("gamma_i", 4):
-        gamma = pyro.sample("gamma",
-                            pyro.distributions.Normal(0, 5))
+        gamma = pyro.sample("gamma", pyro.distributions.Normal(0, 5))
+        # gamma = pyro.sample("gamma", pyro.distributions.StudentT(df=5, loc=0, scale=2))
 
     with pyro.plate("A* and A", x.shape[0]):
         triu_star = pyro.sample("triu_star",
@@ -743,19 +743,19 @@ def pyro_noisy_repeated_networks_model(x, x2, triu_v, triu_v_rep, N, K=2, eps=1e
     nu_diff_norm_val = torch.norm(nu_diff, dim=1)
 
     with pyro.plate("theta_dim", 2):
-        theta = pyro.sample("theta",
-                            pyro.distributions.Normal(0, 5))
+        # theta = pyro.sample("theta", pyro.distributions.Normal(0, 5))
+        theta = pyro.sample("theta", pyro.distributions.StudentT(df=5, loc=0, scale=2))
 
     mu_net = theta[0] + x2 * theta[1] - nu_diff_norm_val
     mu_net = torch.clamp(mu_net, min=-30, max=30)
 
     with pyro.plate("gamma_i", 4):
-        gamma = pyro.sample("gamma",
-                            pyro.distributions.Normal(0, 5))
+        gamma = pyro.sample("gamma", pyro.distributions.Normal(0, 5))
+        # gamma = pyro.sample("gamma", pyro.distributions.StudentT(df=5, loc=0, scale=2))
 
     with pyro.plate("gamma_rep_i", 4):
-        gamma_rep = pyro.sample("gamma_rep",
-                                pyro.distributions.Normal(0, 5))
+        gamma_rep = pyro.sample("gamma_rep", pyro.distributions.Normal(0, 5))
+        # gamma_rep = pyro.sample("gamma_rep", pyro.distributions.StudentT(df=5, loc=0, scale=2))
 
     with pyro.plate("A* and A", x.shape[0]):
         triu_star = pyro.sample("triu_star",
@@ -782,11 +782,13 @@ def pyro_noisy_repeated_networks_model(x, x2, triu_v, triu_v_rep, N, K=2, eps=1e
 def network_model(X_d, X2_eq, triu_v):
     # Network model
     with numpyro.plate("theta_i", 2):
-        theta = numpyro.sample("theta", dist.Normal(0, 5))
+        # theta = numpyro.sample("theta", dist.Normal(0, 5))
+        theta = numpyro.sample("theta", dist.StudentT(df=5, loc=0, scale=2))
     mu_net = theta[0] + theta[1]*X2_eq
 
     with numpyro.plate("gamma_i", 2):
-        gamma = numpyro.sample("gamma", dist.Normal(0, 5))
+        # gamma = numpyro.sample("gamma", dist.Normal(0, 5))
+        gamma = numpyro.sample("gamma", dist.StudentT(df=5, loc=0, scale=2))
 
     with numpyro.plate("A* and A", triu_v.shape[0]):
         triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=mu_net),
