@@ -7,6 +7,7 @@ import src.Aux_functions as aux
 
 # parameters guides:
 # theta: p(A* | X, theta)
+
 # gamma: p(A | A*, X, gamma)
 # eta, sig_y: p(Y | Z, X, A*, eta, sig_y)
 # alpha: pi_alpha(z) ---> stochastic intervention
