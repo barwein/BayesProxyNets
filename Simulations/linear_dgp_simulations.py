@@ -6,6 +6,30 @@ import numpy as np
 import src.Aux_functions as aux
 from Simulations.Simulations import results_to_pd_df, one_simuation_iter
 
+"""
+This script runs a series of simulations for a linear data generating process (DGP) using JAX and multiprocessing.
+Global Variables:
+    RANDOM_SEED (int): Seed for random number generation.
+    rng (Generator): Random number generator instance.
+    THETA (list): Parameters for p(A* | X, theta).
+    GAMMA (list): Parameters for p(A | A*, X, gamma).
+    GAMMA_REP (list): Parameters for repeated gamma.
+    ETA (jnp.array): Parameters for p(Y | Z, X, A*, eta, sig_y).
+    SIG_Y (float): Random error magnitude.
+    RHO (float): mixing parameter.
+    PZ (float): Probability for Z.
+    LIN_Y (bool): Linear relationship flag.
+    ALPHAS (tuple): Parameters for stochastic intervention.
+    N (int): Sample size.
+    N_SIM (int): Number of simulations.
+    N_REP (int): Number of repetitions.
+Functions:
+    main: Entry point for the script. Initializes fixed data and runs simulations.
+Notes:
+    This script is intended to run in a power-cluster and may take a while to finish.
+    Consider reducing N or N_SIM before running the simulation.
+"""
+
 
 # parameters guides:
 # theta: p(A* | X, theta)
