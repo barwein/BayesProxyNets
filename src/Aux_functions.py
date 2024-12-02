@@ -854,16 +854,17 @@ def bym2_model(df, Q_scaled, Y=None, constraint_scale=0.001):
                    (-0.5 * (jnp.sum(u) ** 2)) / ((constraint_scale * N) ** 2))
 
     # unit level random effects
-    v = numpyro.sample('v', dist.Normal(0., 1.), sample_shape=(N,))
+    # v = numpyro.sample('v', dist.Normal(0., 1.), sample_shape=(N,))
 
     # BYM2 mixing parameter
-    rho = numpyro.sample('rho',
-                dist.Beta(0.5, 0.5))
+    # rho = numpyro.sample('rho',
+                # dist.Beta(0.5, 0.5))
 
     # Combine components (BYM2 parameterization)
     random_effects = numpyro.deterministic(
         'random_effects',
-            (jnp.sqrt(rho) * u + jnp.sqrt(1-rho) * v) * sigma)
+            u*sigma)
+            # (jnp.sqrt(rho) * u + jnp.sqrt(1-rho) * v) * sigma)
 
     # Combine components (BYM2 parameterization)
     # random_effects = numpyro.deterministic(
