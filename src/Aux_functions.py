@@ -1145,6 +1145,7 @@ class Network_SVI:
             model_trace = pyro.poutine.trace(inferred_model).get_trace(*self.args)
             # Extract triu_star from the trace
             triu_star_samples.append(model_trace.nodes['triu_star']['value'])
+            # TODO: save log likelihood via model_trace.log_prob_sum() and return it
         # Convert to tensor
         return jnp.stack(jnp.array(triu_star_samples))
 

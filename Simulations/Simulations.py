@@ -128,6 +128,8 @@ def one_simuation_iter(
 
     print("Running Multistage")
     # Multi-Stage (aka threestage)
+
+    # TODO: replace random selection with selection 'n_rep' samples with highest log-likelihood (scores from network samples)
     i_range = np.random.choice(
         a=range(network_pred_samples.shape[0]), size=n_rep, replace=False
     )
