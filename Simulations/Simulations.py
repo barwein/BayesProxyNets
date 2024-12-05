@@ -52,11 +52,6 @@ def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, l
     network_svi.train_model()
     network_pred_samples, network_scores = network_svi.network_samples()
 
-    i_range = np.argsort(network_scores)[::-1][:n_rep]
-
-    for i in range(n_rep):
-        print("Sample:", i)
-        print("Score:", network_scores[i])
 
     print("Running obs and oracle outcome modules")
     # --- Outcome module (linear & GP) ---
@@ -99,10 +94,6 @@ def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, l
     #     a=range(network_pred_samples.shape[0]), size=n_rep, replace=False
     # )
     i_range = np.argsort(network_scores)[::-1][:n_rep]
-
-    for i in range(10):
-        print("Sample:", i)
-        print("Score:", network_scores[i])
 
     threestage_results = aux.multistage_run(
         zeigen_post=post_zeig[i_range,],

@@ -214,7 +214,6 @@ class GenerateFixedData:
         Q_mat = scale_adjacency(adj_mat)
         return mat + mat.T
 
-
     def get_odds_ratio(self, z_diff, zeigen_diff, log_scale=True):
         log_or = self.eta[1] * z_diff + self.eta[3] * zeigen_diff
         if log_scale:
