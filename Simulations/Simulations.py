@@ -48,15 +48,15 @@ def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, l
         data=df_obs, rng_key=rng_key, n_iter=5000, n_samples=1000, with_rep=False
     )
 
+    # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=20000, n_samples=10000)
+    network_svi.train_model()
+    network_pred_samples, network_scores = network_svi.network_samples()
+
     i_range = np.argsort(network_scores)[::-1][:n_rep]
 
     for i in range(n_rep):
         print("Sample:", i)
         print("Score:", network_scores[i])
-
-    # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=20000, n_samples=10000)
-    network_svi.train_model()
-    network_pred_samples, network_scores = network_svi.network_samples()
 
     print("Running obs and oracle outcome modules")
     # --- Outcome module (linear & GP) ---
