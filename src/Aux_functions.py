@@ -211,40 +211,9 @@ class GenerateFixedData:
         idx_upper_tri = np.triu_indices(n=self.n, k=1)
         mat[idx_upper_tri] = self.triu
         adj_mat = mat + mat.T
-        print("min eig value of adj matrix is ", np.min(np.linalg.eigvals(adj_mat)))
-        # add small constant to diag
-        # adj_mat = adj_mat + np.eye(self.n) * 1e-5
-        # Q_mat = scale_adjacency(jnp.array(adj_mat))
         Q_mat = scale_adjacency(adj_mat)
-        print("min eig value is ", np.min(np.linalg.eigvals(Q_mat)))
-        print("is Sigma PSD = ", np.all(np.linalg.eigvals(np.linalg.pinv(Q_mat)) >= 0))
-        # check if Q is postive semi-definite
-        # if not np.all(np.linalg.eigvals(Q_mat) >= 0):
-        #     raise ValueError("Q matrix is NOT positive semi-definite")
-        # else:
-        #     print("Q matrix is positive semi-definite")
-        # if not np.allclose(adj_mat, adj_mat.T) and np.all(np.linalg.eigvals(adj_mat) >= 0):
-        #     raise ValueError("Adjacency matrix is NOT symmetric but positive semi-definite")
-        # if not np.allclose(adj_mat, adj_mat.T) and not np.all(np.linalg.eigvals(adj_mat) >= 0):
-        #     raise ValueError("Adjacency matrix is NOT symmetric and NOT positive semi-definite")
-        # if np.allclose(adj_mat, adj_mat.T) and np.all(np.linalg.eigvals(adj_mat) >= 0):
-        #     print("Adjacency matrix is symmetric and positive semi-definite")
-        #     return adj_mat
         return mat + mat.T
 
-    #
-    # def gen_outcome(self, z, zeig, with_epsi):
-    #     df_lin = jnp.transpose(np.array([[1]*self.n, z, self.X, self.X2]))
-    #     if self.lin:
-    #         mean_y = jnp.dot(jnp.column_stack((df_lin, zeig)), self.eta)
-    #     else:
-    #         return "Non-linear not implemented"
-    #     if with_epsi:
-    #         epsi = jnp.array(self.rng.normal(loc=0, scale=self.sig_y, size=self.n))
-    #         Y = jnp.array(mean_y + epsi)
-    #         return Y, epsi
-    #     else:
-    #         return mean_y
 
     def get_odds_ratio(self, z_diff, zeigen_diff, log_scale=True):
         log_or = self.eta[1] * z_diff + self.eta[3] * zeigen_diff
@@ -312,11 +281,10 @@ class GenerateFixedData:
 
 
 class SampleTreatmentsOutcomes:
-    def __init__(self, rng, fixed_data, eta, sig_y, rho, pz, lin, n=N):
+    def __init__(self, rng, fixed_data, eta, sig_y, pz, lin, n=N):
         self.n = n
         self.eta = eta
         self.sig_y = sig_y
-        self.rho = rho
         self.lin = lin
         self.rng = rng
         self.X = fixed_data["X"]
@@ -334,7 +302,7 @@ class SampleTreatmentsOutcomes:
             jnp.array([[1] * self.n, self.Z, self.X, self.zeigen])
         )
         self.Y = simulate_outcome_bym2(
-            self.df_array, self.Q_matrix, self.eta, self.sig_y, self.rho, self.rng
+            self.df_array, self.Q_matrix, self.eta, self.sig_y, self.rng
         )
         # self.Y, self.epsi = self.gen_outcome(self.Z, self.zeigen, with_epsi=True)
         self.Z_h = fixed_data["Z_h"]
@@ -402,17 +370,9 @@ def scale_precision(Q, eps=np.sqrt(np.finfo(float).eps)):
     # Convert to CSR temporarily for connected_components operation
     Q_csr = Q_sparse.tocsr()
     n_components, labels = sp.sparse.csgraph.connected_components(Q_csr, directed=False)
-    print("number of connected components is ", n_components)
 
     # Initialize output matrix in LIL format
     Q_scaled = sp.sparse.lil_matrix(Q_sparse.shape)
-
-    # Q_sparse = sp.sparse.csr_matrix(Q)
-
-    # Get connected components
-    # n_components, labels = sp.sparse.csgraph.connected_components(Q_sparse, directed=False)
-
-    # Q_scaled = Q_sparse.copy()
 
     for k in range(n_components):
         idx = np.where(labels == k)[0]
@@ -568,16 +528,13 @@ def scale_adjacency(adj_mat):
 #     return scaling_factor
 
 
-def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rho, rng):
+def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rng):
     """
     Simulate from BYM2 model
 
-    Y = fixed_df @ eta + (sqrt(rho) * u + sqrt(1-rho) * v)/sqrt(sigma)
+    Y = fixed_df @ eta +  sigma*u
     where:
     u ~ ICAR(Q_scaled)  # Q_scaled ensures unit variance
-    v ~ N(0, 1)
-
-    we fixed \rho=1 to have only network/spatial random effect
 
     Args:
         fixed_df: fixed treatments + covaraites matrix (N x p)
@@ -600,10 +557,10 @@ def simulate_outcome_bym2(fixed_df, Q_scaled, eta, sigma, rho, rng):
     u = u - np.mean(u)
 
     # simulate unit level effects
-    v = rng.normal(loc=0, scale=1, size=N)
+    # v = rng.normal(loc=0, scale=1, size=N)
     # Combine random effects according to BYM2 parameterization
-    random_effects = (np.sqrt(rho) * u + np.sqrt(1 - rho) * v) * sigma
-    # random_effects = u * sigma
+    # random_effects = (np.sqrt(rho) * u + np.sqrt(1 - rho) * v) * sigma
+    random_effects = u * sigma
     # Generate outcome
     Y_probs = expit(mu + random_effects)
     Y = rng.binomial(n=1, p=Y_probs)
@@ -1298,6 +1255,7 @@ class Network_SVI:
 
     def network_samples(self):
         triu_star_samples = []
+        scores = []
         for _ in tqdm(range(self.n_samples), desc="Sampling A*"):
             # Get a trace from the guide
             # guide_trace = pyro.poutine.trace(self.guide).get_trace(self.X_diff, self.X2_eq, self.triu, self.n)
@@ -1312,9 +1270,10 @@ class Network_SVI:
             model_trace = pyro.poutine.trace(inferred_model).get_trace(*self.args)
             # Extract triu_star from the trace
             triu_star_samples.append(model_trace.nodes["triu_star"]["value"])
-            # TODO: save log likelihood via model_trace.log_prob_sum() and return it
-        # Convert to tensor
-        return jnp.stack(jnp.array(triu_star_samples))
+            # Extract the log_prob_sum from the trace (i.e., the log-likelihood of current draw)
+            scores.append(model_trace.log_prob_sum().item())
+        # Convert to array
+        return jnp.stack(jnp.array(triu_star_samples)), jnp.array(scores)
 
 
 class Network_MCMC:
