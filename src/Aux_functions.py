@@ -2003,9 +2003,9 @@ def save_degree_distributions(adj_mat):
 
     sns.histplot(degrees, kde=False, ax=ax, color="skyblue", edgecolor="navy")
 
-    ax.set_title("True Network A* Degree Distribution")
-    ax.set_xlabel("Degree")
-    ax.set_ylabel("Frequency")
+    ax.set_title("True Network A* Degree Distribution", fontsize=18)
+    ax.set_xlabel("Degree", fontsize=14)
+    ax.set_ylabel("Frequency", fontsize=14)
 
     # Add mean and median annotations
     mean = np.mean(degrees)
@@ -2020,6 +2020,7 @@ def save_degree_distributions(adj_mat):
         verticalalignment="top",
         horizontalalignment="right",
         bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
+        fontsize=14,
     )
 
     plt.tight_layout()
