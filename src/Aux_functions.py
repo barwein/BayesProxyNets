@@ -1155,7 +1155,7 @@ def get_predicted_odds_ratio(post_samples, z_diff, zeigen_diff, log_scale=True):
             If input differences have shape (k,n), returns mean across k samples
     """
     multi_treatments = z_diff.ndim > 1 or zeigen_diff.ndim > 1
-
+    
     # Reshape posterior samples to (m,1)
     coef_z = post_samples[:, 1].reshape(-1, 1)  # Shape: (m, 1)
     coef_zeigen = post_samples[:, 3].reshape(-1, 1)  # Shape: (m, 1)
