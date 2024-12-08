@@ -55,10 +55,10 @@ LIN_Y = True
 ALPHAS = (0.7, 0.3)
 N = 500
 # N = 100
-# N_SIM = 500
-N_SIM = 1
-# N_REP = 2000
-N_REP = 50
+N_SIM = 500
+# N_SIM = 1
+N_REP = 2000
+# N_REP = 50
 
 ### Note: this script is intended to run in a power-cluster and may take a while to finish ###
 ### Consider reducing N or N_SIM before running the simulation ###
@@ -73,27 +73,30 @@ if __name__ == "__main__":
         rng=rng, theta=THETA, eta=ETA, sig_y=SIG_Y, lin=LIN_Y, alphas=ALPHAS, n=N
     ).get_data()
 
+    # Save degree distribution of the A* (fixed througout simulations)
+    aux.save_degree_distributions(fixed_df["adj_mat"])
+
     start = time.time()
     idx_range = jnp.arange(N_SIM)
 
-    # Run simulations
-    for i in range(N_SIM):
-        sim_results = one_simuation_iter(
-            idx=i,
-            fixed_df=fixed_df,
-            gamma=GAMMA,
-            gamma_rep=GAMMA_REP,
-            eta=ETA,
-            sig_y=SIG_Y,
-            pz=PZ,
-            n_rep=N_REP,
-            lin_y=LIN_Y,
-        )
-        df_results = results_to_pd_df(sim_results, 1)
-        w_path = "results"
-        dgp = "linear_dgp_test"
-        with_header = i == 0
-        df_results.to_csv(
-            w_path + "/" + dgp + ".csv", index=False, mode="a", header=with_header
-        )
+    # # Run simulations
+    # for i in range(N_SIM):
+    #     sim_results = one_simuation_iter(
+    #         idx=i,
+    #         fixed_df=fixed_df,
+    #         gamma=GAMMA,
+    #         gamma_rep=GAMMA_REP,
+    #         eta=ETA,
+    #         sig_y=SIG_Y,
+    #         pz=PZ,
+    #         n_rep=N_REP,
+    #         lin_y=LIN_Y,
+    #     )
+    #     df_results = results_to_pd_df(sim_results, 1)
+    #     w_path = "results"
+    #     dgp = "linear_dgp_test"
+    #     with_header = i == 0
+    #     df_results.to_csv(
+    #         w_path + "/" + dgp + ".csv", index=False, mode="a", header=with_header
+    #     )
     print("Elapsed time: ", time.time() - start)

@@ -18,6 +18,9 @@ import torch
 from tqdm import tqdm
 from torch.utils.data import TensorDataset, DataLoader
 from joblib import Parallel, delayed
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 # --- Set cores and seed ---
 N_CORES = 8
@@ -1989,3 +1992,36 @@ class Onestage_MCMC:
         return jnp.vstack(
             [linear_h_stats, bym_h_stats, linear_stoch_stats, bym_stoch_stats]
         )
+
+
+def save_degree_distributions(adj_mat):
+    # Get degree distributions
+    degrees = np.sum(adj_mat, axis=0)
+    # create plot
+    fig, ax = plt.subplots(figsize=(9, 5))
+    # fig.suptitle("Degree Distributions", fontsize=16)
+
+    sns.histplot(degrees, kde=False, ax=ax, color="skyblue", edgecolor="navy")
+
+    ax.set_title("True Network A* Degree Distribution")
+    ax.set_xlabel("Degree")
+    ax.set_ylabel("Frequency")
+
+    # Add mean and median annotations
+    mean = np.mean(degrees)
+    # median = np.median(degrees)
+    ax.axvline(mean, color="red", linestyle="dashed", linewidth=1)
+    # ax.axvline(median, color='green', linestyle='dashed', linewidth=1)
+    ax.text(
+        0.95,
+        0.95,
+        f"Mean: {mean:.2f}, Median: {np.median(degrees):.2f}",
+        transform=ax.transAxes,
+        verticalalignment="top",
+        horizontalalignment="right",
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
+    )
+
+    plt.tight_layout()
+    plt.savefig("Simulations/results/figs/true_network_degree_dist.png", dpi=1000)
+    plt.show()
