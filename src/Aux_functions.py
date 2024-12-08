@@ -2015,7 +2015,7 @@ def save_degree_distributions(adj_mat):
     ax.text(
         0.95,
         0.95,
-        f"Mean: {mean:.2f}, Median: {np.median(degrees):.2f}",
+        f"Mean: {mean:.2f}, Median: {np.median(degrees):.2f}, \n Min: {np.min(degrees)}, Max: {np.max(degrees)}",
         transform=ax.transAxes,
         verticalalignment="top",
         horizontalalignment="right",
