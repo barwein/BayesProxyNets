@@ -13,7 +13,19 @@ import src.Aux_functions as aux
 # alpha: pi_alpha(z) ---> stochastic intervention
 
 
-def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, lin_y):
+def one_simuation_iter(
+    idx,
+    fixed_df,
+    gamma,
+    gamma_rep,
+    eta,
+    sig_y,
+    pz,
+    n_rep,
+    lin_y,
+    with_interference=True,
+    sort_loglik=False,
+):
     rng_key = random.PRNGKey(idx)
     _, rng_key = random.split(rng_key)
 
@@ -22,7 +34,13 @@ def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, l
     # --- Get data ---
     # df_oracle = aux.DataGeneration(rng=rng, theta=theta, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y, alphas=alphas).get_data()
     df_oracle = aux.SampleTreatmentsOutcomes(
-        rng=rng, fixed_data=fixed_df, eta=eta, sig_y=sig_y, pz=pz, lin=lin_y
+        rng=rng,
+        fixed_data=fixed_df,
+        eta=eta,
+        sig_y=sig_y,
+        pz=pz,
+        lin=lin_y,
+        with_interference=with_interference,
     ).get_data()
     # Generate noisy network measurement
     obs_network = aux.create_noisy_network(
@@ -45,55 +63,87 @@ def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, l
 
     # --- network module ---
     network_svi = aux.Network_SVI(
-        data=df_obs, rng_key=rng_key, n_iter=5000, n_samples=1000, with_rep=False
+        # data=df_obs, rng_key=rng_key, n_iter=5000, n_samples=1000, with_rep=False
+        data=df_obs,
+        rng_key=rng_key,
+        n_iter=1000,
+        n_samples=100,
+        with_rep=False,
     )
 
     # network_svi = aux.Network_SVI(data=df_obs, rng_key=rng_key, n_iter=20000, n_samples=10000)
     network_svi.train_model()
     network_pred_samples, network_scores = network_svi.network_samples()
 
-
     print("Running obs and oracle outcome modules")
     # --- Outcome module (linear & GP) ---
     # with true network
     print("Running Oracle")
     oracle_outcome_mcmc = aux.Outcome_MCMC(
-        data=df_oracle, type="oracle", rng_key=rng_key, iter=idx
+        data=df_oracle,
+        type="oracle",
+        rng_key=rng_key,
+        iter=idx,
+        with_interference=with_interference,
     )
     oracle_results = oracle_outcome_mcmc.get_results()
     # with observed network
     print("Running Observed")
     obs_outcome_mcmc = aux.Outcome_MCMC(
-        data=df_obs, type="observed", rng_key=rng_key, iter=idx
+        data=df_obs,
+        type="observed",
+        rng_key=rng_key,
+        iter=idx,
+        with_interference=with_interference,
     )
     obs_results = obs_outcome_mcmc.get_results()
 
     #  --- cut-posterior ---
     # Get posterior network stats
-    post_zeig, post_zeig_h1, post_zeig_h2, post_zeig_stoch1, post_zeig_stoch2 = (
-        aux.get_post_net_stats(
-            network_pred_samples, df_obs["Z"], df_obs["Z_h"], df_obs["Z_stoch"]
+    if with_interference:
+        post_zeig, post_zeig_h1, post_zeig_h2, post_zeig_stoch1, post_zeig_stoch2 = (
+            aux.get_post_net_stats(
+                network_pred_samples, df_obs["Z"], df_obs["Z_h"], df_obs["Z_stoch"]
+            )
         )
-    )
+    else:
+        # generate them as zeros array with shape (network_pred_samples.shape[0], df_obs["Z"].shape[0])
+        post_zeig = jnp.zeros((network_pred_samples.shape[0], df_obs["Z"].shape[0]))
+        post_zeig_h1 = jnp.zeros((network_pred_samples.shape[0], df_obs["Z"].shape[0]))
+        post_zeig_h2 = jnp.zeros((network_pred_samples.shape[0], df_obs["Z"].shape[0]))
+        post_zeig_stoch1 = jnp.zeros(
+            (network_pred_samples.shape[0], 2, df_obs["Z"].shape[0])
+        )
+        post_zeig_stoch2 = jnp.zeros(
+            (network_pred_samples.shape[0], 2, df_obs["Z"].shape[0])
+        )
 
-    # post_Q_mat = aux.get_post_Q_mat(network_pred_samples)
-    post_Q_mat = aux.vectorized_Q_post(network_pred_samples)
+    post_Q_mat = aux.get_post_Q_mat(network_pred_samples)
+    # post_Q_mat = aux.vectorized_Q_post(network_pred_samples)
 
     post_zeig_error = np.mean(np.abs(post_zeig - df_oracle["Zeigen"]))
     print("Post abs zeigen error:", post_zeig_error)
     esti_post_zeig_error = jnp.mean(
         np.abs(post_zeig.mean(axis=0) - df_oracle["Zeigen"])
     )
-    print("Rand post abs zeigen error:", esti_post_zeig_error)
+    print("esti post abs zeigen error:", esti_post_zeig_error)
+
+    print(
+        "@@@@ shape post_zeig: ",
+        post_zeig.shape,
+        "shape post_Q_mat: ",
+        post_Q_mat.shape,
+    )
 
     print("Running Multistage")
     # Multi-Stage (aka threestage)
 
-    # TODO: replace random selection with selection 'n_rep' samples with highest log-likelihood (scores from network samples)
-    # i_range = np.random.choice(
-    #     a=range(network_pred_samples.shape[0]), size=n_rep, replace=False
-    # )
-    i_range = np.argsort(network_scores)[::-1][:n_rep]
+    if sort_loglik:  # select networks with highest posterior log-likelihood
+        i_range = np.argsort(network_scores)[::-1][:n_rep]
+    else:  # random selection
+        i_range = np.random.choice(
+            a=range(network_pred_samples.shape[0]), size=n_rep, replace=False
+        )
 
     threestage_results = aux.multistage_run(
         zeigen_post=post_zeig[i_range,],
@@ -112,6 +162,7 @@ def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, l
         stoch_estimand=df_obs["estimand_stoch"],
         iter=idx,
         key=rng_key,
+        with_interference=with_interference,
     )
 
     print("Running Plug-in")
@@ -140,6 +191,7 @@ def one_simuation_iter(idx, fixed_df, gamma, gamma_rep, eta, sig_y, pz, n_rep, l
         Q_post=mean_post_Q,
         rng_key=rng_key,
         iter=idx,
+        with_interference=with_interference,
     )
     onestage_results = onestage_outcome_mcmc.get_results()
 

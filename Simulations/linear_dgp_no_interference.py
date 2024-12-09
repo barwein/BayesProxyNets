@@ -8,6 +8,7 @@ from Simulations import results_to_pd_df, one_simuation_iter
 
 """
 This script runs a series of simulations for a linear data generating process (DGP) using JAX and multiprocessing.
+This simulations is *without* interference (\phi_1 = 0).
 Global Variables:
     RANDOM_SEED (int): Seed for random number generation.
     rng (Generator): Random number generator instance.
@@ -47,19 +48,20 @@ THETA = [-2, 1.5]
 GAMMA = [1.1, 0.2, -1, 1]
 GAMMA_REP = [1, 0.7, -1, 0.6]
 # ETA = jnp.array([-1, 3, -0.25, 0, 3])
-ETA = jnp.array([-1, 3, -0.25, 3])
+ETA = jnp.array([-1, 3, -0.25, 0])  # changed ETA[3] to 0 to avoid interference
 SIG_Y = 1.5
 # SIG_Y = 1
 PZ = 0.5
 LIN_Y = True
-ALPHAS = (0.7, 0.3)
+# ALPHAS = (0.7, 0.3)
+ALPHAS = (1, 0)
 N = 500
 # N = 100
 # N_SIM = 500
 N_SIM = 1
 # N_REP = 2000
 N_REP = 5
-WITH_INTERFERENCE = True
+WITH_INTERFERENCE = False
 
 
 ### Note: this script is intended to run in a power-cluster and may take a while to finish ###
