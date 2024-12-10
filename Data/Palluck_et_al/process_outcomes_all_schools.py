@@ -6,7 +6,9 @@ import os
 import wrapper_functions as wrap
 import data_wrangle as dw
 from jax import random
-import pyreadr
+
+# import pyreadr
+import lzma
 
 # Global variables
 NUM_REP_MS = 2000
@@ -26,8 +28,10 @@ def combine_school_results(output_dir):
 
     # Load all pickle files in the directory
     for filename in sorted(os.listdir(output_dir)):  # sorting ensures consistent order
-        if filename.endswith("_results.pkl"):
-            with open(os.path.join(output_dir, filename), "rb") as f:
+        # if filename.endswith("_results.pkl"):
+        if filename.endswith("_results.xz"):
+            # with open(os.path.join(output_dir, filename), "rb") as f:
+            with lzma.open(os.path.join(output_dir, filename), "rb") as f:
                 results = pickle.load(f)
 
             obs_data_list.append(results["obs_data"])

@@ -7,6 +7,7 @@ import pyreadr
 import wrapper_functions as wrap
 import data_wrangle as dw
 import argparse
+import lzma
 
 
 # Load data
@@ -54,8 +55,11 @@ def process_single_school(all_df, schid, output_dir):
         "post_stoch_expos": np.array(post_stoch_expos),
     }
 
-    output_file = os.path.join(output_dir, f"school_{schid}_results.pkl")
-    with open(output_file, "wb") as f:
+    # output_file = os.path.join(output_dir, f"school_{schid}_results.pkl")
+    output_file = os.path.join(output_dir, f"school_{schid}_results.xz")
+    with lzma.open(output_file, "wb") as f:
+        # with open(output_file, "wb") as f:
+        # pickle.dump(results, f)
         pickle.dump(results, f)
 
     return output_file
