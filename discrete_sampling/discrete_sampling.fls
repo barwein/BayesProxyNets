@@ -620,10 +620,7 @@ INPUT .\dmala.png
 INPUT .\dmala.png
 INPUT .\dmala.png
 INPUT .\dmala.png
-INPUT .\discrete_sampling.bbl
-INPUT discrete_sampling.bbl
-INPUT .\discrete_sampling.bbl
-INPUT discrete_sampling.bbl
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmtt12.tfm
 INPUT discrete_sampling.aux
 INPUT .\discrete_sampling.out
 INPUT .\discrete_sampling.out
@@ -659,3 +656,5 @@ INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmti12.pfb
 INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmti12.pfb
 INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmtt10.pfb
 INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmtt10.pfb
+INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmtt12.pfb
+INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmtt12.pfb

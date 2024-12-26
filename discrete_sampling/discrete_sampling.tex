@@ -72,9 +72,9 @@ MALA or HMC. I'll now present methods for sampling $A^\ast$.
 
 \section{Methods for Discrete Sampling}
 Assume that $\mathcal{A}^\ast$ is the space of all possible $A^\ast$.
-Naively, we can sample $A*$ by sampling all edges independently. 
+Naively, we can draw $A^\ast$ by sampling all edges independently. 
 However, $A^\ast$ may have global impact on $Y$ so flipping one edge $A^\ast_{ij}$
-can impact the the likelihood of $Y_k$ where $k \neq i,j$. 
+can impact the likelihood of $Y_k$ where $k \neq i,j$. 
 That will complicate the naive $A^\ast$ updates, e.g., via MH.
 
 Write the log conditional posterior of $A^\ast$ as
@@ -111,21 +111,24 @@ Write the log conditional posterior of $A^\ast$ as
             paper on Informed Proposals.
              
             Assume for now that we only ``flip'' one edge at a time 
-            (can be extended for block or sequential updates in each iteration).
+            (can be extended for block or sequential updates in each iteration). 
+            That is, updates are limited to a local neighbor of Hemming distance 1.
             One option is to inform the edge selection by its impact on $f(A^\ast)$ values,
-            i.e., on the gradients. Since $A^\ast$ is discrete we don't have gradients.
+            i.e., on the likelihood ratio.
             As before, write $A^{\ast'}$ as $A^\ast$ where only edge $e$ is ``flipped" ($0\to 1, 1\to 0$).
-            Then the score is $d(A^{\ast'},A^\ast) = f(A^{\ast'}) - f(A^\ast)$.
+            Then the score, or log likelihood ratio, is $d(A^{\ast'},A^\ast) = f(A^{\ast'}) - f(A^\ast)$.
             We can use this score to inform the edge selection by taking proposals 
-            $q(A^{\ast'} \vert A^\ast) \propto \exp(d(A^{\ast'},A^\ast)/t)$ where $t$ is a 
-            ``temprature'' controlling the locality of the updates. 
-            By Zanella (2020), optimal $t$ is $t=2$ in the binary case (so called ``Barker choice").
-            The scores are 
-            effectively the tempered likelihood ratios.
+            $q(A^{\ast'} \vert A^\ast) \propto g(\exp(d(A^{\ast'},A^\ast)))$ for function 
+            $g$ that satisfy $g(a) = a g(1/a)$, e.g., $g(a)=\sqrt{a}, g(a) = \frac{a}{a+1}$.
+            For $g(a) = \frac{a}{a+1}$ we can take the proposal as 
+            $q(A^{\ast'} \vert A^\ast) \propto Softmax(d(A^{\ast'},A^\ast)/\tau)$,
+            where $\tau$ is a ``temprature'' controlling the locality of the updates. 
+            By Zanella (2020), optimal $\tau$ is $\tau=2$ in the binary case (so called ``Barker choice").
+            The scores are effectively the tempered likelihood ratios.
             However, computing $d(A^{\ast'},A^\ast)$ is expensive since we need to evaluate $f$ twice
             for each possible edges, i.e., at least $O(N^2)$ per iteration. 
             Grathwohl et al. (2021)\footnote{\url{https://proceedings.mlr.press/v139/grathwohl21a.html}}
-            proposed to approximate this score by taking 
+            proposed to approximate this score for $g(a) = \frac{a}{a+1}$ by taking 
             a gradient:
             $\widetilde{d}(A^{\ast'},A^\ast) = (A^{\ast'}_e - A^{\ast}_e)\nabla f_{A^\ast_e}(A^\ast_e)$.
             That is, $\widetilde{d}(A^{\ast'},A^\ast) \approx d(A^{\ast'},A^\ast) = f(A^{\ast'}) - f(A^\ast)$,
@@ -133,6 +136,8 @@ Write the log conditional posterior of $A^\ast$ as
             continuous\footnote{It can be performed automatically in torch via \texttt{torch.autograd.grad} or in 
             JAX via \texttt{jax.grad}.}.
             They have some results about this approximation.
+            The main benefit is computional since computing $d(A^{\ast'},A^\ast)$ requires
+            $O(N^2)$ evaluations whereas $\widetilde{d}$ requires only $O(1)$.
             The proposed pseudo-algorithm for $A^\ast$ updates is thus:
 
             \begin{figure}[!ht]
@@ -149,7 +154,7 @@ Write the log conditional posterior of $A^\ast$ as
              The cool thing is that don't really have to flip all edges
              in each iteration.
 
-            \textit{Limitations.} To compute the scores $d(A^{\ast'},A^\ast)$ 
+            \textit{Limitations.} To compute the exact scores (log of likelihood ratio) $d(A^{\ast'},A^\ast)$ 
             we need to evalutate $f$ twice for each edge flip, i.e., $O(N^2)$ evaluations.
             If $A^\ast$ and $A$ are edge indepdent then, evaluating 
             $\log p(A \vert A^\ast, X,\gamma) + \log p(A^\ast \vert X,\theta)$ is easy
@@ -161,11 +166,12 @@ Write the log conditional posterior of $A^\ast$ as
             or just use them occasionally (e.g., in every $L$ iterations). 
             That resemble cut-posterior sampling, but not exactly as we sample everything together.
             Need to think if using the gradient with $\widetilde{d}$ will assist even with the outcome model.
+            Probably depend on the `grad' functions implementation.
 
             \textit{Multiple updates.} In Grathwohl et al. (2021) approach, in each iteration we ``flip'' one edge.
-            It can be updated by sampling $K$ edges from $q(i\vert A^\ast)$ and
+            It can be modified to sampling $K$ edges from $q(i\vert A^\ast)$ and
             in the accept/reject step write accordingly the new network $A^{\ast'}$ 
-            with all the edges flipps, and instead of $q(i \vert A^\ast)$ write
+            with all the selected edges flipped, and instead of $q(i \vert A^\ast)$ write
             the product $\prod_k q(i_k \vert A^\ast)$.
 
             \textbf{Discrete MALA.} Zhang et al. (2022)\footnote{\url{https://proceedings.mlr.press/v162/zhang22t.html}}
@@ -181,22 +187,46 @@ Write the log conditional posterior of $A^\ast$ as
             $\frac{\exp\big(\frac{1}{2}\nabla f(A^\ast)_e (A^{\ast'}_e - A^\ast_e) - \frac{1}{2\alpha}\big)}{
                 \exp\big(\frac{1}{2}\nabla f(A^\ast)_e (A^{\ast'}_e - A^\ast_e) - \frac{1}{2\alpha}\big) + 1
             } $
-            where $\alpha$ is the step size. 
+            where $\alpha$ is the step size that need to be tuned. 
             Namely, we compute once the gradient for all edges, and then propose 
-            update (flip) for each edge at once. 
+            update (flip) for each edge at once (simultaneously edge updates). 
             We accept/reject the update with MH step with the log-probabilities $f$ 
             and the product of selection probabilities.
+            In our case, if we include the outcome model in $f(A^\ast)$,
+            then eventhough the space $\mathcal{A}^\ast$ is factorized, the posterior
+            edges are not neccessarily independent.
+            Therefore, updating all edges simultaneously might not be accurate.
+            Need to see how this is work in practice.
+            This DMALA appraoch was rigrourously analyzed by Sun et al. (2023)\footnote{\url{https://proceedings.mlr.press/v206/sun23f.html}}.
+            They showed how Discrete Langevian Monte Carlo is derived
+            from continuous Lanegvian Monte Carlo using Markov Jump Process.
+            Zhang et al. (2022) is a specific case of their approach. 
             \begin{figure}[!ht]
                 \centering
                 \includegraphics[width=0.99\textwidth]{dmala.png}
                 % \caption{DMALA.}
             \end{figure}
-            
-
 
         \end{enumerate}
 
-\bibliographystyle{plain} % Choose a bibliography style
-\bibliography{ref.bib} % Include the references.bib file
+        \section{Implementation}
+         To implment any of of the methods based on Local Proposal, we need the following
+         \begin{enumerate}
+            \item Evaluate the log conditional posterior $f(A^\ast)$ given the observed
+                   data and the current values of the continuous parameters.
+            \item Compute the gradient $\nabla f(A^\ast)$ given the above. 
+                    Both 1. and 2. can be achieved using automatic differentiation libraries,
+                    e.g., using \texttt{jax.value\_and\_grad}.
+            \item Assuming I use proposal with $g(a) = \frac{a}{a+1}$, 
+                    need also to compute $-(2A^\ast - 1)\nabla f(A^\ast)$ in each iteration.
+            \item Consider single or multiple updates via GWG. Or use DMALA.
+            \item Combine Discrete updates of $A^\ast$ with the continuous updates of, e.g., $\eta,\theta,\gamma$.
+                  Continuous updates can be done using MALA or HMC. 
+                  The combination is within Gibbs sampling.
+                  For example, HMC-within-Gibbs that iterate between discrete and continuous updates.
+        \end{enumerate}
+
+% \bibliographystyle{plain} % Choose a bibliography style
+% \bibliography{ref.bib} % Include the references.bib file
     
 \end{document}
