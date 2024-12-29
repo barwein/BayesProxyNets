@@ -120,10 +120,10 @@ Write the log conditional posterior of $A^\ast$ as
             We can use this score to inform the edge selection by taking proposals 
             $q(A^{\ast'} \vert A^\ast) \propto g(\exp(d(A^{\ast'},A^\ast)))$ for function 
             $g$ that satisfy $g(a) = a g(1/a)$, e.g., $g(a)=\sqrt{a}, g(a) = \frac{a}{a+1}$.
-            For $g(a) = \frac{a}{a+1}$ we can take the proposal as 
-            $q(A^{\ast'} \vert A^\ast) \propto Softmax(d(A^{\ast'},A^\ast)/\tau)$,
-            where $\tau$ is a ``temprature'' controlling the locality of the updates. 
-            By Zanella (2020), optimal $\tau$ is $\tau=2$ in the binary case (so called ``Barker choice").
+            For $g(a) = \sqrt{a}$ we can take the proposal as 
+            $q(A^{\ast'} \vert A^\ast) \propto Softmax(d(A^{\ast'},A^\ast)/2)$,
+            where $2$ can be viewed as ``temprature'' controlling the locality of the updates
+            (so called ``Barker choice").
             The scores are effectively the tempered likelihood ratios.
             However, computing $d(A^{\ast'},A^\ast)$ is expensive since we need to evaluate $f$ twice
             for each possible edges, i.e., at least $O(N^2)$ per iteration. 
@@ -224,6 +224,45 @@ Write the log conditional posterior of $A^\ast$ as
                   Continuous updates can be done using MALA or HMC. 
                   The combination is within Gibbs sampling.
                   For example, HMC-within-Gibbs that iterate between discrete and continuous updates.
+        \end{enumerate}
+
+        \paragraph{Proposed psuedo-algorithm.} 
+        Given $\eta,\theta,\gamma$ values and current $A^\ast$ network $A^\ast_t$,
+        a single update to $A^\ast_{t+1}$ is performed as follows.
+        All of the following are performed on the edges of the upper triangle of $A^\ast$.
+        For computional efficiency, we can sample only a subset of the edges.
+        In addition, the proposal edges to flip $q(i \vert A^\ast)$ are 
+        computed \textbf{without} the outcome model $p(Y \vert \cdot )$. 
+        The outcome model will be used only in the accept/reject step.
+        \begin{enumerate}
+            \item Compute batch indices $idx$ by sampling $p$ percent of $A^\ast$ edges.
+            \item Let $\widetilde{A}^\ast_t$ be $A^\ast_t$ with the edges in $idx$ flipped.
+            \item Compute log-likelihood difference $d(\widetilde{A}^\ast_t,A^\ast_t)$ for each
+                    edge in $idx$ without the outcome model.
+                    Can be done in parallel or in vectorized form.
+            \item Compute flip probablities
+                 $q(\widetilde{A}^\ast_t \vert A^\ast_t)_i \propto Softmax\big\{g\big[\exp(d(\widetilde{A}^\ast_t,A^\ast_t)_i)\big]\big\}$ .  
+            \item Flip edges in $idx$ if $U_i < q(\widetilde{A}^\ast_t \vert A^\ast_t)_i$, 
+                    where $U_i \sim U[0,1]$. 
+                    Save results in $\mathcal{I}$ where $\mathcal{I}_i = 1$ if edge $i$ is flipped.
+            \item Accept/Reject MH step.
+            \begin{enumerate}
+                \item Compute forward proposal probability 
+                $q(\widetilde{A}^\ast_t \vert A^\ast_t) = 
+                    \prod_{i \in idx}q(\widetilde{A}^\ast_t \vert A^\ast_t)_i^{\mathcal{I}_i}
+                                            (1-q(\widetilde{A}^\ast_t \vert A^\ast_t)_i)^{1-\mathcal{I}_i}$. 
+                \item Compute reverse flip probability 
+                        $q(A^\ast_t \vert \widetilde{A}^\ast_t) \propto Softmax\big\{g\big[\exp(d(A^\ast_t, \widetilde{A}^\ast_t)_i)\big]\big\}$.
+                \item Compute reverse proposal probability $q(A^\ast_t \vert \widetilde{A}^\ast_t)$ as in (a)+(b).
+                \item Using the outcome model as well, compute the log-likelihood ratio 
+                        $f(\widetilde{A}^\ast_t) - f(A^\ast_t)$.
+                \item Compute accept/reject variable 
+                        $Accept = I\Big(U_i \leq 
+                        \min \big \{1, \exp(f(\widetilde{A}^\ast_t) - f(A^\ast_t)) \frac{q(A^\ast_t \vert \widetilde{A}^\ast_t)}{q(\widetilde{A}^\ast_t \vert A^\ast_t)}\big\} \Big)$.
+            \end{enumerate}
+            \item Set $A^\ast_{t+1} \leftarrow \widetilde{A}^\ast_t$ if $Accept=1$;
+                    otherwise, set $A^\ast_{t+1} \leftarrow A^\ast_t$.
+
         \end{enumerate}
 
 % \bibliographystyle{plain} % Choose a bibliography style

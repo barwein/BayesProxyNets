@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1735218478.27167 "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/discrete_sampling/discrete_sampling.tex" "discrete_sampling.pdf" "discrete_sampling" 1735218480.95405 0
+["pdflatex"] 1735465981.88144 "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/discrete_sampling/discrete_sampling.tex" "discrete_sampling.pdf" "discrete_sampling" 1735465985.26879 0
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm" 1233951848 1004 54797486969f23fa377b128694d548df ""
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/public/amsfonts/cmextra/cmex8.tfm" 1233951848 988 bdf658c3bfc2d96d3c8b02cfc1c94c20 ""
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/public/amsfonts/symbols/msam10.tfm" 1233951854 916 f87d7c45f9c908e672703b83b72241a3 ""
@@ -40,6 +40,7 @@
   "C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmti12.pfb" 1247596667 36118 fad905eba93cff5bce1e185fe980a177 ""
   "C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmtt10.pfb" 1247596667 31099 c85edf1dd5b9e826d67c9c7293b6786c ""
   "C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmtt12.pfb" 1247596666 24252 1e4e051947e12dfb50fee0b7f4e26e3a ""
+  "C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cmextra/cmex8.pfb" 1247596670 30273 87a352d78b6810ae5cfdc68d2fb827b2 ""
   "C:/Program Files/MiKTeX 2.9/tex/context/base/mkii/supp-pdf.mkii" 1580390158 71627 94eb9990bed73c364d7f53f960cc8c5b ""
   "C:/Program Files/MiKTeX 2.9/tex/generic/atbegshi/atbegshi.sty" 1575571100 24708 5584a51a7101caf7e6bbf1fc27d8f7b1 ""
   "C:/Program Files/MiKTeX 2.9/tex/generic/bigintcalc/bigintcalc.sty" 1576433602 40635 c40361e206be584d448876bba8a64a3b ""
@@ -98,9 +99,9 @@
   "C:/Program Files/MiKTeX 2.9/tex/latex/url/url.sty" 1388490452 12796 8edb7d69a20b857904dd0ea757c14ec9 ""
   "C:/Users/bar21/AppData/Local/MiKTeX/2.9/miktex/data/le/pdftex/pdflatex.fmt" 1620282951.49184 9513992 a8f094b2d1c8537576e46ea1503734dd ""
   "C:/Users/bar21/AppData/Local/MiKTeX/2.9/pdftex/config/pdftex.map" 1620282940.16785 110803 ff6a4c1b3091bfbfc006fe82ab7d95f7 ""
-  "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/discrete_sampling/discrete_sampling.tex" 1735218477.55379 13019 59dc8e68091d9d593301703693e2dcf1 ""
-  "discrete_sampling.aux" 1735218480.65214 1294 5002090bb7330590dd184e0215ad747c "pdflatex"
-  "discrete_sampling.out" 1735218480.65333 378 178eada5279a0f8672295101a6eff3a4 "pdflatex"
+  "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/discrete_sampling/discrete_sampling.tex" 1735465982.07475 15794 55f4b9c6af05091ea0c337436b219696 ""
+  "discrete_sampling.aux" 1735465984.9314 1405 f60da36c81b064d64a122cd0f8a683e1 "pdflatex"
+  "discrete_sampling.out" 1735465984.9334 378 178eada5279a0f8672295101a6eff3a4 "pdflatex"
   "dmala.png" 1735041224.55518 99524 9d51adc34b397651e3c84ff6b86cfb91 ""
   "gwg.png" 1734967019.22294 66176 690b7fdb1e66696c020bbaca6eea6199 ""
   (generated)
