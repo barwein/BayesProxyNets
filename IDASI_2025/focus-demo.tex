@@ -5,18 +5,31 @@
 % https://github.com/pcafrica/focus-beamertheme
 
 \documentclass{beamer}
-\usetheme{focus}
+% \usetheme{focus}
+\usetheme[numbering=minimal]{focus}
+% \usetheme[numbering=minimal, totalframenumbering=no]{focus}
+% \usetheme[numbering=fullbar]{focus}
+\definecolor{main}{RGB}{45, 45, 45}
+% \definecolor{main}{HTML}{1A1A1A}
+\definecolor{background}{RGB}{242, 241, 239}
+% \definecolor{background}{HTML}{F5F5F5}
 
-\title{Estimating Causal Effects Using Proxy Interference Networks}
+\usepackage{geometry}
+\geometry{paperwidth=16cm, paperheight=9cm}
+
+
+\title{Estimating Causal Effects Using \texorpdfstring{\\}{,} Proxy Interference Networks}
 % \subtitle{Subtitle}
 \centering
 \author{Bar Weinstein \texorpdfstring{\\}{,} Daniel Nevo}
 \titlegraphic{\includegraphics[scale=1.25]{focus-logo.pdf}}
-\institute{Depratement of Statistics \& OR \\ Tel Aviv University}
+\institute{Statistics \& OR \\ Tel Aviv University}
 \date{IDSAI 2025}
 
 % Footline info is printed only if [numbering=fullbar].
 %\footlineinfo{Custom footline text}
+
+
 
 \begin{document}
     \begin{frame}
@@ -45,8 +58,9 @@
     \end{frame}
     
     \begin{frame}{Typesetting and Math}
-        The packages \texttt{fontenc} and \texttt{FiraSans}\footnote{\url{https://fonts.google.com/specimen/Fira+Sans}}\textsuperscript{,}\footnote{\url{http://mozilla.github.io/Fira/}} are used to properly set the main fonts.
+        \large The packages \texttt{fontenc} and \texttt{FiraSans}\footnote{\url{https://fonts.google.com/specimen/Fira+Sans}}\textsuperscript{,}\footnote{\url{http://mozilla.github.io/Fira/}} are used to properly set the main fonts.
         \vfill
+        \normalsize
         This theme provides styling commands to typeset \emph{emphasized}, \alert{alerted}, \textbf{bold}, \textcolor{example}{example text}, \dots
         \vfill
         \texttt{FiraSans} also provides support for mathematical symbols:
@@ -54,6 +68,15 @@
             e^{i\pi} + 1 & = 0, \\
             \int_{-\infty}^\infty e^{-x^2}\,\mathrm{d}x & = \sqrt{\pi}.
         \end{align*}
+    \end{frame}
+
+    \begin{frame}[t]{Test title}
+        \begin{enumerate}
+            \item<1-> 1st item in regular font size
+            \item<2->  \Large 2nd item in \texttt{Large} font size
+            \item<2->  \large 3rd item in \texttt{large} font size
+            \item<2->   \normalsize 4th item in \texttt{normalsize} font size
+        \end{enumerate}
     \end{frame}
 
     \section{Section 2}
