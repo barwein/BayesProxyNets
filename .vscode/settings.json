@@ -5,5 +5,7 @@
         "PYTHONPATH": "${workspaceFolder}"
     },
     "python.analysis.extraPaths": ["${workspaceFolder}"],
-    "jupyter.notebookFileRoot": "${workspaceFolder}"
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "latex-workshop.latex.recipe.default": "latexmk (xelatex)"
+
 }

@@ -1,0 +1,18 @@
+\begin{thebibliography}{1}
+
+\bibitem{knuth74}
+Donald~E. Knuth.
+\newblock Computer programming as an art.
+\newblock {\em Commun. ACM}, pages 667--673, 1974.
+
+\bibitem{knuth92}
+Donald~E. Knuth.
+\newblock Two notes on notation.
+\newblock {\em Amer. Math. Monthly}, 99:403--422, 1992.
+
+\bibitem{lamport94}
+Leslie Lamport.
+\newblock {\em LaTeX: A Document Preparation System}.
+\newblock Pearson Education India, 1994.
+
+\end{thebibliography}
