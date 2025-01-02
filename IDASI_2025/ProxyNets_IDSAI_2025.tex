@@ -21,7 +21,7 @@
 \title{Estimating Causal Effects Using \texorpdfstring{\\}{,} Proxy Interference Networks}
 % \subtitle{Subtitle}
 \author{Bar Weinstein \texorpdfstring{\\}{,} Daniel Nevo}
-\titlegraphic{\includegraphics[scale=0.35]{figs/connected_net.png}}
+\titlegraphic{\includegraphics[scale=0.22]{figs/noisy_networks.png}}
 \institute{Statistics \& OR \\ Tel Aviv University}
 \date{IDSAI 2025}
 
@@ -37,16 +37,56 @@
     
     % Use starred version (e.g. \section*{Section name})
     % to disable (sub)section page.
-    \begin{frame}{Simple frame}
-        This is a simple frame.
+    \begin{frame}{Background}
+        \large
+        \begin{itemize}
+            \item<1-> \textbf{Causal Inference}. Estimate the effect of treatment on an outcome. 
+            \vspace{0.2cm}
+            \item<1-> \textbf{Interference}. Treatment of one unit affect the outcomes of others.
+            \vspace{0.2cm}
+            \item<1->  Treatments spreads through a network.
+            \begin{itemize}
+                \item Nodes: units; Edges: magntiude of pairwise interfernce.
+            \vspace{0.2cm}
+            \end{itemize}
+            \item<2-> Examples:
+                \begin{itemize}
+                    \item \emph{Social networks.} Transmission of information, behavior, encouragements, etc.
+                    \vspace{0.05cm}
+                    \item \emph{Epidemiology.} Mitigating spread of infectious diseases or addictive drugs.
+                    \vspace{0.05cm}
+                    \item A/B testing in marketplaces.
+                \end{itemize} 
+        \end{itemize}
     \end{frame}
 
     \begin{frame}[t]
         \begin{figure}[t]
             \centering
-            \includegraphics[width=0.7\textwidth]{figs/connected_net.png}
+            \includegraphics[width=0.65\textwidth]{figs/connected_net.png}
             % \caption{Plain frame with a figure.}
         \end{figure}
+    \end{frame}
+
+    \begin{frame}{The Challenge}
+        \large
+        \begin{itemize}
+            \item<1-> Accurately measuring social networks is challenging.
+            \vspace{0.2cm}
+            \item<1-> We observe only proxy measurements of the true network.
+            \begin{itemize}
+                \item Measurements error.
+                \item Multiple sources of data.
+                \item Multilayer networks.
+            \end{itemize}
+            \vspace{0.2cm}
+            \item<1-> True network remains latent.
+        \end{itemize}
+        \vspace{.5cm}
+        \begin{center}
+            \Large
+            \textbf{How can we estimate causal effects using proxy networks?}
+        \end{center}
     \end{frame}
 
     \begin{frame}[t]
@@ -57,86 +97,53 @@
         \end{figure}
     \end{frame}
     
-    \section{The Challenge}
-    \begin{frame}[t]
-        This frame has an empty title and is aligned to top.
+    \begin{frame}{Illustrative Example -- Paluck et al. (2016)}
+        \large
+        \begin{itemize}
+            \item<1-> Field experiement in 56 middle-schools.
+            \vspace{0.2cm}
+            \item<1-> Study how anti-conflict education spread through social networks.
+            \vspace{0.2cm}
+            \item<1-> Measured social networks using self-reported friendships.
+            \begin{itemize}
+                \item Bi-layer networks: frequently interacted and best friends.
+                \vspace{0.05cm}
+                \item Measured at pre- and post-intervention period.
+            \end{itemize} 
+            \vspace{0.2cm}
+            \item<2-> Which of the networks, if any, is the true network?
+            \vspace{0.2cm}
+            \item<2-> \textbf{Objective:} Estimate the intervention effects using the proxy networks.
+        \end{itemize}
     \end{frame}
     
-    \begin{frame}[noframenumbering]{No frame numbering}
-        This frame is not numbered and is citing reference \cite{knuth74}.
-    \end{frame}
-    
-    \begin{frame}{Typesetting and Math}
-        \large The packages \texttt{fontenc} and \texttt{FiraSans}\footnote{\url{https://fonts.google.com/specimen/Fira+Sans}}\textsuperscript{,}\footnote{\url{http://mozilla.github.io/Fira/}} are used to properly set the main fonts.
-        \vfill
-        \normalsize
-        This theme provides styling commands to typeset \emph{emphasized}, \alert{alerted}, \textbf{bold}, \textcolor{example}{example text}, \dots
-        \vfill
-        \texttt{FiraSans} also provides support for mathematical symbols:
-        \begin{align*}
-            e^{i\pi} + 1 & = 0, \\
-            \int_{-\infty}^\infty e^{-x^2}\,\mathrm{d}x & = \sqrt{\pi}.
-        \end{align*}
+    \begin{frame}{Formal Framework}
+        MATH HERE
     \end{frame}
 
-    \begin{frame}[t]{Test title}
-        \begin{enumerate}
-            \item<1-> 1st item in regular font size
-            \item<2->  \Large 2nd item in \texttt{Large} font size
-            \item<2->  \large 3rd item in \texttt{large} font size
-            \item<2->   \normalsize 4th item in \texttt{normalsize} font size
-        \end{enumerate}
+    \begin{frame}{Structural Causal Model}
+        SCM and relevant DAG or equations here.
     \end{frame}
 
-    \section{Section 2}
-    \begin{frame}{Blocks}
-        \begin{block}{Block}
-            Text.
-        \end{block}
-        \pause
-        \begin{alertblock}{Alert block}
-            Alert \alert{text}.
-        \end{alertblock}
-        \pause
-        \begin{exampleblock}{Example block}
-            Example \textcolor{example}{text}.
-        \end{exampleblock}
+    \begin{frame}
+        Plate-notation graph of the model (?)
     \end{frame}
+
+    \begin{frame}{Bayesian Inference}
+        Bayesian approach for estimation and inference.
+        Posterior composed of discrete and continuous parameters.
+        Give high-level details of sampling algos (cut-posterior and informed proposals).
+    \end{frame}
+
+    \begin{frame}{Simulations}
+        Two figures: MAPE of estimated treatment effects and MAE of exposure mapping.        
+    \end{frame}
+
+    \begin{frame}{Data Analysis}
+        Results of Paluck et al. (2016) analysis.
+    \end{frame}
+
     
-    \begin{frame}{Lists}
-        \begin{columns}[t, onlytextwidth]
-            \column{0.33\textwidth}
-                Items:
-                \begin{itemize}
-                    \item Item 1
-                    \begin{itemize}
-                        \item Subitem 1.1
-                        \item Subitem 1.2
-                    \end{itemize}
-                    \item Item 2
-                    \item Item 3
-                \end{itemize}
-            
-            \column{0.33\textwidth}
-                Enumerations:
-                \begin{enumerate}
-                    \item First
-                    \item Second
-                    \begin{enumerate}
-                        \item Sub-first
-                        \item Sub-second
-                    \end{enumerate}
-                    \item Third
-                \end{enumerate}
-            
-            \column{0.33\textwidth}
-                Descriptions:
-                \begin{description}
-                    \item[First] Yes.
-                    \item[Second] No.
-                \end{description}
-        \end{columns}
-    \end{frame}
 \setbeamertemplate{caption}[numbered]
     \begin{frame}{Figures and Tables}
         \begin{columns}
@@ -174,9 +181,7 @@
         \bibliographystyle{plain}
     \end{frame}
     
-    \begin{frame}{Backup frame}
-        This is a backup frame, useful to include additional material for questions from the audience.
-        \vfill
-        The package \texttt{appendixnumberbeamer} is used not to number appendix frames.
+    \begin{frame}{Appendix}
+        More math details.
     \end{frame}
 \end{document}
