@@ -1,18 +1,18 @@
 # Fdb version 4
-["bibtex ProxyNets_IDSAI_2025"] 1735826217.17884 "ProxyNets_IDSAI_2025.aux" "ProxyNets_IDSAI_2025.bbl" "ProxyNets_IDSAI_2025" 1735826238.57065 0
+["bibtex ProxyNets_IDSAI_2025"] 1735826217.17884 "ProxyNets_IDSAI_2025.aux" "ProxyNets_IDSAI_2025.bbl" "ProxyNets_IDSAI_2025" 1735826574.27999 0
   "./focus-demo_bibliography.bib" 1735724458.47672 602 6bf0775402c735fed25856f360474f21 ""
   "C:/Program Files/MiKTeX 2.9/bibtex/bst/bibtex/plain.bst" 1291864736 20613 bd3fbfa9f64872b81ac57a0dd2ed855f ""
-  "ProxyNets_IDSAI_2025.aux" 1735826232.93082 4653 f0bd0522846dbe81842bcffd7d4f5ab6 "xelatex"
+  "ProxyNets_IDSAI_2025.aux" 1735826569.58643 4653 f0bd0522846dbe81842bcffd7d4f5ab6 "xelatex"
   (generated)
   "ProxyNets_IDSAI_2025.bbl"
   "ProxyNets_IDSAI_2025.blg"
   (rewritten before read)
-["xdvipdfmx"] 1735826235.32394 "ProxyNets_IDSAI_2025.xdv" "ProxyNets_IDSAI_2025.pdf" "ProxyNets_IDSAI_2025" 1735826238.66308 0
-  "ProxyNets_IDSAI_2025.xdv" 1735826232.93565 240116 7b639ec51210447382e9c734edb984ac "xelatex"
+["xdvipdfmx"] 1735826571.57243 "ProxyNets_IDSAI_2025.xdv" "ProxyNets_IDSAI_2025.pdf" "ProxyNets_IDSAI_2025" 1735826574.31948 0
+  "ProxyNets_IDSAI_2025.xdv" 1735826569.59162 238832 18489102131d329c7ecebbda591ddc48 "xelatex"
   (generated)
   "ProxyNets_IDSAI_2025.pdf"
   (rewritten before read)
-["xelatex"] 1735826217.77856 "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/IDASI_2025/ProxyNets_IDSAI_2025.tex" "ProxyNets_IDSAI_2025.xdv" "ProxyNets_IDSAI_2025" 1735826238.57216 0
+["xelatex"] 1735826556.31327 "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/IDASI_2025/ProxyNets_IDSAI_2025.tex" "ProxyNets_IDSAI_2025.xdv" "ProxyNets_IDSAI_2025" 1735826574.28103 0
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/adobe/zapfding/pzdr.tfm" 1136765054 1528 f853c4d1b4e0550255e02831fdc8496f ""
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/public/amsfonts/cmextra/cmmib5.tfm" 1233951848 1496 c79f6914c6d39ffb3759967363d1be79 ""
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/public/amsfonts/cmextra/cmmib7.tfm" 1233951848 1508 6e807ff901c35a5f1fde0ca275533df8 ""
@@ -263,15 +263,15 @@
   "C:/Users/bar21/AppData/Local/MiKTeX/2.9/fonts/tfm/public/rsfs/rsfs5.tfm" 1612777963.41953 684 3a51bd4fd9600428d5264cf25f04bb9a ""
   "C:/Users/bar21/AppData/Local/MiKTeX/2.9/fonts/tfm/public/rsfs/rsfs7.tfm" 1612777962.33512 692 1b6510779f0f05e9cbf03e0f6c8361e6 ""
   "C:/Users/bar21/AppData/Local/MiKTeX/2.9/miktex/data/le/xetex/xelatex.fmt" 1735724663.9128 23010306 46ce5494201a45e5711f5b75673186e7 ""
-  "ProxyNets_IDSAI_2025.aux" 1735826232.93082 4653 f0bd0522846dbe81842bcffd7d4f5ab6 "xelatex"
+  "ProxyNets_IDSAI_2025.aux" 1735826569.58643 4653 f0bd0522846dbe81842bcffd7d4f5ab6 "xelatex"
   "ProxyNets_IDSAI_2025.bbl" 1735826217.60688 454 b20d8ab2510db20565dc8fe41c3e28d9 "bibtex ProxyNets_IDSAI_2025"
-  "ProxyNets_IDSAI_2025.nav" 1735826232.93464 2058 10212361b8e4e88d88e39a1e94e48e9d "xelatex"
+  "ProxyNets_IDSAI_2025.nav" 1735826569.58643 2058 10212361b8e4e88d88e39a1e94e48e9d "xelatex"
   "beamercolorthemefocus.sty" 1735724428.17468 2693 7759ab3664be0109cf046592eb061bdb ""
   "beamerfontthemefocus.sty" 1735740040.09582 2092 326e5cbe02adcc3871f9023f2110916c ""
   "beamerinnerthemefocus.sty" 1735724438.31075 4597 786c6947cb3c485e35d8d845914e4d59 ""
   "beamerouterthemefocus.sty" 1735724443.09303 13248 5cf2bd5cdf61e824ebc1ac7a341764b7 ""
   "beamerthemefocus.sty" 1735724447.9434 2152 52edf74fa23438beb47b98249f78e9b5 ""
-  "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/IDASI_2025/ProxyNets_IDSAI_2025.tex" 1735826198.32321 13063 3f617ccae13fdaf310d791c2b277a959 ""
+  "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/IDASI_2025/ProxyNets_IDSAI_2025.tex" 1735826542.12963 13031 471b1d34c79e6373a6cd337ebb7e0d66 ""
   "figs/connected_net.png" 1735808821.04692 438021 0e6cc85c933763a70d026b20730dc53d ""
   "figs/noisy_networks.png" 1735810179.89998 1143938 60b5f54a342e3ddae60a7a3b5afd51b9 ""
   "focus-logo.pdf" 1735724465.33748 4062 d22dbe6fe335b1317d919faed0b9c8d5 ""
