@@ -1,0 +1,48 @@
+This is BibTeX, Version 0.99d
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: ProxyNets_IDSAI_2025.aux
+Reallocating 'name_of_file' (item size: 1) to 24 items.
+Reallocating 'name_of_file' (item size: 1) to 6 items.
+The style file: plain.bst
+Database file #1: focus-demo_bibliography.bib
+You've used 3 entries,
+            2118 wiz_defined-function locations,
+            516 strings with 4280 characters,
+and the built_in function-call counts, 915 in all, are:
+= -- 95
+> -- 21
+< -- 1
++ -- 9
+- -- 6
+* -- 48
+:= -- 151
+add.period$ -- 9
+call.type$ -- 3
+change.case$ -- 11
+chr.to.int$ -- 0
+cite$ -- 3
+duplicate$ -- 43
+empty$ -- 81
+format.name$ -- 6
+if$ -- 197
+int.to.chr$ -- 0
+int.to.str$ -- 3
+missing$ -- 4
+newline$ -- 18
+num.names$ -- 6
+pop$ -- 14
+preamble$ -- 1
+purify$ -- 9
+quote$ -- 0
+skip$ -- 32
+stack$ -- 0
+substring$ -- 72
+swap$ -- 12
+text.length$ -- 1
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 10
+warning$ -- 0
+while$ -- 11
+width$ -- 4
+write$ -- 34
