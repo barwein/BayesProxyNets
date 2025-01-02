@@ -1,7 +1,7 @@
 PWD C:\Users\bar21\Dropbox\My PC (LAPTOP-6NAJD2IQ)\Desktop\Gate\University\TAU\PhD\Writing\Drafts\Sampled networks\Bayes_incorrect_network\IDASI_2025
 INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\miktex\data\le\xetex\xelatex.fmt
-INPUT c:\Users\bar21\Dropbox\My PC (LAPTOP-6NAJD2IQ)\Desktop\Gate\University\TAU\PhD\Writing\Drafts\Sampled networks\Bayes_incorrect_network\IDASI_2025\focus-demo.tex
-OUTPUT focus-demo.log
+INPUT c:\Users\bar21\Dropbox\My PC (LAPTOP-6NAJD2IQ)\Desktop\Gate\University\TAU\PhD\Writing\Drafts\Sampled networks\Bayes_incorrect_network\IDASI_2025\ProxyNets_IDSAI_2025.tex
+OUTPUT ProxyNets_IDSAI_2025.log
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamer.cls
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamer.cls
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamer.cls
@@ -1495,10 +1495,10 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\bookmark\bkm-dvipdfm.def
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\etoolbox\etoolbox.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\pgf\frontendlayer\tikz.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\geometry\geometry.sty
-INPUT .\focus-demo.aux
-INPUT focus-demo.aux
-INPUT focus-demo.aux
-OUTPUT focus-demo.aux
+INPUT .\ProxyNets_IDSAI_2025.aux
+INPUT ProxyNets_IDSAI_2025.aux
+INPUT ProxyNets_IDSAI_2025.aux
+OUTPUT ProxyNets_IDSAI_2025.aux
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\nameref.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\nameref.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\nameref.sty
@@ -1560,13 +1560,19 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\translator\translator-theorem-dictio
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\translator\translator-theorem-dictionary-English.dict
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\translator\translator-theorem-dictionary-English.dict
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\translator\translator-theorem-dictionary-English.dict
-INPUT .\focus-demo.nav
-INPUT focus-demo.nav
-INPUT focus-demo.nav
-INPUT .\focus-logo.pdf
-INPUT .\focus-logo.pdf
-INPUT focus-logo.pdf
-OUTPUT focus-demo.xdv
+INPUT .\ProxyNets_IDSAI_2025.nav
+INPUT ProxyNets_IDSAI_2025.nav
+INPUT ProxyNets_IDSAI_2025.nav
+INPUT .\figs\connected_net.png
+INPUT .\figs\connected_net.png
+INPUT figs\connected_net.png
+OUTPUT ProxyNets_IDSAI_2025.xdv
+INPUT .\figs\connected_net.png
+INPUT .\figs\connected_net.png
+INPUT figs\connected_net.png
+INPUT .\figs\noisy_networks.png
+INPUT .\figs\noisy_networks.png
+INPUT figs\noisy_networks.png
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi12.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi8.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi6.tfm
@@ -1605,10 +1611,10 @@ INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm7.tfm
 INPUT .\focus-logo.pdf
 INPUT .\focus-logo.pdf
 INPUT focus-logo.pdf
-INPUT .\focus-demo.bbl
-INPUT focus-demo.bbl
-INPUT .\focus-demo.bbl
-INPUT focus-demo.bbl
+INPUT .\ProxyNets_IDSAI_2025.bbl
+INPUT ProxyNets_IDSAI_2025.bbl
+INPUT .\ProxyNets_IDSAI_2025.bbl
+INPUT ProxyNets_IDSAI_2025.bbl
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
@@ -1621,7 +1627,7 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-OUTPUT focus-demo.nav
-OUTPUT focus-demo.toc
-OUTPUT focus-demo.snm
-INPUT focus-demo.aux
+OUTPUT ProxyNets_IDSAI_2025.nav
+OUTPUT ProxyNets_IDSAI_2025.toc
+OUTPUT ProxyNets_IDSAI_2025.snm
+INPUT ProxyNets_IDSAI_2025.aux
