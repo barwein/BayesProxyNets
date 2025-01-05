@@ -1682,24 +1682,36 @@ INPUT .\figs\noisy_networks.png
 INPUT .\figs\noisy_networks.png
 INPUT figs\noisy_networks.png
 OUTPUT ProxyNets_IDSAI_2025.xdv
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi12.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi8.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi6.tfm
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsa.fd
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsa.fd
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsa.fd
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsa.fd
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam10.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam7.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam5.tfm
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsb.fd
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsb.fd
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsb.fd
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsb.fd
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm7.tfm
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\ursfs.fd
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\ursfs.fd
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\ursfs.fd
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\ursfs.fd
+INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs10.tfm
+INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs10.tfm
+INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs5.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam10.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam7.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam5.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm7.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm5.tfm
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\ursfs.fd
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\ursfs.fd
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\ursfs.fd
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\ursfs.fd
 INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs10.tfm
 INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs7.tfm
 INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs5.tfm
@@ -1709,18 +1721,6 @@ INPUT figs\connected_net.png
 INPUT .\figs\noisy_networks.png
 INPUT .\figs\noisy_networks.png
 INPUT figs\noisy_networks.png
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi12.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi8.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi6.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam10.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam10.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam7.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm7.tfm
-INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs10.tfm
-INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs10.tfm
-INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\fonts\tfm\public\rsfs\rsfs5.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi7.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi6.tfm
@@ -1735,30 +1735,32 @@ INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmib10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\cmextra\cmmib7.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\cmextra\cmmib7.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmib10.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\cmextra\cmmib7.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\cmextra\cmmib5.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmib10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmib10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\cmextra\cmmib7.tfm
-INPUT .\focus-logo.pdf
-INPUT .\focus-logo.pdf
-INPUT focus-logo.pdf
-INPUT .\ProxyNets_IDSAI_2025.bbl
-INPUT ProxyNets_IDSAI_2025.bbl
-INPUT .\ProxyNets_IDSAI_2025.bbl
-INPUT ProxyNets_IDSAI_2025.bbl
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\beamer\beamericonarticle.pdf
+INPUT .\figs\mape_boxplot.png
+INPUT .\figs\mape_boxplot.png
+INPUT figs\mape_boxplot.png
+INPUT .\figs\mae_hist.png
+INPUT .\figs\mae_hist.png
+INPUT figs\mae_hist.png
+INPUT .\figs\mape_boxplot.png
+INPUT .\figs\mape_boxplot.png
+INPUT figs\mape_boxplot.png
+INPUT .\figs\mae_hist.png
+INPUT .\figs\mae_hist.png
+INPUT figs\mae_hist.png
+INPUT .\figs\mape_boxplot.png
+INPUT .\figs\mape_boxplot.png
+INPUT figs\mape_boxplot.png
+INPUT .\figs\mae_hist.png
+INPUT .\figs\mae_hist.png
+INPUT figs\mae_hist.png
+INPUT .\figs\paluck_results.png
+INPUT .\figs\paluck_results.png
+INPUT figs\paluck_results.png
+INPUT .\figs\qr-code.png
+INPUT .\figs\qr-code.png
+INPUT figs\qr-code.png
 OUTPUT ProxyNets_IDSAI_2025.nav
 OUTPUT ProxyNets_IDSAI_2025.toc
 OUTPUT ProxyNets_IDSAI_2025.snm

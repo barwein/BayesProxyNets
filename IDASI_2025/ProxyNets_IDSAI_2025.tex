@@ -139,26 +139,65 @@ shorten >= 3pt, preaction = {decorate}
     \begin{frame}
         \maketitle
     \end{frame}
+
+        
+    \begin{frame}{Illustrative Example -- Paluck et al. (2016)}
+        \large
+            Field experiement in $56$ middle-schools.
+            \pause
+            \begin{enumerate}
+                \item \emph{Goal:} reduce student conflicts through education.
+                \vspace{0.05cm}
+                \pause
+                \item \emph{Challenge:} students are influenced by their peers.
+                \vspace{0.05cm}
+                \pause
+                \item \emph{Data:} Multiple friendship networks.
+                \begin{itemize}
+                    \item Who do you spend time with?
+                    \item Who is your best friend?
+                    \item Measured at pre and post.
+                    \item Self-reported.
+                \end{itemize}
+            \end{enumerate}
+            % \vspace{0.2cm}
+            % \item<1-> Study how anti-conflict education spread through social networks.
+            % \vspace{0.2cm}
+            % \item<2-> Measured social networks using self-reported friendships.
+            % \begin{itemize}
+            %     \item Frequently interacted and best friends.
+            %     \vspace{0.05cm}
+            %     \item Measured at pre and post.
+            % \end{itemize} 
+            \vspace{0.2cm}
+            \pause
+            \begin{itemize}
+            \item Which of the networks, if any, is the true network? which to choose?
+            \vspace{0.2cm}
+            \pause
+            \item \textbf{Objective:} Estimate the intervention effects using the proxy networks.
+        \end{itemize}
+    \end{frame}
     
     % Use starred version (e.g. \section*{Section name})
     % to disable (sub)section page.
     \begin{frame}{Background}
         \large
         \begin{itemize}
-            \item<1-> \textbf{Causal Inference}. Estimate the effect of treatment on an outcome. 
+            \item<1-> \textbf{Causal Inference}. Effect of treatment on an outcome. 
             \vspace{0.2cm}
-            \item<1-> \textbf{Interference}. Treatment of one unit affect the outcomes of others.
+            \item<2-> \textbf{Interference}. Treatment of one unit affect the outcomes of others.
             \vspace{0.2cm}
-            \item<1->  Treatments spreads through a network.
+            \item<3->  Treatments spreads through a \textbf{network}.
             \begin{itemize}
-                \item Nodes: units; Edges: magntiude of pairwise interfernce.
+                \item Nodes: units. Edges: pairwise interactions.
             \vspace{0.2cm}
             \end{itemize}
-            \item<2-> Examples:
+            \item<4-> Examples:
                 \begin{itemize}
-                    \item \emph{Social networks.} Transmission of information, behavior, encouragements, etc.
+                    \item \emph{Social networks.} Information \& behavior spread.
                     \vspace{0.05cm}
-                    \item \emph{Epidemiology.} Mitigating spread of infectious diseases or addictive drugs.
+                    \item \emph{Public health.} transmisstion of infectious diseases or addictive drugs.
                     \vspace{0.05cm}
                     \item A/B testing in marketplaces.
                 \end{itemize} 
@@ -168,7 +207,7 @@ shorten >= 3pt, preaction = {decorate}
     \begin{frame}[t]
         \begin{figure}[t]
             \centering
-            \includegraphics[width=0.65\textwidth]{figs/connected_net.png}
+            \includegraphics[width=0.6\textwidth]{figs/connected_net.png}
             % \caption{Plain frame with a figure.}
         \end{figure}
     \end{frame}
@@ -176,16 +215,20 @@ shorten >= 3pt, preaction = {decorate}
     \begin{frame}{The Challenge}
         \large
         \begin{itemize}
-            \item<1-> Accurately measuring social networks is challenging.
+            \item Randomized experiment in networked population.
             \vspace{0.2cm}
-            \item<1-> We observe only proxy measurements of the true network.
+            \pause
+            \item Accurately measuring social networks is challenging.
+            \vspace{0.2cm}
+            \pause
+            \item We observe only proxy measurements of the true network.
             \begin{itemize}
                 \item Measurements error.
                 \item Multiple sources of data.
                 \item Multilayer networks.
             \end{itemize}
             \vspace{0.2cm}
-            \item<1-> True network remains latent.
+            \item True network remains latent.
         \end{itemize}
         \vspace{.5cm}
         \pause
@@ -202,27 +245,7 @@ shorten >= 3pt, preaction = {decorate}
             % \caption{Plain frame with a figure.}
         \end{figure}
     \end{frame}
-    
-    \begin{frame}{Illustrative Example -- Paluck et al. (2016)}
-        \large
-        \begin{itemize}
-            \item<1-> Field experiement in 56 middle-schools.
-            \vspace{0.2cm}
-            \item<1-> Study how anti-conflict education spread through social networks.
-            \vspace{0.2cm}
-            \item<1-> Measured social networks using self-reported friendships.
-            \begin{itemize}
-                \item Bi-layer networks: frequently interacted and best friends.
-                \vspace{0.05cm}
-                \item Measured at pre- and post-intervention period.
-            \end{itemize} 
-            \vspace{0.2cm}
-            \item<2-> Which of the networks, if any, is the true network?
-            \vspace{0.2cm}
-            \item<2-> \textbf{Objective:} Estimate the intervention effects using the proxy networks.
-        \end{itemize}
-    \end{frame}
-    
+
     \begin{frame}{Formal Setup}
         \large 
         \begin{itemize}
@@ -252,28 +275,28 @@ shorten >= 3pt, preaction = {decorate}
                     \node (A) at (2, .5) {$\bA$};
                     \node (Z) at (4, 2) {$\bZ$};
                     \node (Y) at (6, 2) {$\bY$};
-                    \node (U) at (4, .5) {$\bU$};
-                    \draw[->] (X) -- (A*);
-                    \draw[->] (X) -- (A);
+                    % \node (U) at (4, .5) {$\bU$};
+                    \draw[->, violet] (X) -- (A*);
+                    \draw[->, blue] (X) -- (A);
                     \draw[->] (X) to [out=10,in=160] (Z);
-                    \draw[->] (X) to [out=20,in=150] (Y);
+                    \draw[->, red] (X) to [out=20,in=150] (Y);
                     \draw[->] (A*) -- (Z);
-                    \draw[->] (A*) -- (A);
-                    \draw[->] (Z) -- (Y);
-                    \draw[->] (A*) to [out=25,in=160] (Y);
-                    \draw[->] (A) -- (Z);
-                    \draw[->, dashed] (U) to (A*);
-                    \draw[->, dashed] (U) to (Y);
+                    \draw[->, blue] (A*) -- (A);
+                    \draw[->, red] (Z) -- (Y);
+                    \draw[->, red] (A*) to [out=25,in=160] (Y);
+                    % \draw[->] (A) -- (Z);
+                    % \draw[->, dashed] (U) to (A*);
+                    % \draw[->, dashed] (U) to (Y);
                   \end{tikzpicture}
               \end{figure}
             \item<2-> Requires probabilistic models:
             \begin{enumerate}
                 \normalsize
-                \item \emph{True network.} $p\big(\bA^\ast \vert \bX, \btheta \big)$.
+                \item \emph{\textcolor{violet}{True network.}} $p\big(\bA^\ast \vert \bX, \btheta \big)$.
                 \vspace{0.1cm}
-                \item \emph{Proxy networks.} $p\big(\bA \vert \bA^\ast, \bX, \bgamma \big)$.
+                \item \emph{\textcolor{blue}{Proxy networks.}} $p\big(\bA \vert \bA^\ast, \bX, \bgamma \big)$.
                 \vspace{0.1cm}
-                \item \emph{Outcomes.} $p\big(\bY \vert \bZ, \bA^\ast, \bX, \boeta \big)$.
+                \item \emph{\textcolor{red}{Outcomes.}} $p\big(\bY \vert \bZ, \bA^\ast, \bX, \boeta \big)$.
             \end{enumerate} 
             % \vspace{0.2cm}
             % \item<3-> Outcome often simplified to
@@ -283,25 +306,28 @@ shorten >= 3pt, preaction = {decorate}
 
     \begin{frame}{Causal Estimands}
         \large
-        Causal effects are the impact of hypothetical interventions on $\bZ$. \\
-        \vspace{0.1cm}
-        Can be viewed as population-level treatment assignment policies.
+        Impact of hypothetical treatments assignment policies.
+        %  -- population-level treatment assignment policies.
+        % \vspace{0.1cm}
+        % Can be viewed as population-level treatment assignment policies.
         \vspace{0.3cm}
         \pause
         \begin{enumerate}
             \item \textbf{Static.} $\bbE\big[Y_i \vert do(\bZ=\bz),\bX,\bA^\ast\big]$.
             \begin{itemize}
-                \item Treating all ($\bz=\boldsymbol{1}$) versus none ($\bz = \boldsymbol{0}$).
+                \item Treating all ($\bz=\textbf{1}$) vs none ($\bz = \textbf{0}$).
             \end{itemize}
+            \pause
             \vspace{0.2cm}
             \item \textbf{Dynamic.} $\bbE\big[Y_i \vert do(\bZ=h(\bX,\bA^\ast)),\bX,\bA^\ast\big]$.
             \begin{itemize}
                 \item Treating units with specific features, e.g., above certain age. 
             \end{itemize}
+            \pause
             \vspace{0.2cm}
             \item \textbf{Stochastic.} $\bbE_{\pi_\alpha(\bZ)}\bbE\big[Y_i \vert do(\bZ),\bX,\bA^\ast\big]$.
             \begin{itemize}
-                \item Expected impact of randomly treating $\alpha_1$ vs $\alpha_0$ percent of units.
+                \item Randomly treating $\alpha_1$ vs $\alpha_0$ percent of units.
             \end{itemize}
         \end{enumerate}
     \end{frame}
@@ -309,7 +335,8 @@ shorten >= 3pt, preaction = {decorate}
     \begin{frame}{Bayesian Inference}
         \large
         \begin{itemize}
-            \item<1-> Observed data $\bO = (\bY,\bZ,\bX,\bA)$. Latent variables $(\bA^\ast, \eta,\gamma,\theta)$.
+            \item<1-> \emph{Data:} $\bO = (\bY,\bZ,\bX,\bA)$. \emph{Latent:} $\bA^\ast$
+            and models' parameters ($\eta,\gamma,\theta$).
             \vspace{0.2cm}
             \item<2-> Posterior distribution:
             \begin{equation*}
@@ -325,8 +352,10 @@ shorten >= 3pt, preaction = {decorate}
                     p(\bA^\ast \vert \bX,\btheta) p(\btheta).
                 \end{split}
             \end{equation*} 
-            \item<3-> Mixed space of continuous $(\eta,\gamma,\theta)$ and discrete $\bA^\ast$. Discrete have $\mathcal{O}(N^2)$ terms!
+            \item<3-> Mixed space. Discrete ($\bA^\ast$) have $\mathcal{O}(N^2)$ terms!
+            \vspace{0.2cm}
             \item<4-> Propose two sampling schemes:
+            \normalsize
             \begin{enumerate}
                 \item \emph{Modularization.} ``break" the posterior into smaller, more manageable parts.
                 \vspace{0.1cm}
@@ -335,51 +364,90 @@ shorten >= 3pt, preaction = {decorate}
         \end{itemize}
     \end{frame}
 
-    \begin{frame}{Simulations}
-        Two figures: MAPE of estimated treatment effects and MAE of exposure mapping.        
+    \setbeamertemplate{caption}[numbered]
+    \begin{frame}[t]{Simulations}
+        \begin{itemize}
+            \item $N=500$ units. True network is measured with error. Outcomes from MRF.
+            \pause
+            \vspace{0.5cm}
+            \begin{columns}
+            \column{0.5\textwidth}
+            \begin{figure}[hbtp]
+                \centering
+                \includegraphics[width=1\textwidth]{figs/mape_boxplot.png}
+                \footnotesize
+                \caption{MAPE ($\downarrow$) of stochastic estimand.}
+            \end{figure}
+            \pause
+            \column{0.5\textwidth}
+                \begin{figure}[hbtp]
+                    \centering
+                    \includegraphics[width=1\textwidth]{figs/mae_hist.png}
+                    \footnotesize
+                    \caption{MAE ($\leftarrow$) of network statistics.}
+                \end{figure}
+        \end{columns}
+        \end{itemize}        
     \end{frame}
 
-    \begin{frame}{Data Analysis}
-        Results of Paluck et al. (2016) analysis.
+    \begin{frame}{Data Analysis - Paluck et al. (2016)}
+        \large
+        \begin{itemize}
+            \item Outcome is indicator of anti-conflict behavior. 
+            \vspace{0.2cm}
+            \item Stochastic estimand.
+            \vspace{0.2cm}
+            \item Four available networks. 
+            \begin{itemize}
+                \normalsize
+                \item Use one as "Observed" true network.
+                \vspace{0.05cm}
+                \item Analysis using different combination of the four proxy networks.
+            \end{itemize}
+            
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}[noframenumbering]{Data Analysis - Paluck et al. (2016)}
+        \begin{figure}[hbtp]
+            \centering
+            \includegraphics[width=0.9\textwidth]{figs/paluck_results.png}
+            % \footnotesize
+            % \caption{Estimated treatment effects.}
+        \end{figure}
     \end{frame}
 
     
-\setbeamertemplate{caption}[numbered]
-    \begin{frame}{Figures and Tables}
-        \begin{columns}
-            \column{0.4\textwidth}
-                \begin{figure}
-                    \centering
-                    \includegraphics{focus-logo.pdf}
-                    \caption{Figure caption.}
-                    \label{fig:focuslogo}
-                \end{figure}
-                
-            \column{0.6\textwidth}
-                \begin{table}
-                    \centering
-                    \begin{tabular}{rcc}
-                         & Heading 1 & Heading 2 \\\hline
-                        Row 1 & \(v_{11}\) & \(v_{12}\) \\
-                        Row 2 & \(v_{21}\) & \(v_{22}\) \\
-                        Row 3 & \(v_{31}\) & \(v_{32}\) \\
-                    \end{tabular}
-                    \caption{Table caption.}
-                    \label{tab:demo}
-                \end{table}
-        \end{columns}
+    \begin{frame}{Key Takeaways}
+        \large
+        \begin{itemize}
+            \item<1-> Network interference is common $\Rightarrow$ implications for many A/B tests.
+            \vspace{0.3cm}
+            \item<2-> Correctly measuring social relations is often impossible.
+            \vspace{0.3cm}
+            \item<2-> Can estimate causal effects using proxy networks.
+            \vspace{0.3cm}
+            \item<3-> Bayesian framework for inference. Computation is challenging.
+        \end{itemize}
     \end{frame}
+
     
     \begin{frame}[focus]
-        Thanks for using \textbf{Focus}!
+        \Huge
+        Thank You!
+        \vspace{0.5cm}
+        \begin{figure}[hbtp]
+            \centering
+            \includegraphics[width=0.3\textwidth]{figs/qr-code.png}
+        \end{figure}
     \end{frame}
     
     \appendix
-    \begin{frame}{References}
-        \nocite{*}
-        \bibliography{focus-demo_bibliography}
-        \bibliographystyle{plain}
-    \end{frame}
+    % \begin{frame}{References}
+    %     \nocite{*}
+    %     \bibliography{focus-demo_bibliography}
+    %     \bibliographystyle{plain}
+    % \end{frame}
     
     \begin{frame}{Appendix}
         More math details.
