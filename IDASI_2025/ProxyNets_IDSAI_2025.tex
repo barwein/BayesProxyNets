@@ -17,7 +17,8 @@
 \usepackage{geometry}
 \geometry{paperwidth=16cm, paperheight=9cm}
 \usepackage{tikz}
-\usepackage{amsthm,amsmath,bbm,amsfonts,amssymb, mathrsfs}
+\usepackage{amsthm,bbm,amsfonts,amssymb, mathrsfs}
+\usepackage{amsmath}
 \usepackage{mathtools}
 
 % math expressions
@@ -279,14 +280,14 @@ shorten >= 3pt, preaction = {decorate}
                     \node (Z) at (4, 2) {$\bZ$};
                     \node (Y) at (6, 2) {$\bY$};
                     % \node (U) at (4, .5) {$\bU$};
-                    \draw[->, violet] (X) -- (A*);
+                    \draw[->, red] (X) -- (A*);
                     \draw[->, blue] (X) -- (A);
                     \draw[->] (X) to [out=10,in=160] (Z);
-                    \draw[->, red] (X) to [out=20,in=150] (Y);
+                    \draw[->, violet] (X) to [out=20,in=150] (Y);
                     \draw[->] (A*) -- (Z);
                     \draw[->, blue] (A*) -- (A);
-                    \draw[->, red] (Z) -- (Y);
-                    \draw[->, red] (A*) to [out=25,in=160] (Y);
+                    \draw[->, violet] (Z) -- (Y);
+                    \draw[->, violet] (A*) to [out=25,in=160] (Y);
                     % \draw[->] (A) -- (Z);
                     % \draw[->, dashed] (U) to (A*);
                     % \draw[->, dashed] (U) to (Y);
@@ -295,11 +296,11 @@ shorten >= 3pt, preaction = {decorate}
             \item<2-> Requires probabilistic models:
             \begin{enumerate}
                 \normalsize
-                \item \emph{\textcolor{violet}{True network.}} $p\big(\bA^\ast \vert \bX, \btheta \big)$.
+                \item \emph{\textcolor{red}{True network.}} $p\big(\bA^\ast \vert \bX, \btheta \big)$.
                 \vspace{0.1cm}
                 \item \emph{\textcolor{blue}{Proxy networks.}} $p\big(\bA \vert \bA^\ast, \bX, \bgamma \big)$.
                 \vspace{0.1cm}
-                \item \emph{\textcolor{red}{Outcomes.}} $p\big(\bY \vert \bZ, \bA^\ast, \bX, \boeta \big)$.
+                \item \emph{\textcolor{violet}{Outcomes.}} $p\big(\bY \vert \bZ, \bA^\ast, \bX, \boeta \big)$.
             \end{enumerate} 
             % \vspace{0.2cm}
             % \item<3-> Outcome often simplified to
@@ -441,7 +442,7 @@ shorten >= 3pt, preaction = {decorate}
         \vspace{0.5cm}
         \begin{figure}[hbtp]
             \centering
-            \includegraphics[width=0.3\textwidth]{figs/qr-code.png}
+            \includegraphics[width=0.25\textwidth]{figs/qr-code.png}
         \end{figure}
     \end{frame}
     
@@ -452,7 +453,166 @@ shorten >= 3pt, preaction = {decorate}
     %     \bibliographystyle{plain}
     % \end{frame}
     
-    \begin{frame}{Appendix}
-        More math details.
+    \begin{frame}{Appendix -- DAG }
+        \begin{columns}
+            \begin{column}{0.5\textwidth}
+                \begin{figure}[hbtp]
+                    \centering
+                      \begin{tikzpicture}[>=Stealth,line width=.7pt]
+                        \node (X) at (0, 2.5) {$\bX$};
+                        \node (A*) at (2, 2) {$\bA^\ast$};
+                        \node (A) at (2, .5) {$\bA$};
+                        \node (Z) at (4, 2) {$\bZ$};
+                        \node (Y) at (6, 2) {$\bY$};
+                        \node (U) at (4, .5) {$\bU$};
+                        \draw[->] (X) -- (A*);
+                        \draw[->] (X) -- (A);
+                        \draw[->] (X) to [out=10,in=160] (Z);
+                        \draw[->] (X) to [out=20,in=150] (Y);
+                        \draw[->] (A*) -- (Z);
+                        \draw[->] (A*) -- (A);
+                        \draw[->] (Z) -- (Y);
+                        \draw[->] (A*) to [out=25,in=160] (Y);
+                        \draw[->] (A) -- (Z);
+                        \draw[->, dashed] (U) to (A*);
+                        \draw[->, dashed] (U) to (Y);
+                      \end{tikzpicture}
+                  \end{figure}
+            \end{column}
+            \begin{column}{0.5 \textwidth}
+                \begin{itemize}
+                    \item $\bX$: covariates.
+                    \item $\bA^\ast$: true network.
+                    \item $\bA$: proxy networks.
+                    \item $\bZ$: treatments.
+                    \item $\bY$: outcomes.
+                    \item $\bU$: unobserved confounders.
+                \end{itemize}
+                
+            \end{column}
+        \end{columns}
+        
+    \end{frame}
+
+    \begin{frame}{Appendix -- SCM}
+        \begin{equation*}
+            % \label{eq:SCM}
+            \begin{aligned}
+                \bU_i &= f_U\big(\beps_{U_i} \big), &&\quad i \in [N] \\ 
+                \bX_i &= f_X\big( \beps_{X_i} \big), &&\quad i \in [N] \\
+                \bA^\ast &= f_{A^\ast}\big(\bX, \bU, \beps_{A^\ast}\big) \\
+                \bA^b &= f_{A^b}\big(\bA^\ast,\bX,\beps_{A^b}\big) ,&&\quad b=1,\ldots,B \\
+                Z_i &= f_Z\big(\bA^\ast, \bA, \bX_i, \bX_{-i},\varepsilon_{Z_i}\big) &&\quad i\in [N] \\
+                Y_i &= f_Y\big(Z_i,\bX_i, \bZ_{-i},\bX_{-i},\bA^\ast, \bU_i, \varepsilon_{Y_i} \big) &&\quad i\in [N],
+            \end{aligned}
+        \end{equation*}
+        often simplified to
+        \begin{equation*}
+            % \label{eq:SCM_mod}
+            \begin{aligned}
+                Z_i &= f_Z\big(\bX_i, \phi_2(\bX_{-i},\bA^\ast), \phi_{3,i}(\bA^\ast),\varepsilon_{Z_i}\big) &&\quad i\in [N] \\
+                Y_i &= f_Y\big(Z_i,\bX_i, \phi_1(\bZ_{-i},\bA^\ast), \phi_2(\bX_{-i},\bA^\ast),\phi_{3,i}(\bA^\ast), \bU_i, \varepsilon_{Y_i} \big) &&\quad i\in [N].
+            \end{aligned}
+        \end{equation*}
+    \end{frame}
+
+    \begin{frame}{Appendix -- Examples of proxy network models}
+        \begin{enumerate}
+            \item \textbf{Random noise.} $ p(\bA \vert \bA^\ast, \bX,\bgamma) =
+            \prod_{i>j}\Pr(A_{ij} \vert A^\ast_{ij},\bgamma)$  where $\Pr(A_{ij}=1 \vert A^\ast_{ij}=k,\bgamma) = \gamma_k,\; k=0,1$, corresponding to false positive rate when $k=0$ and true positive rate when $k=1$. 
+            \vspace{0.2cm}
+            \item \textbf{Edge censoring.} Each unit report maximal $C$ friends, that is, report only
+                    $\min(C,d_i)$ friends. The probability that $A_{ij}=1$ given that $A^\ast_{ij}=1$ can be modeled by
+                    \begin{equation*}
+                    \Pr(A_{ij}=1 \vert A^\ast_{ij}=1, \gamma) =
+                    1 - \big(1- \min(1, C/d_i))(1- \min(1, C/d_j)\big)
+                    \end{equation*}
+            \vspace{0.2cm}
+            \item \textbf{Repeated measures.} Each proxy modeled some thing like 1., and we have joint over all $B$ proxies.
+            \vspace{0.2cm}
+            \item \textbf{Multilayer networks.} Each layer is a proxy network, and we have a model $p(\bA^b \vert \bA^\ast,\bX,\gamma_b)$ for each proxy.
+                        For example, we have conditional independence across proxies but hierarchical structure for the parameters.
+        \end{enumerate}
+    \end{frame}
+
+    \begin{frame}[t]{Appendix -- Sampling from the posterior}
+        \textbf{Bayesian Modularization.} Note that 
+        \begin{equation*}
+            % \label{eq:posterior_module_feedback}
+            p(\eta,\theta,\gamma,\bA^\ast \vert \bO) \propto 
+            \underbrace{p(\eta \vert \bY,\bZ,\bA^\ast,\bX)}_{\text{Outcome module}}
+            \underbrace{p(\theta,\gamma,\bA^\ast \vert \bA,\bX)}_{\text{Network module}}
+            \underbrace{p(\bY \vert \bZ,\bA^\ast,\bX)}_{\text{Feedback term}}.
+        \end{equation*}
+        Remove feedback by sampling from \emph{cut-posterior}:
+        \begin{equation*}
+            % \label{eq:outcome_module}
+            p_{cut}(\eta,\theta,\gamma,\bA^\ast \vert \bO) \propto 
+            p(\eta \vert \bY,\bZ,\bA^\ast,\bX)
+            p(\theta,\gamma,\bA^\ast \vert \bA,\bX).
+        \end{equation*}
+        Sample from network module by first sample $\theta,\gamma$ from 
+        $$p(\theta,\gamma \vert \bA,\bX) \propto
+        p(\theta)p(\gamma)
+        \sum_{\bA^\ast} 
+        p(\bA\vert \bA^\ast,\bX,\gamma) 
+        p(\bA^\ast \vert \bX,\theta)$$
+         and then sample $\bA^\ast$ from
+        $$p(\bA^\ast \vert \bA,\bX,\theta,\gamma) \propto   
+        \frac{p(\bA\vert \bA^\ast,\bX,\gamma) 
+        p(\bA^\ast \vert \bX,\theta)}{\sum_{\bA^\ast} 
+        p(\bA\vert \bA^\ast,\bX,\gamma) 
+        p(\bA^\ast \vert \bX,\theta)}$$
+        % Finally, given $\bA^\ast$ samples we can sample from the outcome module, i.e., Bayesian regression.
+    \end{frame}
+
+    \begin{frame}{Appendix -- Sampling from the posteior 2}
+        \textbf{Gibbs sampling.} Given $\bA^\ast$, sampling $(\eta,\theta,\gamma)$ is easy and can be done with any 
+        gradient-based sampler, such as MALA or HMC. 
+        \\ 
+        \vspace{0.3cm}
+        Updating $\bA^\ast$ given the rest is challenging as the space is huge. 
+        \\
+        \vspace{0.3cm}
+        Can be done with \emph{Local Informed Proposals}: 
+        ``flip'' edges with probaility proportional to likelihood ratios. 
+        \\
+        \vspace{0.3cm}
+        Can be even more efficient by approximating likelihood ratios with gradients. 
+        \\
+        \vspace{0.3cm}
+        Block Gibbs is therefore the following for multiple iterations.
+        \begin{itemize}
+            \item Update $\bA^\ast$ given $\eta,\theta,\gamma$.
+            \item Update $(\eta,\theta,\gamma)$ given $\bA^\ast$.
+        \end{itemize}
+    \end{frame}
+
+    \begin{frame}{Appendix -- Simulation DGP}
+        \begin{equation*}
+            \begin{aligned}
+                X_{1,i} &\sim N(0,3^2) \\
+                X_{2,i} &\sim Ber(0.1) \\
+                \bU_i &\sim N(0,I_2) \\ 
+                \Pr(A^\ast_{ij}=1 \vert \bX,\bU,\theta) &= expit\big(-2 +  1.5\widetilde{X}_{2,ij} - \lVert \bU_i - \bU_j \rVert \big ) \\
+                \Pr(A_{ij}=1 \vert A^\ast_{ij}, \bX, \gamma) &= expit\big(A^\ast_{ij}1.1 + (1-A^\ast_{ij})(0.2 - \widetilde{X}_{1,ij} + \widetilde{X}_{2,ij})\big) \\
+                Z_i &\sim Ber(0.5) \\
+                \psi &\sim N\Big(0, \widetilde{Q}^{-1}\Big) \\
+                \Pr(Y_i=1 \vert \cdot) &= expit\big(-1 - 0.25X_{1,i} + 3Z_i + 3 \phi_1(\bZ_{-i},\bA^\ast_i) + 1.5 \psi_i \big) 
+            \end{aligned}
+        \end{equation*}
+    \end{frame}
+
+    \begin{frame}{Appendix -- Data Analysis}
+        \begin{itemize}
+            \item Noisy (single) -- ST network measured with differential noise.
+            \item Noisy (repeated) -- ST pre and post measured with differential noise. 
+            \item Multi-layer -- ST and BT networks are function of latent predecssor $\bA^\ast$.
+        \end{itemize}
+        Degree distribution in observed networks:
+        \begin{figure}
+            \centering
+            \includegraphics[width=0.75\textwidth]{figs/data_degree_dist.png}
+        \end{figure}
     \end{frame}
 \end{document}

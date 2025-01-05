@@ -1497,7 +1497,6 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\pgf\frontendlayer\tikz.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\geometry\geometry.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\pgf\frontendlayer\tikz.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amscls\amsthm.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsmath\amsmath.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\bbm\bbm.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\bbm\bbm.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\bbm\bbm.sty
@@ -1522,6 +1521,7 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\mathrsfs.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\mathrsfs.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\mathrsfs.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\jknappen\mathrsfs.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsmath\amsmath.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\mathtools\mathtools.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\mathtools\mathtools.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\mathtools\mathtools.sty
@@ -1761,6 +1761,9 @@ INPUT figs\paluck_results.png
 INPUT .\figs\qr-code.png
 INPUT .\figs\qr-code.png
 INPUT figs\qr-code.png
+INPUT .\figs\data_degree_dist.png
+INPUT .\figs\data_degree_dist.png
+INPUT figs\data_degree_dist.png
 OUTPUT ProxyNets_IDSAI_2025.nav
 OUTPUT ProxyNets_IDSAI_2025.toc
 OUTPUT ProxyNets_IDSAI_2025.snm
