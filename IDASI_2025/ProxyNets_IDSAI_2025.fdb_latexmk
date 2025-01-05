@@ -1,10 +1,10 @@
 # Fdb version 4
-["xdvipdfmx"] 1736081913.79666 "ProxyNets_IDSAI_2025.xdv" "ProxyNets_IDSAI_2025.pdf" "ProxyNets_IDSAI_2025" 1736081927.12796 0
-  "ProxyNets_IDSAI_2025.xdv" 1736081912.61202 396820 b54a6620864d86f816143b5638696cfe "xelatex"
+["xdvipdfmx"] 1736082109.0073 "ProxyNets_IDSAI_2025.xdv" "ProxyNets_IDSAI_2025.pdf" "ProxyNets_IDSAI_2025" 1736082120.61537 0
+  "ProxyNets_IDSAI_2025.xdv" 1736082108.02408 399292 d813b4160c5c9a774e723333426e98a2 "xelatex"
   (generated)
   "ProxyNets_IDSAI_2025.pdf"
   (rewritten before read)
-["xelatex"] 1736081892.5935 "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/IDASI_2025/ProxyNets_IDSAI_2025.tex" "ProxyNets_IDSAI_2025.xdv" "ProxyNets_IDSAI_2025" 1736081927.08116 0
+["xelatex"] 1736082093.58497 "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/IDASI_2025/ProxyNets_IDSAI_2025.tex" "ProxyNets_IDSAI_2025.xdv" "ProxyNets_IDSAI_2025" 1736082120.56852 0
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/adobe/zapfding/pzdr.tfm" 1136765054 1528 f853c4d1b4e0550255e02831fdc8496f ""
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/public/amsfonts/cmextra/cmmib7.tfm" 1233951848 1508 6e807ff901c35a5f1fde0ca275533df8 ""
   "C:/Program Files/MiKTeX 2.9/fonts/tfm/public/amsfonts/symbols/msam10.tfm" 1233951854 916 f87d7c45f9c908e672703b83b72241a3 ""
@@ -254,14 +254,14 @@
   "C:/Users/bar21/AppData/Local/MiKTeX/2.9/fonts/tfm/public/rsfs/rsfs5.tfm" 1612777963.41953 684 3a51bd4fd9600428d5264cf25f04bb9a ""
   "C:/Users/bar21/AppData/Local/MiKTeX/2.9/fonts/tfm/public/rsfs/rsfs7.tfm" 1612777962.33512 692 1b6510779f0f05e9cbf03e0f6c8361e6 ""
   "C:/Users/bar21/AppData/Local/MiKTeX/2.9/miktex/data/le/xetex/xelatex.fmt" 1735724663.9128 23010306 46ce5494201a45e5711f5b75673186e7 ""
-  "ProxyNets_IDSAI_2025.aux" 1736081912.6069 4218 56847bcfb713e3bff10647fdb2a9c7e6 "xelatex"
-  "ProxyNets_IDSAI_2025.nav" 1736081912.61102 2072 4c5e2c3c49ff165ca3c7b4e1d28336c7 "xelatex"
+  "ProxyNets_IDSAI_2025.aux" 1736082108.01939 4218 56847bcfb713e3bff10647fdb2a9c7e6 "xelatex"
+  "ProxyNets_IDSAI_2025.nav" 1736082108.02408 2072 4c5e2c3c49ff165ca3c7b4e1d28336c7 "xelatex"
   "beamercolorthemefocus.sty" 1735724428.17468 2693 7759ab3664be0109cf046592eb061bdb ""
   "beamerfontthemefocus.sty" 1735740040.09582 2092 326e5cbe02adcc3871f9023f2110916c ""
   "beamerinnerthemefocus.sty" 1735724438.31075 4597 786c6947cb3c485e35d8d845914e4d59 ""
   "beamerouterthemefocus.sty" 1735724443.09303 13248 5cf2bd5cdf61e824ebc1ac7a341764b7 ""
   "beamerthemefocus.sty" 1735724447.9434 2152 52edf74fa23438beb47b98249f78e9b5 ""
-  "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/IDASI_2025/ProxyNets_IDSAI_2025.tex" 1736081882.58035 15386 114d3ff13946489a32cbdb066910387b ""
+  "c:/Users/bar21/Dropbox/My PC (LAPTOP-6NAJD2IQ)/Desktop/Gate/University/TAU/PhD/Writing/Drafts/Sampled networks/Bayes_incorrect_network/IDASI_2025/ProxyNets_IDSAI_2025.tex" 1736082083.81723 15504 d7bc1cbc2421b69ea54ab940796d1055 ""
   "figs/connected_net.png" 1735808821.04692 438021 0e6cc85c933763a70d026b20730dc53d ""
   "figs/mae_hist.png" 1736073314.26914 353482 fe034b98f3916a8ff3cf6ab754d1c3bf ""
   "figs/mape_boxplot.png" 1736073458.50653 335253 9f5753e11072dc2f027d08e5f8a3f5e7 ""
