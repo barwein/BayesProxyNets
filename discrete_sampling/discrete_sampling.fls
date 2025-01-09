@@ -1,5 +1,5 @@
 PWD C:\Users\bar21\Dropbox\My PC (LAPTOP-6NAJD2IQ)\Desktop\Gate\University\TAU\PhD\Writing\Drafts\Sampled networks\Bayes_incorrect_network\discrete_sampling
-INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\miktex\data\le\pdftex\pdflatex.fmt
+INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\miktex\data\le\xetex\xelatex.fmt
 INPUT c:\Users\bar21\Dropbox\My PC (LAPTOP-6NAJD2IQ)\Desktop\Gate\University\TAU\PhD\Writing\Drafts\Sampled networks\Bayes_incorrect_network\discrete_sampling\discrete_sampling.tex
 OUTPUT discrete_sampling.log
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\article.cls
@@ -17,7 +17,6 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\size12.clo
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\size12.clo
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\size12.clo
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\size12.clo
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmr12.tfm
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\inputenc.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\inputenc.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\inputenc.sty
@@ -158,10 +157,10 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-cfg\graphics.cfg
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-cfg\graphics.cfg
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-cfg\graphics.cfg
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-cfg\graphics.cfg
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-def\pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-def\pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-def\pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-def\pdftex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-def\xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-def\xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-def\xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\graphics-def\xetex.def
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hyperref.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hyperref.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hyperref.sty
@@ -349,6 +348,7 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\url\url.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\url\url.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\url\url.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\url\url.sty
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\adobe\zapfding\pzdr.tfm
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\bitset\bitset.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\bitset\bitset.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\bitset\bitset.sty
@@ -390,26 +390,24 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atbegshi-ltx.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atbegshi-ltx.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\atbegshi\atbegshi.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atbegshi-ltx.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hpdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hpdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hpdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hpdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hxetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hxetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hxetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hxetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\infwarerr\infwarerr.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\ltxcmds\ltxcmds.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\generic\pdfescape\pdfescape.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\rerunfilecheck\rerunfilecheck.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\rerunfilecheck\rerunfilecheck.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\rerunfilecheck\rerunfilecheck.sty
@@ -425,6 +423,21 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\kvoptions\kvoptions.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\infwarerr\infwarerr.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\pdftexcmds\pdftexcmds.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\atveryend\atveryend.sty
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\atveryend-ltx.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\uniquecounter\uniquecounter.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\uniquecounter\uniquecounter.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\uniquecounter\uniquecounter.sty
@@ -462,10 +475,10 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\generic\iftex\ifvtex.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\iftex\ifvtex.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\iftex\ifvtex.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\generic\iftex\iftex.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\geometry\geometry.cfg
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\geometry\geometry.cfg
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\geometry\geometry.cfg
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\geometry\geometry.cfg
+INPUT C:\Program Files\MiKTeX 2.9\tex\xelatex\xetexconfig\geometry.cfg
+INPUT C:\Program Files\MiKTeX 2.9\tex\xelatex\xetexconfig\geometry.cfg
+INPUT C:\Program Files\MiKTeX 2.9\tex\xelatex\xetexconfig\geometry.cfg
+INPUT C:\Program Files\MiKTeX 2.9\tex\xelatex\xetexconfig\geometry.cfg
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\natbib\natbib.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\natbib\natbib.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\natbib\natbib.sty
@@ -477,40 +490,26 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\natbib\natbib.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\natbib\natbib.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\natbib\natbib.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\natbib\natbib.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-pdftex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\l3backend\l3backend-xetex.def
+INPUT extractbb "--version"
 INPUT .\discrete_sampling.aux
 INPUT discrete_sampling.aux
 INPUT discrete_sampling.aux
 OUTPUT discrete_sampling.aux
-INPUT C:\Program Files\MiKTeX 2.9\tex\context\base\mkii\supp-pdf.mkii
-INPUT C:\Program Files\MiKTeX 2.9\tex\context\base\mkii\supp-pdf.mkii
-INPUT C:\Program Files\MiKTeX 2.9\tex\context\base\mkii\supp-pdf.mkii
-INPUT C:\Program Files\MiKTeX 2.9\tex\context\base\mkii\supp-pdf.mkii
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\epstopdf-pkg\epstopdf-base.sty
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\00miktex\epstopdf-sys.cfg
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\00miktex\epstopdf-sys.cfg
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\00miktex\epstopdf-sys.cfg
-INPUT C:\Program Files\MiKTeX 2.9\tex\latex\00miktex\epstopdf-sys.cfg
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\ts1cmr.fd
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\ts1cmr.fd
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\ts1cmr.fd
+INPUT C:\Program Files\MiKTeX 2.9\tex\latex\base\ts1cmr.fd
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\nameref.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\nameref.sty
 INPUT C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\nameref.sty
@@ -556,11 +555,9 @@ INPUT .\discrete_sampling.out
 INPUT discrete_sampling.out
 INPUT .\discrete_sampling.out
 INPUT discrete_sampling.out
-OUTPUT discrete_sampling.pdf
 INPUT .\discrete_sampling.out
 INPUT .\discrete_sampling.out
 OUTPUT discrete_sampling.out
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmr17.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmr12.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi12.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmsy10.tfm
@@ -580,8 +577,7 @@ INPUT C:\Program Files\MiKTeX 2.9\tex\latex\amsfonts\umsb.fd
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm7.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmr17.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmbx12.tfm
+INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmr12.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmr8.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmr6.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmmi12.tfm
@@ -599,64 +595,16 @@ INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam7.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm10.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm7.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmbx12.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\cmextra\cmex7.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msam5.tfm
 INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\amsfonts\symbols\msbm5.tfm
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmtt10.tfm
-INPUT C:\Users\bar21\AppData\Local\MiKTeX\2.9\pdftex\config\pdftex.map
+OUTPUT discrete_sampling.xdv
 INPUT .\gwg.png
 INPUT .\gwg.png
 INPUT gwg.png
-INPUT .\gwg.png
-INPUT .\gwg.png
-INPUT .\gwg.png
-INPUT .\gwg.png
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmti12.tfm
 INPUT .\dmala.png
 INPUT .\dmala.png
 INPUT dmala.png
-INPUT .\dmala.png
-INPUT .\dmala.png
-INPUT .\dmala.png
-INPUT .\dmala.png
-INPUT C:\Program Files\MiKTeX 2.9\fonts\tfm\public\cm\cmtt12.tfm
 INPUT discrete_sampling.aux
 INPUT .\discrete_sampling.out
 INPUT .\discrete_sampling.out
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmbx12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmbx12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmex10.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmex10.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cmextra\cmex8.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cmextra\cmex8.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmmi12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmmi12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmmi6.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmmi6.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmmi8.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmmi8.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr10.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr10.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr17.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr17.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr6.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr6.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr7.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr7.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr8.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmr8.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmsy10.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmsy10.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmsy6.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmsy6.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmsy8.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmsy8.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmti12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmti12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmtt10.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmtt10.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmtt12.pfb
-INPUT C:\Program Files\MiKTeX 2.9\fonts\type1\public\amsfonts\cm\cmtt12.pfb
