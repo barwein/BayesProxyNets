@@ -250,7 +250,7 @@ def cond_logpost_a_star(triu_star, data, param):
 triu_star_grad_fn = jit(value_and_grad(cond_logpost_a_star))
 
 
-def compute_log_cut_posterior(astar_sample, theta, gamma, x2_or, x_diff, triu_obs):
+def compute_log_cut_posterior(astar_sample, theta, gamma, data):
     """
     Compute log cut-posterior of $A*|theta,gamma$ in network module (true and proxy)
     for a single astar configuration
@@ -259,13 +259,10 @@ def compute_log_cut_posterior(astar_sample, theta, gamma, x2_or, x_diff, triu_ob
     astar_sample: A* sample
     theta: Parameters for A*
     gamma: Parameters for A_ij
-    x2_or: if x2_i + x2_j = 1
-    x_diff: Difference in x covaraiates
-    triu_obs: Upper triangular observed adjacency matrix
-
+    data: DataTuple object 
     """
     # Prior term (log p(A*|theta))
-    star_logits = theta[0] + theta[1] * x2_or
+    star_logits = theta[0] + theta[1] * data.x2_or
     log_prior = jnp.where(
         astar_sample == 1,
         star_logits - jnp.log1p(jnp.exp(star_logits)),  # log p(A*=1)
@@ -273,11 +270,11 @@ def compute_log_cut_posterior(astar_sample, theta, gamma, x2_or, x_diff, triu_ob
     )  # log p(A*=0)
 
     # Likelihood term (log p(A|A*,gamma))
-    obs_logits_k0 = gamma[1] + gamma[2] * x_diff
+    obs_logits_k0 = gamma[1] + gamma[2] * data.x_diff
     log_lik = jnp.where(
         astar_sample == 1,
-        triu_obs * gamma[0] - jnp.log1p(jnp.exp(gamma[0])),  # when A*=1
-        triu_obs * obs_logits_k0 - jnp.log1p(jnp.exp(obs_logits_k0)),
+        data.triu_obs * gamma[0] - jnp.log1p(jnp.exp(gamma[0])),  # when A*=1
+        data.triu_obs * obs_logits_k0 - jnp.log1p(jnp.exp(obs_logits_k0)),
     )  # when A*=0
 
     return jnp.sum(log_prior + log_lik)
@@ -285,5 +282,5 @@ def compute_log_cut_posterior(astar_sample, theta, gamma, x2_or, x_diff, triu_ob
 
 # Vectorize over samples
 compute_log_posterior_vmap = vmap(
-    compute_log_cut_posterior, in_axes=(0, None, None, None, None, None)
+    compute_log_cut_posterior, in_axes=(0, None, None, None)
 )
