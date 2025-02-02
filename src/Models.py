@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax import jit, value_and_grad, vmap
 import numpyro
 import numpyro.distributions as dist
-import src.Aux_functions as aux
+import src.utils as utils
 
 ### Numpyro models ###
 
@@ -111,10 +111,10 @@ def combined_model(data):
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
     triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
-    adj_mat = aux.Triu_to_mat(triu_star)
+    adj_mat = utils.Triu_to_mat(triu_star)
 
     # Outcome model
-    expos = compute_exposures(triu_star, data.Z)
+    expos = utils.compute_exposures(triu_star, data.Z)
     df_nodes = jnp.transpose(
         jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, data.X, expos])
     )
@@ -233,14 +233,14 @@ def cond_logpost_a_star(triu_star, data, param):
     a_obs_logpmf = data.triu_obs * logits_a_obs - jnp.log1p(jnp.exp(logits_a_obs))
 
     # p(Y|A*,X,Z,\eta,\sig_y)
-    exposures = compute_exposures(triu_star, data.Z)
+    exposures = utils.compute_exposures(triu_star, data.Z)
     df_nodes = jnp.transpose(
         jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, data.x, exposures])
     )
     mean_y = jnp.dot(df_nodes, param.eta)
 
     y_logpdf = car_logdensity(
-        data.Y, mean_y, param.sig_inv, param.rho, aux.Triu_to_mat(triu_star)
+        data.Y, mean_y, param.sig_inv, param.rho, utils.Triu_to_mat(triu_star)
     )
 
     return a_star_logpmf.sum() + a_obs_logpmf.sum() + y_logpdf
@@ -259,7 +259,7 @@ def compute_log_cut_posterior(astar_sample, theta, gamma, data):
     astar_sample: A* sample
     theta: Parameters for A*
     gamma: Parameters for A_ij
-    data: DataTuple object 
+    data: DataTuple object
     """
     # Prior term (log p(A*|theta))
     star_logits = theta[0] + theta[1] * data.x2_or

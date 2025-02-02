@@ -8,8 +8,8 @@ from jax import jit
 import jax
 import jax.random as random
 from typing import NamedTuple, Any
-from Simulations.Models import triu_star_grad_fn
-
+from src.Models import triu_star_grad_fn
+from src.utils import ParamTuple
 
 # Global hyper-parameters
 BATCH_LEN = 5
@@ -113,6 +113,7 @@ def GWG_kernel(rng_key, state, data, param):
     """
     Run N_STEPS of GWG sampler given the current param (continuous) values
     """
+
     def body_fun(carry, _):
         rng_key, cur_state = carry
         rng_key, step_key = random.split(rng_key)
@@ -121,14 +122,14 @@ def GWG_kernel(rng_key, state, data, param):
 
     # Run the scan
     (_, final_state), final_info = jax.lax.scan(
-        body_fun,
-        (rng_key, state),
-        jnp.arange(N_STEPS)
+        body_fun, (rng_key, state), jnp.arange(N_STEPS)
     )
-    
+
     return final_state, final_info
 
+
 # Adapt the GWG sampler for the Metroplis-within-Gibbs (MWG) combined sampler (continuous and discrete parameters)
+
 
 def make_gwg_gibbs_fn(data):
     """
@@ -136,48 +137,42 @@ def make_gwg_gibbs_fn(data):
     The function will be used in the HMCGibbs sampler;
     It will depend on the current continuous parameters (gibbs_sites) and the fixed data
     """
+
     # Create a closure over the fixed data
     @jit  # Can JIT since data is fixed in closure
     def gwg_gibbs_fn(rng_key, gibbs_sites, hmc_sites):
         # Get current state of triu_star
-        cur_triu_star = jnp.astype(gibbs_sites['triu_star'], jnp.float32)
-        
+        cur_triu_star = jnp.astype(gibbs_sites["triu_star"], jnp.float32)
+
         # Get current values of continuous parameters
         cur_param = ParamTuple(
-            theta=hmc_sites['theta'],
-            gamma=hmc_sites['gamma'],
-            eta=hmc_sites['eta'],
-            rho=hmc_sites["rho"],       
-            sig_inv=hmc_sites["sig_inv"]
-        )
-    
-        # Create/update IPState 
-        cur_logdensity, cur_grad = triu_star_grad_fn(
-            cur_triu_star,
-            data,
-            cur_param
+            theta=hmc_sites["theta"],
+            gamma=hmc_sites["gamma"],
+            eta=hmc_sites["eta"],
+            rho=hmc_sites["rho"],
+            sig_inv=hmc_sites["sig_inv"],
         )
 
-        cur_scores = (-(2*cur_triu_star-1)*cur_grad)/2
-        
+        # Create/update IPState
+        cur_logdensity, cur_grad = triu_star_grad_fn(cur_triu_star, data, cur_param)
+
+        cur_scores = (-(2 * cur_triu_star - 1) * cur_grad) / 2
+
         state = IPState(
             positions=cur_triu_star,
             logdensity=cur_logdensity,
             logdensity_grad=cur_grad,
-            scores=cur_scores
+            scores=cur_scores,
         )
-        
+
         # Run GWG (N_STEPS times)
         new_state, _ = GWG_kernel(
-            rng_key=rng_key,
-            state=state,
-            data=data,
-            param=cur_param
-            )
-        
+            rng_key=rng_key, state=state, data=data, param=cur_param
+        )
+
         # Return only the new positions as required by HMCGibbs
         # Note that we need to convert the positions to int32 as it is latent binary variable
         # See NumPyro conventions for coding latent variables
-        return {'triu_star': jnp.astype(new_state.positions, jnp.int32)}
-    
+        return {"triu_star": jnp.astype(new_state.positions, jnp.int32)}
+
     return gwg_gibbs_fn
