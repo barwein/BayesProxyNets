@@ -39,6 +39,13 @@ class ParamTuple(NamedTuple):
     sig_inv: float
 
 
+class NewEstimands(NamedTuple):
+    Z_h: jnp.ndarray
+    Z_stoch: jnp.ndarray
+    estimand_h: jnp.ndarray
+    estimand_stoch: jnp.ndarray
+
+
 # --- Aux functions for network wrangle and stats ---
 
 # @jit
@@ -98,23 +105,24 @@ vmap_compute_exposures = vmap(compute_exposures, in_axes=(0, None))
 
 
 @jit
-def get_estimates_multi_triu(new_z, triu_star_samps, eta_samps):
+def get_estimates(z_diff, expos_diff, eta_samps):
     """
-    Get estimates of the outcome model given new treatment assignments
-
+    Get estimates of new interventions given posterior 'eta' samples
     Args:
-    new_z: New treatment assignments
-    triu_star_samps: Samples of upper triangular adjacency matrix
-    eta_samps: Samples of eta parameters
+    new_z: New treatment assignments jnp.ndarray with shape (2, n)
+    expos_diff: Difference in exposures jnp.ndarray with shape of (M, n) or (n,) (multi vs fixed nets)
+    eta_samps: Samples of posterior eta parameters with shape (M, 4) where M is number of posterior draws
 
     Returns:
     jnp.ndarray: Estimated expected outcomes; shape (M, N) where M is the number of samples
     """
-    exposures_samps = vmap_compute_exposures(triu_star_samps, new_z)
-    estimates = (
-        eta_samps[:, 1][:, None] * new_z[None,:] + eta_samps[:, 3][:, None] * exposures_samps
-    )
-    return estimates
+    if expos_diff.ndim == 2:
+        return eta_samps[:, 1][:, None] * z_diff[None, :] + eta_samps[:, 3][:, None] * expos_diff
+    elif expos_diff.ndim == 1:
+        return eta_samps[:, 1][:, None] * z_diff[None, :] + eta_samps[:, 3][:, None] * expos_diff[None, :]
+
+# estimates for stochastic interventions with multiple treatments and expos diff
+get_estimates_vmap = vmap(get_estimates, in_axes=(0, 0, None))
 
 
 def compute_error_stats(post_estimates, true_estimand):
@@ -141,7 +149,7 @@ def compute_error_stats(post_estimates, true_estimand):
     rmse_rel = jnp.round(jnp.sqrt(jnp.mean(jnp.square(units_rel_error))), 5)
     mae = jnp.round(jnp.mean(jnp.abs(units_error)), 5)
     mape = jnp.round(jnp.mean(jnp.abs(units_rel_error)), 5)
-    
+
     bias = jnp.round(mean_all - mean_estimand, 5)
     std = jnp.round(jnp.std(mean_of_units), 5)
 
@@ -171,4 +179,3 @@ def compute_error_stats(post_estimates, true_estimand):
         "covering": coverage,
         "mean_ind_cover": mean_cover_ind,
     }
-

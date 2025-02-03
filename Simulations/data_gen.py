@@ -124,3 +124,54 @@ def data_for_sim(fixed_data_dict, obs_triu_dict):
         true_exposures=fixed_data_dict["true_exposures"],
         Y=fixed_data_dict["Y"],
     )
+
+
+def dynamic_intervention(x, thresholds=(0.75, 1.5)):
+    # Dynamic intervention by 'x' values
+    Z_h1 = jnp.where((x > thresholds[0]) | (x < -thresholds[0]), 1, 0)
+    Z_h2 = jnp.where((x > thresholds[1]) | (x < -thresholds[1]), 1, 0)
+    return jnp.array([Z_h1, Z_h2], dtype=jnp.float32)
+
+def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
+    # Stochastic intervention by 'alpha' values
+    Z_stoch1 = rng.binomial(n=1, p=alphas[0], size=(n_approx, n))
+    Z_stoch2 = rng.binomial(n=1, p=alphas[1], size=(n_approx, n))
+    return jnp.array([Z_stoch1, Z_stoch2], dtype=jnp.float32)
+
+def get_true_estimands(n, z_new, triu_star, eta):
+    if z_new.ndim == 3: # stoch intervention
+        exposures_new1 = utils.compute_exposures(triu_star, z_new[0, :, :])
+        exposures_new2 = utils.compute_exposures(triu_star, z_new[1, :, :])
+        exposures_diff = exposures_new1 - exposures_new2
+        z_diff = z_new[0, :, :] - z_new[1, :, :]
+        n_stoch = z_new.shape[1]
+        results = np.zeros((n_stoch, n))
+        for i in range(n_stoch):
+            results[i, :] = eta[1]*z_diff[i, :] + eta[3]*exposures_diff[i, :]
+        return jnp.mean(results, axis=0).squeeze()
+    elif z_new.ndim == 2: # dynamic intervention
+        exposures_new1 = utils.compute_exposures(triu_star, z_new[0, :])
+        exposures_new2 = utils.compute_exposures(triu_star, z_new[1, :])
+        exposures_diff = exposures_new1 - exposures_new2
+        z_diff = z_new[0, :] - z_new[1, :]
+        results = eta[1]*z_diff + eta[3]*exposures_diff
+        return results
+    else:
+        raise ValueError("Invalid dimension for new interventions")
+
+
+def new_interventions_estimands(rng, n, x, triu_star, eta):
+    # new interventions
+    Z_h = dynamic_intervention(x)
+    Z_stoch = stochastic_intervention(rng, n)
+
+    # new estimands
+    dynamic_estimands = get_true_estimands(n, Z_h, triu_star, eta)
+    stoch_estimands = get_true_estimands(n, Z_stoch, triu_star, eta)
+
+    return utils.NewEstimands(
+        Z_h=Z_h,
+        Z_stoch=Z_stoch,
+        estimand_h=dynamic_estimands,
+        estimand_stoch=stoch_estimands,
+    )

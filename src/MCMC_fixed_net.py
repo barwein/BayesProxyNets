@@ -1,23 +1,9 @@
-# TODO: write aux function that will wrap the simulation study
-
-# TODO: def one_iter_fixed_network
-
-
-# TODO: def one_iter_mwg
-
-# TODO: make all functions work with repeated measures of triu_obs
-
-
 import jax.numpy as jnp
-import jax
-import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS
-
 import src.Models as models
 import src.utils as utils
 
 # --- MCMC for outcome model with fixed network (true or obs) ---
-
 
 class mcmc_fixed_net:
     def __init__(

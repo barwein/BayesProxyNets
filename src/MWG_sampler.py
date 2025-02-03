@@ -230,25 +230,16 @@ class MWG_sampler:
         self.init_params = init_params
         self.combined_model = combined_model
         self.continuous_sampler = continuous_sampler
+        self.n_warmup = n_warmup
+        self.n_samples = n_samples
+        self.num_chains = num_chains
+        self.progress_bar = progress_bar
 
+        #  init function for mwg
         self.gwg_fn = make_gwg_gibbs_fn(data)
         self.continuous_kernel = self.make_continuous_kernel()
-
-        self.mwg_kernel = HMCGibbs(
-            inner_kernel=self.continuous_kernel,
-            gibbs_fn=self.gwg_fn,
-            gibbs_sites=["triu_star"],
-        )
-
-        self.mwg_mcmc = MCMC(
-            self.mwg_kernel,
-            num_warmup=n_warmup,
-            num_samples=n_samples,
-            num_chains=num_chains,
-            progress_bar=progress_bar,
-        )
-
-        self.posterior_samples = None
+        #  get posterior samples
+        self.posterior_samples = self.get_samples()
 
     def make_continuous_kernel(self):
         if self.continuous_sampler == "NUTS":
@@ -258,11 +249,57 @@ class MWG_sampler:
         else:
             raise ValueError("continuous_sampler must be one of 'NUTS' or 'HMC'")
 
-    def run(self):
-        self.mwg_mcmc.run(self.rng_key, self.data, init_params=self.init_params)
-        self.posterior_samples = self.mwg_mcmc.get_samples()
+    def get_samples(self):
+        mwg_kernel = HMCGibbs(
+            inner_kernel=self.continuous_kernel,
+            gibbs_fn=self.gwg_fn,
+            gibbs_sites=["triu_star"],
+        )
 
-    def get_posterior_samples(self):
-        return self.posterior_samples
+        mwg_mcmc = MCMC(
+            mwg_kernel,
+            num_warmup=self.n_warmup,
+            num_samples=self.n_samples,
+            num_chains=self.num_chains,
+            progress_bar=self.progress_bar,
+        )
 
-    # TODO: add Predictive function that reutrn predictive distribution of Y (outcome)
+        mwg_mcmc.run(self.rng_key, self.data, init_params=self.init_params)
+        return mwg_mcmc.get_samples()
+
+    def new_intervention_error_stats(self, new_z, true_estimands):
+        if new_z.ndim == 3:  # stoch intervention
+            # compute exposures for new interventions
+            expos_1 = utils.vmap_compute_exposures(
+                self.posterior_samples["triu_star"], new_z[0, :, :]
+            )
+            expos_2 = utils.vmap_compute_exposures(
+                self.posterior_samples["triu_star"], new_z[1, :, :]
+            )
+            expos_diff = expos_1 - expos_2
+            # reshape expos_diff to have shape (n_stoch, M, N) where n_stoch is number of stoch treatments approx
+            diff_shapes = expos_diff.shape
+            expos_diff = expos_diff.reshape(
+                diff_shapes[1], diff_shapes[0], diff_shapes[2]
+            )
+            z_diff = new_z[0, :, :] - new_z[1, :, :]
+            estimates = utils.get_estimates_vmap(
+                z_diff, expos_diff, self.posterior_samples["eta"]
+            ).mean(axis=0)
+            # estimates should have shape (M,n) where M is number of posterior samples
+            return utils.compute_error_stats(estimates, true_estimands)
+        elif new_z.ndim == 2:  # dynamic intervention
+            expos_1 = utils.vmap_compute_exposures(
+                self.posterior_samples["triu_star"], new_z[0, :]
+            )
+            expos_2 = utils.vmap_compute_exposures(
+                self.posterior_samples["triu_star"], new_z[1, :]
+            )
+            expos_diff = expos_1 - expos_2
+            z_diff = new_z[0, :] - new_z[1, :]
+            estimates = utils.get_estimates(
+                z_diff, expos_diff, self.posterior_samples["eta"]
+            )
+            return utils.compute_error_stats(estimates, true_estimands)
+        else:
+            raise ValueError("Invalid dimension for new interventions")
