@@ -72,8 +72,9 @@ def degree_centrality(adj_matrix):
     degrees = jnp.sum(adj_matrix, axis=1)
 
     # Normalize by maximum possible degree (n-1)
-    n = adj_matrix.shape[0]
-    return degrees / (n - 1)
+    # n = adj_matrix.shape[0]
+    # return degrees / (n - 1)
+    return degrees / (N - 1)
 
 
 @jit
@@ -90,14 +91,14 @@ def weighted_exposures(Z, node_weights, adj_mat):
 def compute_exposures(triu_star, Z):
     mat_star = Triu_to_mat(triu_star)
     deg_cen = degree_centrality(mat_star)
-    return compute_exposures(Z, deg_cen, mat_star)
+    return weighted_exposures(Z, deg_cen, mat_star)
 
 
 vmap_compute_exposures = vmap(compute_exposures, in_axes=(0, None))
 
 
 @jit
-def get_estimates(new_z, triu_star_samps, eta_samps):
+def get_estimates_multi_triu(new_z, triu_star_samps, eta_samps):
     """
     Get estimates of the outcome model given new treatment assignments
 
@@ -111,9 +112,63 @@ def get_estimates(new_z, triu_star_samps, eta_samps):
     """
     exposures_samps = vmap_compute_exposures(triu_star_samps, new_z)
     estimates = (
-        eta_samps[:, 1][:, None] * new_z + eta_samps[:, 3][:, None] * exposures_samps
+        eta_samps[:, 1][:, None] * new_z[None,:] + eta_samps[:, 3][:, None] * exposures_samps
     )
     return estimates
 
 
-# TODO: def compute_error_stats(....):
+def compute_error_stats(post_estimates, true_estimand):
+    """
+    Compute error metrics for posterior estimates
+
+    Args:
+    post_estimates: Posterior estimates with shape (M, N) where M is the number of samples
+    true_estimand: True estimand with shape (N,)
+
+    """
+    # mean values
+    mean_estimand = jnp.mean(true_estimand)  # scalar
+    mean_of_units = jnp.mean(post_estimates, axis=1)  # shape (M,)
+    mean_all = jnp.mean(post_estimates)  # scalar
+    median_all = jnp.median(post_estimates)  # scalar
+
+    # raw errors
+    units_error = mean_of_units - mean_estimand
+    units_rel_error = (mean_of_units - mean_estimand) / mean_estimand
+
+    # error metrics
+    rmse = jnp.round(jnp.sqrt(jnp.mean(jnp.square(units_error))), 5)
+    rmse_rel = jnp.round(jnp.sqrt(jnp.mean(jnp.square(units_rel_error))), 5)
+    mae = jnp.round(jnp.mean(jnp.abs(units_error)), 5)
+    mape = jnp.round(jnp.mean(jnp.abs(units_rel_error)), 5)
+    
+    bias = jnp.round(mean_all - mean_estimand, 5)
+    std = jnp.round(jnp.std(mean_of_units), 5)
+
+    # coverage
+    q025 = jnp.quantile(mean_of_units, 0.025)
+    q975 = jnp.quantile(mean_of_units, 0.975)
+    coverage = jnp.mean((q025 <= true_estimand) & (true_estimand <= q975))
+
+    q025_ind = jnp.quantile(post_estimates, 0.025, axis=0)
+    q975_ind = jnp.quantile(post_estimates, 0.975, axis=0)
+    coverage_ind = (q025_ind <= true_estimand) & (true_estimand <= q975_ind)
+    mean_cover_ind = jnp.round(jnp.mean(coverage_ind), 5)
+
+    return {
+        "mean": jnp.round(mean_all, 5),
+        "median": jnp.round(median_all, 5),
+        "true": jnp.round(mean_estimand, 5),
+        "bias": bias,
+        "std": std,
+        "RMSE": rmse,
+        "RMSE_all": rmse_rel,
+        "MAE": mae,
+        "MAPE": mape,
+        "rel_RMSE": rmse_rel,
+        "q025": q025,
+        "q975": q975,
+        "covering": coverage,
+        "mean_ind_cover": mean_cover_ind,
+    }
+

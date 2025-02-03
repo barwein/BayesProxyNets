@@ -6,6 +6,23 @@ import numpyro
 import numpyro.distributions as dist
 import src.utils as utils
 
+### --- Probabilistic models --- ###
+
+# True network: p(A*|X,\theta) \propto expit(theta_0 + theta_1 * x2_or)
+# Proxy network: p(A_ij|A*_{ij},X,\gamma) \propto expit(gamma_0 * A*_{ij} + (1-A*_{ij}) * (gamma_1 + gamma_2 * x_diff))
+# TODO: Proxy network (rep): p(A^{rep}_{ij} | )
+# Outcome: p(Y|A*,X,Z,\eta,\rho,\sig_inv) \propto N(Y|mu; Sigma)
+# where mu = df @ eta, with df = [1, Z, X, exposures] and exposures = compute_exposures(A*, Z) (weighted sum of Z by deg cen)
+# and Sigma = [sig_inv(D - rho * A*]^{-1}, with D=diag(degrees(A*)) --> CAR model
+
+# priors are:
+# theta ~ N(0, 3)
+# gamma ~ N(0, 3)
+# eta ~ N(0, 3)
+# rho ~ Beta(2, 2)
+# sig_inv ~ Gamma(2, 2)
+
+
 ### Numpyro models ###
 
 
@@ -116,7 +133,7 @@ def combined_model(data):
     # Outcome model
     expos = utils.compute_exposures(triu_star, data.Z)
     df_nodes = jnp.transpose(
-        jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, data.X, expos])
+        jnp.stack([jnp.ones(data.Z.shape[0]), data.Z, data.X, expos])
     )
 
     # priors
@@ -159,7 +176,8 @@ def combined_model(data):
 
 @jit
 def car_logdensity(y, mu, sigma, rho, adj_matrix):
-    """Compute log density of CAR model
+    """
+    Compute log density of CAR model
 
     Args:
         y: array of shape (n,) - observed values
@@ -246,7 +264,7 @@ def cond_logpost_a_star(triu_star, data, param):
     return a_star_logpmf.sum() + a_obs_logpmf.sum() + y_logpdf
 
 
-# Gradient of the conditional log-posterior for A*
+# Gradient of A* conditional log-posterior
 triu_star_grad_fn = jit(value_and_grad(cond_logpost_a_star))
 
 
