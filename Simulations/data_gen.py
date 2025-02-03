@@ -136,8 +136,8 @@ def dynamic_intervention(x, thresholds=(0.75, 1.5)):
     return jnp.array([Z_h1, Z_h2], dtype=jnp.float32)
 
 
-# def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
-def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=50):
+def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
+    # def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=50):
     # Stochastic intervention by 'alpha' values
     Z_stoch1 = rng.binomial(n=1, p=alphas[0], size=(n_approx, n))
     Z_stoch2 = rng.binomial(n=1, p=alphas[1], size=(n_approx, n))
