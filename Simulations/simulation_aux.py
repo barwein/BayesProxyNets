@@ -139,4 +139,4 @@ def one_simulation_iter(
     # save results and write to csv
     results_df = pd.DataFrame(results)
     file_name = f"{file_path}/results_{idx}.csv"
-    results_df.to_csv(file_name, index=False)
+    results_df.to_csv(file_name, index=False, mode="a")
