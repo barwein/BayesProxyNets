@@ -156,7 +156,7 @@ def compute_error_stats(post_estimates, true_estimand):
     # coverage
     q025 = jnp.quantile(mean_of_units, 0.025)
     q975 = jnp.quantile(mean_of_units, 0.975)
-    coverage = jnp.mean((q025 <= true_estimand) & (true_estimand <= q975))
+    coverage = (q025 <= mean_estimand) & (mean_estimand <= q975)
 
     q025_ind = jnp.quantile(post_estimates, 0.025, axis=0)
     q975_ind = jnp.quantile(post_estimates, 0.975, axis=0)
@@ -170,10 +170,9 @@ def compute_error_stats(post_estimates, true_estimand):
         "bias": bias,
         "std": std,
         "RMSE": rmse,
-        "RMSE_all": rmse_rel,
+        "RMSE_rel": rmse_rel,
         "MAE": mae,
         "MAPE": mape,
-        "rel_RMSE": rmse_rel,
         "q025": q025,
         "q975": q975,
         "covering": coverage,

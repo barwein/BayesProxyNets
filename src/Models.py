@@ -133,7 +133,7 @@ def combined_model(data):
     # Outcome model
     expos = utils.compute_exposures(triu_star, data.Z)
     df_nodes = jnp.transpose(
-        jnp.stack([jnp.ones(data.Z.shape[0]), data.Z, data.X, expos])
+        jnp.stack([jnp.ones(data.Z.shape[0]), data.Z, data.x, expos])
     )
 
     # priors

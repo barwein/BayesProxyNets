@@ -5,9 +5,17 @@ import src.utils as utils
 
 # --- MCMC for outcome model with fixed network (true or obs) ---
 
+
 class mcmc_fixed_net:
     def __init__(
-        self, rng_key, data, net_type, n_warmup=2000, n_samples=2500, num_chains=4
+        self,
+        rng_key,
+        data,
+        net_type,
+        n_warmup=2000,
+        n_samples=2500,
+        num_chains=4,
+        progress_bar=False,
     ):
         self.rng_key = rng_key
         self.data = data
@@ -15,6 +23,7 @@ class mcmc_fixed_net:
         self.n_warmup = n_warmup
         self.n_samples = n_samples
         self.num_chains = num_chains
+        self.progress_bar = progress_bar
 
         self.df_nodes, self.adj_mat, self.triu = self.df_nodes_and_adj_mat()
         self.samples = self.get_samples()
@@ -57,7 +66,7 @@ class mcmc_fixed_net:
             num_warmup=self.n_warmup,
             num_samples=self.n_samples,
             num_chains=self.num_chains,
-            progress_bar=False,
+            progress_bar=self.progress_bar,
         )
         mcmc_.run(self.rng_key, self.df_nodes, self.adj_mat, self.data.Y)
         return mcmc_.get_samples()

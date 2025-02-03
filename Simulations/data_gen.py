@@ -132,14 +132,17 @@ def dynamic_intervention(x, thresholds=(0.75, 1.5)):
     Z_h2 = jnp.where((x > thresholds[1]) | (x < -thresholds[1]), 1, 0)
     return jnp.array([Z_h1, Z_h2], dtype=jnp.float32)
 
-def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
+
+# def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
+def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=50):
     # Stochastic intervention by 'alpha' values
     Z_stoch1 = rng.binomial(n=1, p=alphas[0], size=(n_approx, n))
     Z_stoch2 = rng.binomial(n=1, p=alphas[1], size=(n_approx, n))
     return jnp.array([Z_stoch1, Z_stoch2], dtype=jnp.float32)
 
+
 def get_true_estimands(n, z_new, triu_star, eta):
-    if z_new.ndim == 3: # stoch intervention
+    if z_new.ndim == 3:  # stoch intervention
         exposures_new1 = utils.compute_exposures(triu_star, z_new[0, :, :])
         exposures_new2 = utils.compute_exposures(triu_star, z_new[1, :, :])
         exposures_diff = exposures_new1 - exposures_new2
@@ -147,14 +150,14 @@ def get_true_estimands(n, z_new, triu_star, eta):
         n_stoch = z_new.shape[1]
         results = np.zeros((n_stoch, n))
         for i in range(n_stoch):
-            results[i, :] = eta[1]*z_diff[i, :] + eta[3]*exposures_diff[i, :]
+            results[i, :] = eta[1] * z_diff[i, :] + eta[3] * exposures_diff[i, :]
         return jnp.mean(results, axis=0).squeeze()
-    elif z_new.ndim == 2: # dynamic intervention
+    elif z_new.ndim == 2:  # dynamic intervention
         exposures_new1 = utils.compute_exposures(triu_star, z_new[0, :])
         exposures_new2 = utils.compute_exposures(triu_star, z_new[1, :])
         exposures_diff = exposures_new1 - exposures_new2
         z_diff = z_new[0, :] - z_new[1, :]
-        results = eta[1]*z_diff + eta[3]*exposures_diff
+        results = eta[1] * z_diff + eta[3] * exposures_diff
         return results
     else:
         raise ValueError("Invalid dimension for new interventions")

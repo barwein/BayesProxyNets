@@ -16,12 +16,6 @@ import src.Models as models
 import src.utils as utils
 from src.GWG import make_gwg_gibbs_fn
 
-import os
-
-# --- Set cores and seed ---
-N_CORES = 4
-os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
-
 
 # Init values from the cut-posterior
 
@@ -69,7 +63,9 @@ class MWG_init:
         n_nets_samples=2000,
         n_warmup_outcome=2000,
         n_samples_outcome=2500,
+        num_chains=4,
         learning_rate=0.01,
+        progress_bar=False,
     ):
         self.rng_key = rng_key
         self.data = data
@@ -80,7 +76,9 @@ class MWG_init:
         self.n_nets_samples = n_nets_samples
         self.n_warmup_outcome = n_warmup_outcome
         self.n_samples_outcome = n_samples_outcome
+        self.num_chains = num_chains
         self.learning_rate = learning_rate
+        self.progress_bar = progress_bar
 
         # initial parameters
         self.theta = None
@@ -110,7 +108,9 @@ class MWG_init:
         )
 
         # Run SVI
-        svi_results = svi.run(runkey, self.n_iter_networks, self.data)
+        svi_results = svi.run(
+            runkey, self.n_iter_networks, self.data, progress_bar=self.progress_bar
+        )
 
         # Get MAP of theta and gamma
         map_params = guide.median(svi_results.params)
@@ -120,10 +120,15 @@ class MWG_init:
 
         # get A* posterior probs
         preds = Predictive(
-            self.cut_posterior_net_model, guide=guide, params=svi_results.params
+            self.cut_posterior_net_model,
+            guide=guide,
+            params=svi_results.params,
+            num_samples=1,
         )
         predictions = preds(sampkey, self.data)
         self.triu_star_probs = predictions["triu_star_probs"][0]
+
+        print("triu star probs shape:", self.triu_star_probs.shape)
 
     def init_triu_star_and_exposures(self):
         """
@@ -133,15 +138,33 @@ class MWG_init:
             self.rng_key, self.triu_star_probs, self.n_nets_samples
         )
 
+        print("triu star samps shape:", triu_star_samps.shape)
+
         # get exposures --> init is the posterior mean exposures
         exposures_samps = utils.vmap_compute_exposures(triu_star_samps, self.data.Z)
+
+        print("exposures samps shape:", exposures_samps.shape)
+
         self.exposures = exposures_samps.mean(axis=0)
+
+        print("init mwg exposure mean", self.exposures.mean())
 
         # get triu_star --> init is the posterior triu_star with largest log-posterior density
         triu_star_log_post = self.triu_star_log_posterior_fn(
             triu_star_samps, self.theta, self.gamma, self.data
         )
         best_idx = jnp.argmax(triu_star_log_post)
+
+        worst_idx = jnp.argmin(triu_star_log_post)
+
+        print(
+            "best logposterior:",
+            triu_star_log_post[best_idx],
+            "\n",
+            "worst logposterior:",
+            triu_star_log_post[worst_idx],
+        )
+
         self.triu_star = triu_star_samps[best_idx]
 
     def init_outcome_model(self):
@@ -165,8 +188,8 @@ class MWG_init:
             kernel_plugin,
             num_warmup=self.n_warmup_outcome,
             num_samples=self.n_samples_outcome,
-            num_chains=4,
-            progress_bar=False,
+            num_chains=self.num_chains,
+            progress_bar=self.progress_bar,
         )
         mcmc_plugin.run(
             self.rng_key, df_nodes, utils.Triu_to_mat(self.triu_star), self.data.Y
@@ -175,11 +198,13 @@ class MWG_init:
         # Get posterior samples
         samples = mcmc_plugin.get_samples()
 
+        print("mwg init sample eta shape:", samples["eta"].shape)
+
         self.eta = samples["eta"].mean(axis=0)
         self.rho = samples["rho"].mean()
         self.sig_inv = samples["sig_inv"].mean()
 
-    def get_init_values(self, num_chains=4):
+    def get_init_values(self):
         """
         Get initial values for the MWG sampler
 
@@ -203,8 +228,29 @@ class MWG_init:
             "rho": self.rho,
             "sig_inv": self.sig_inv,
         }
-        if num_chains > 1:
-            return replicate_params(init_params, num_chains)
+
+        print(
+            "MWG init params:",
+            "\n",
+            "theta:",
+            self.theta,
+            "\n",
+            "gamma:",
+            self.gamma,
+            "\n",
+            #   "triu_star:", self.triu_star, "\n",
+            "eta:",
+            self.eta,
+            "\n",
+            "rho:",
+            self.rho,
+            "\n",
+            "sig_inv:",
+            self.sig_inv,
+        )
+
+        if self.num_chains > 1:
+            return replicate_params(init_params, self.num_chains)
         else:
             return init_params
 
@@ -223,7 +269,7 @@ class MWG_sampler:
         n_samples=2500,
         num_chains=4,
         continuous_sampler="NUTS",  # one of "NUTS" or "HMC"
-        progress_bar=True,
+        progress_bar=False,
     ):
         self.rng_key = rng_key
         self.data = data
