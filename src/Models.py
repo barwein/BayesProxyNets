@@ -39,10 +39,10 @@ def network_only_models_marginalized(data):
     """
     # priors
     with numpyro.plate("theta_plate", 2):
-        theta = numpyro.sample("theta", dist.Normal(0, 3))
+        theta = numpyro.sample("theta", dist.Normal(0, 5))
 
     with numpyro.plate("gamma_plate", 3):
-        gamma = numpyro.sample("gamma", dist.Normal(0, 3))
+        gamma = numpyro.sample("gamma", dist.Normal(0, 5))
 
     # Calculate logits for A*
     star_logits = theta[0] + theta[1] * data.x2_or
@@ -84,7 +84,7 @@ def plugin_outcome_model(df_nodes, adj_mat, Y):
 
     # priors
     with numpyro.plate("eta_plate", df_nodes.shape[1]):
-        eta = numpyro.sample("eta", dist.Normal(0, 3))
+        eta = numpyro.sample("eta", dist.Normal(0, 5))
 
     rho = numpyro.sample("rho", dist.Beta(2, 2))
 
@@ -123,7 +123,7 @@ def combined_model(data):
     # True network model
     # priors
     with numpyro.plate("theta_plate", 2):
-        theta = numpyro.sample("theta", dist.Normal(0, 3))
+        theta = numpyro.sample("theta", dist.Normal(0, 5))
 
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
@@ -138,7 +138,7 @@ def combined_model(data):
 
     # priors
     with numpyro.plate("eta_plate", df_nodes.shape[1]):
-        eta = numpyro.sample("eta", dist.Normal(0, 3))
+        eta = numpyro.sample("eta", dist.Normal(0, 5))
 
     rho = numpyro.sample("rho", dist.Beta(2, 2))
 
@@ -161,7 +161,7 @@ def combined_model(data):
     # Proxy nets model
     # priors
     with numpyro.plate("gamma_plate", 3):
-        gamma = numpyro.sample("gamma", dist.Normal(0, 3))
+        gamma = numpyro.sample("gamma", dist.Normal(0, 5))
 
     # likelihood
     obs_logits = triu_star * gamma[0] + (1 - triu_star) * (

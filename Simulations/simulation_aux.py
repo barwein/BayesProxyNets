@@ -102,8 +102,8 @@ def one_simulation_iter(
         rng_key=rng_key,
         data=data,
         init_params=mwg_init,
-        n_warmup=20,
-        n_samples=20,
+        n_warmup=500,
+        n_samples=500,
         num_chains=2,
         progress_bar=True,
     )

@@ -46,15 +46,18 @@ def CAR_cov(triu_vals, sig_inv, rho, n):
 
 def generate_outcomes_n_exposures(rng, n, x, z, triu_star, eta, rho, sig_inv):
     # Compute exposures
-    expos = utils.compute_exposures(triu_star, x)
+    expos = utils.compute_exposures(triu_star, z)
 
     # Expectation vector
     df_nodes = jnp.transpose(jnp.stack([jnp.ones(n), z, x, expos]))
     mean_y = df_nodes @ eta
 
+    y_cov = CAR_cov(triu_star, sig_inv, rho, n)
+
     # Generate observed outcomes
     y = jnp.array(
-        rng.multivariate_normal(mean_y, CAR_cov(triu_star, sig_inv, rho, n)),
+        # rng.multivariate_normal(mean_y, CAR_cov(triu_star, sig_inv, rho, n)),
+        rng.multivariate_normal(mean_y, y_cov),
         dtype=jnp.float32,
     )
 

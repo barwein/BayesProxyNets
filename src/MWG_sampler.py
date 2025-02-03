@@ -7,6 +7,7 @@
 import jax
 import jax.numpy as jnp
 from jax import random, vmap
+import numpy as np
 from numpyro.infer import SVI, TraceGraph_ELBO, MCMC, NUTS, HMC, Predictive
 from numpyro.infer.hmc_gibbs import HMCGibbs
 from numpyro.optim import ClippedAdam
@@ -15,6 +16,8 @@ from numpyro.infer.autoguide import AutoDelta
 import src.Models as models
 import src.utils as utils
 from src.GWG import make_gwg_gibbs_fn
+
+from tqdm import tqdm
 
 
 # Init values from the cut-posterior
@@ -33,7 +36,7 @@ def sample_posterior_triu_star(key, probs, num_samples=2000):
     """
     # Split key for each sample
     keys = random.split(key, num_samples)
-
+ 
     # Define single sample function
     def sample_single(key):
         return jnp.astype(random.bernoulli(key, probs), jnp.int32)
@@ -59,12 +62,12 @@ class MWG_init:
         cut_posterior_net_model=models.network_only_models_marginalized,
         cut_posterior_outcome_model=models.plugin_outcome_model,
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
-        n_iter_networks=10000,
-        n_nets_samples=2000,
+        n_iter_networks=5000,
+        n_nets_samples=3000,
         n_warmup_outcome=2000,
         n_samples_outcome=2500,
         num_chains=4,
-        learning_rate=0.01,
+        learning_rate=0.05,
         progress_bar=False,
     ):
         self.rng_key = rng_key
@@ -128,8 +131,6 @@ class MWG_init:
         predictions = preds(sampkey, self.data)
         self.triu_star_probs = predictions["triu_star_probs"][0]
 
-        print("triu star probs shape:", self.triu_star_probs.shape)
-
     def init_triu_star_and_exposures(self):
         """
         Initialize triu_star and exposures using theta and gamma samples
@@ -138,14 +139,11 @@ class MWG_init:
             self.rng_key, self.triu_star_probs, self.n_nets_samples
         )
 
-        print("triu star samps shape:", triu_star_samps.shape)
-
         # get exposures --> init is the posterior mean exposures
         exposures_samps = utils.vmap_compute_exposures(triu_star_samps, self.data.Z)
 
-        print("exposures samps shape:", exposures_samps.shape)
-
         self.exposures = exposures_samps.mean(axis=0)
+        # self.exposures = jnp.median(exposures_samps, axis=0)
 
         print("init mwg exposure mean", self.exposures.mean())
 
@@ -197,8 +195,6 @@ class MWG_init:
 
         # Get posterior samples
         samples = mcmc_plugin.get_samples()
-
-        print("mwg init sample eta shape:", samples["eta"].shape)
 
         self.eta = samples["eta"].mean(axis=0)
         self.rho = samples["rho"].mean()
@@ -311,6 +307,7 @@ class MWG_sampler:
         )
 
         mwg_mcmc.run(self.rng_key, self.data, init_params=self.init_params)
+
         return mwg_mcmc.get_samples()
 
     def new_intervention_error_stats(self, new_z, true_estimands):

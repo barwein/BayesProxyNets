@@ -20,9 +20,9 @@ N = 500
 TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2.5, 1])
-GAMMA = jnp.array([logit(0.85), logit(0.1), 1])
+GAMMA = jnp.array([logit(0.90), logit(0.1), 1])
 
-print("GAMMA", GAMMA)   
+print("GAMMA", GAMMA)
 
 ETA = jnp.array([-1, 3, -0.25, 2])
 SIG_INV = 2 / 3
@@ -36,7 +36,9 @@ param = utils.ParamTuple(theta=THETA, gamma=GAMMA, eta=ETA, rho=RHO, sig_inv=SIG
 FILEPATH = "Simulations/results"
 
 rng_key = random.PRNGKey(0)
-rng = np.random.default_rng(15)
+rng_key = random.split(rng_key)[0]
+
+rng = np.random.default_rng(7)
 
 # gen data
 
@@ -53,7 +55,7 @@ new_interventions = dg.new_interventions_estimands(
     rng, N, fixed_data["x"], fixed_data["triu_star"], ETA
 )
 
-# run one simulation
+# # run one simulation
 
 one_simulation_iter(
     idx=1,

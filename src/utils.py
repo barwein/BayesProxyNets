@@ -117,9 +117,16 @@ def get_estimates(z_diff, expos_diff, eta_samps):
     jnp.ndarray: Estimated expected outcomes; shape (M, N) where M is the number of samples
     """
     if expos_diff.ndim == 2:
-        return eta_samps[:, 1][:, None] * z_diff[None, :] + eta_samps[:, 3][:, None] * expos_diff
+        return (
+            eta_samps[:, 1][:, None] * z_diff[None, :]
+            + eta_samps[:, 3][:, None] * expos_diff
+        )
     elif expos_diff.ndim == 1:
-        return eta_samps[:, 1][:, None] * z_diff[None, :] + eta_samps[:, 3][:, None] * expos_diff[None, :]
+        return (
+            eta_samps[:, 1][:, None] * z_diff[None, :]
+            + eta_samps[:, 3][:, None] * expos_diff[None, :]
+        )
+
 
 # estimates for stochastic interventions with multiple treatments and expos diff
 get_estimates_vmap = vmap(get_estimates, in_axes=(0, 0, None))
