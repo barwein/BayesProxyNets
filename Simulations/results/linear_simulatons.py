@@ -1,3 +1,7 @@
+###
+# This script runs the simulations for the linear model with CAR cov
+###
+
 import jax.numpy as jnp
 from jax import random
 from jax.scipy.special import logit
@@ -5,7 +9,6 @@ import numpy as np
 
 from Simulations.simulation_aux import one_simulation_iter
 import Simulations.data_gen as dg
-import src.utils as utils
 
 import os
 
@@ -17,51 +20,76 @@ os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 # --- Global variables ---
 
 N = 500
+# N = 1000
 TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2.5, 1])
-GAMMA = jnp.array([logit(0.90), logit(0.1), 1])
-
-print("GAMMA", GAMMA)
+# GAMMA_FIX = jnp.array([logit(0.9), logit(0.1), 1])
+GAMMA_FIX = jnp.array([logit(0.85), logit(0.15)])
+# GAMMA_X_NOISES = jnp.arange(0.2, 2.2, 0.2)
+GAMMA_X_NOISES = jnp.arange(0, 1.1, 0.1)
 
 ETA = jnp.array([-1, 3, -0.25, 2])
 SIG_INV = 2 / 3
 RHO = 0.5
 PZ = 0.5
 
-param = utils.ParamTuple(theta=THETA, gamma=GAMMA, eta=ETA, rho=RHO, sig_inv=SIG_INV)
-
-# test one iter
-
+# param = utils.ParamTuple(theta=THETA, gamma=GAMMA, eta=ETA, rho=RHO, sig_inv=SIG_INV)
+PARAM = {
+    "theta": THETA,
+    "eta": ETA,
+    "rho": RHO,
+    "sig_inv": SIG_INV,
+}
 FILEPATH = "Simulations/results"
 
-rng_key = random.PRNGKey(0)
-rng_key = random.split(rng_key)[0]
+N_ITER = 1
+N_GAMMAS = GAMMA_X_NOISES.shape[0]
 
-rng = np.random.default_rng(7)
+# TODO: check why MWG_init with svi in network module is not stable and not working that well!
 
-# gen data
+for i in range(N_ITER):
+    # Set keys
+    rng_key = random.PRNGKey(i)
+    rng_key = random.split(rng_key)[0]
+    rng = np.random.default_rng(i)
 
-fixed_data = dg.generate_fixed_data(rng, N, param, PZ)
-proxy_nets = dg.generate_proxy_networks(
-    rng, TRIU_DIM, fixed_data["triu_star"], GAMMA, fixed_data["x_diff"], fixed_data["Z"]
-)
+    # gen data (not depedent on gamma)
+    fixed_data = dg.generate_fixed_data(rng, N, PARAM, PZ)
 
-data_sim = dg.data_for_sim(fixed_data, proxy_nets)
+    # gen new interventions
+    new_interventions = dg.new_interventions_estimands(
+        rng, N, fixed_data["x"], fixed_data["triu_star"], ETA
+    )
 
-print("true exposure mean", data_sim.true_exposures.mean())
+    for j in range(N_GAMMAS):
+        print(f"### iteration {i}, gamma noise {j} ###")
 
-new_interventions = dg.new_interventions_estimands(
-    rng, N, fixed_data["x"], fixed_data["triu_star"], ETA
-)
+        # update gamma
+        # param["gamma"] = jnp.append(GAMMA_FIX, GAMMA_X_NOISES[i])
+        cur_gamma = jnp.append(GAMMA_FIX, GAMMA_X_NOISES[j])
 
-# # run one simulation
+        # sample proxy networks with current gamma
+        proxy_nets = dg.generate_proxy_networks(
+            rng,
+            TRIU_DIM,
+            fixed_data["triu_star"],
+            cur_gamma,
+            fixed_data["x_diff"],
+            fixed_data["Z"],
+        )
 
-one_simulation_iter(
-    idx=1,
-    rng_key=random.split(rng_key)[0],
-    data=data_sim,
-    new_interventions=new_interventions,
-    cur_gamma_noise=GAMMA[2],
-    file_path=FILEPATH,
-)
+        data_sim = dg.data_for_sim(fixed_data, proxy_nets)
+
+        # run one iteration
+        rng_key = random.split(rng_key)[0]
+        idx = i * N_ITER + j * N_GAMMAS
+
+        one_simulation_iter(
+            idx=idx,
+            rng_key=rng_key,
+            data=data_sim,
+            new_interventions=new_interventions,
+            cur_gamma_noise=GAMMA_X_NOISES[j],
+            file_path=FILEPATH,
+        )

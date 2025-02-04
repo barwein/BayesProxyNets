@@ -102,8 +102,10 @@ def one_simulation_iter(
         rng_key=rng_key,
         data=data,
         init_params=mwg_init,
-        n_warmup=2000,
-        n_samples=2500,
+        # n_warmup=2000,
+        n_warmup=10,
+        # n_samples=2500,
+        n_samples=10,
         num_chains=2,
         progress_bar=True,
     )
@@ -138,5 +140,5 @@ def one_simulation_iter(
 
     # save results and write to csv
     results_df = pd.DataFrame(results)
-    file_name = f"{file_path}/results_{idx}.csv"
+    file_name = f"{file_path}/linear_car_results_{idx}.csv"
     results_df.to_csv(file_name, index=False, mode="a")

@@ -8,10 +8,19 @@ import jax
 import jax.numpy as jnp
 from jax import random, vmap
 import numpy as np
-from numpyro.infer import SVI, TraceGraph_ELBO, MCMC, NUTS, HMC, Predictive
+import numpyro
+from numpyro.infer import (
+    SVI,
+    TraceGraph_ELBO,
+    TraceEnum_ELBO,
+    MCMC,
+    NUTS,
+    HMC,
+    Predictive,
+)
 from numpyro.infer.hmc_gibbs import HMCGibbs
 from numpyro.optim import ClippedAdam
-from numpyro.infer.autoguide import AutoDelta
+from numpyro.infer.autoguide import AutoDelta, AutoNormal
 
 import src.Models as models
 import src.utils as utils
@@ -36,7 +45,7 @@ def sample_posterior_triu_star(key, probs, num_samples=2000):
     """
     # Split key for each sample
     keys = random.split(key, num_samples)
- 
+
     # Define single sample function
     def sample_single(key):
         return jnp.astype(random.bernoulli(key, probs), jnp.int32)
@@ -101,13 +110,15 @@ class MWG_init:
 
         # Define guide
         guide = AutoDelta(self.cut_posterior_net_model)
+        # guide = AutoNormal(self.cut_posterior_net_model)
 
         # Define SVI
         svi = SVI(
             model=self.cut_posterior_net_model,
             guide=guide,
             optim=ClippedAdam(self.learning_rate),
-            loss=TraceGraph_ELBO(),
+            # loss=TraceGraph_ELBO(),
+            loss=TraceEnum_ELBO(),
         )
 
         # Run SVI
@@ -121,15 +132,38 @@ class MWG_init:
         self.theta = map_params["theta"]
         self.gamma = map_params["gamma"]
 
+        # # Sample from posterior and compute means
+        # posterior_samples = guide.sample_posterior(
+        #     sampkey,
+        #     svi_results.params,
+        #     sample_shape=(self.n_nets_samples,),  # number of samples to draw
+        # )
+
+        # # Get mean of posterior samples
+        # self.theta = jnp.mean(posterior_samples["theta"], axis=0)
+        # self.gamma = jnp.mean(posterior_samples["gamma"], axis=0)
+
+        print("svi_results.params", svi_results.params, "\n", "map_params", map_params)
         # get A* posterior probs
         preds = Predictive(
             self.cut_posterior_net_model,
             guide=guide,
             params=svi_results.params,
+            # params=map_params,
             num_samples=1,
         )
         predictions = preds(sampkey, self.data)
         self.triu_star_probs = predictions["triu_star_probs"][0]
+        # with numpyro.handlers.substitute(data=map_params):
+        #     predictions = self.cut_posterior_net_model(self.data)
+        # self.triu_star_probs = predictions["triu_star_probs"]
+
+        print(
+            "triustar probs mean",
+            self.triu_star_probs.mean(),
+            "trriu_star_probs shape",
+            self.triu_star_probs.shape,
+        )
 
     def init_triu_star_and_exposures(self):
         """

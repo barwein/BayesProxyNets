@@ -78,11 +78,12 @@ def generate_fixed_data(rng, n, param, pz=0.5):
 
     # triu_star (A*)
     triu_dim = n * (n - 1) // 2
-    triu_star = generate_triu_star(rng, triu_dim, x2_or, param.theta)
+    # triu_star = generate_triu_star(rng, triu_dim, x2_or, param.theta)
+    triu_star = generate_triu_star(rng, triu_dim, x2_or, param["theta"])
 
     # outcomes + exposures
     Y, true_exposures = generate_outcomes_n_exposures(
-        rng, n, x, Z, triu_star, param.eta, param.rho, param.sig_inv
+        rng, n, x, Z, triu_star, param["eta"], param["rho"], param["rho"]
     )
 
     return {
@@ -136,8 +137,8 @@ def dynamic_intervention(x, thresholds=(0.75, 1.5)):
     return jnp.array([Z_h1, Z_h2], dtype=jnp.float32)
 
 
-def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
-    # def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=50):
+# def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
+def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=50):
     # Stochastic intervention by 'alpha' values
     Z_stoch1 = rng.binomial(n=1, p=alphas[0], size=(n_approx, n))
     Z_stoch2 = rng.binomial(n=1, p=alphas[1], size=(n_approx, n))
