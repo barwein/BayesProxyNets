@@ -4,7 +4,7 @@
 
 import jax.numpy as jnp
 from jax import random
-from jax.scipy.special import logit
+from jax.scipy.special import logit 
 import numpy as np
 
 from Simulations.simulation_aux import one_simulation_iter
@@ -25,9 +25,9 @@ TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2.5, 1])
 # GAMMA_FIX = jnp.array([logit(0.9), logit(0.1), 1])
-GAMMA_FIX = jnp.array([logit(0.85), logit(0.15)])
-# GAMMA_X_NOISES = jnp.arange(0.2, 2.2, 0.2)
-GAMMA_X_NOISES = jnp.arange(0, 1.1, 0.1)
+GAMMA_FIX = jnp.array([logit(0.9), logit(0.1)])
+GAMMA_X_NOISES = jnp.arange(0.2, 2.2, 0.2)
+# GAMMA_X_NOISES = jnp.arange(0, 1.1, 0.1)
 
 ETA = jnp.array([-1, 3, -0.25, 2])
 SIG_INV = 2 / 3
@@ -51,11 +51,12 @@ N_GAMMAS = GAMMA_X_NOISES.shape[0]
 for i in range(N_ITER):
     # Set keys
     rng_key = random.PRNGKey(i)
-    rng_key = random.split(rng_key)[0]
     rng = np.random.default_rng(i)
 
     # gen data (not depedent on gamma)
     fixed_data = dg.generate_fixed_data(rng, N, PARAM, PZ)
+
+    print(f"mean true exposures: {jnp.mean(fixed_data['true_exposures'])}")
 
     # gen new interventions
     new_interventions = dg.new_interventions_estimands(
@@ -68,6 +69,7 @@ for i in range(N_ITER):
         # update gamma
         # param["gamma"] = jnp.append(GAMMA_FIX, GAMMA_X_NOISES[i])
         cur_gamma = jnp.append(GAMMA_FIX, GAMMA_X_NOISES[j])
+        print(f"cur_gamma: {cur_gamma}")
 
         # sample proxy networks with current gamma
         proxy_nets = dg.generate_proxy_networks(

@@ -11,8 +11,8 @@ import numpy as np
 import numpyro
 from numpyro.infer import (
     SVI,
-    TraceGraph_ELBO,
-    TraceEnum_ELBO,
+    Trace_ELBO,
+    # TraceEnum_ELBO,
     MCMC,
     NUTS,
     HMC,
@@ -71,12 +71,12 @@ class MWG_init:
         cut_posterior_net_model=models.network_only_models_marginalized,
         cut_posterior_outcome_model=models.plugin_outcome_model,
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
-        n_iter_networks=5000,
+        n_iter_networks=15000,
         n_nets_samples=3000,
         n_warmup_outcome=2000,
         n_samples_outcome=2500,
         num_chains=4,
-        learning_rate=0.05,
+        learning_rate=0.001,
         progress_bar=False,
     ):
         self.rng_key = rng_key
@@ -117,8 +117,7 @@ class MWG_init:
             model=self.cut_posterior_net_model,
             guide=guide,
             optim=ClippedAdam(self.learning_rate),
-            # loss=TraceGraph_ELBO(),
-            loss=TraceEnum_ELBO(),
+            loss=Trace_ELBO(),
         )
 
         # Run SVI
@@ -143,7 +142,7 @@ class MWG_init:
         # self.theta = jnp.mean(posterior_samples["theta"], axis=0)
         # self.gamma = jnp.mean(posterior_samples["gamma"], axis=0)
 
-        print("svi_results.params", svi_results.params, "\n", "map_params", map_params)
+        print("map_params", map_params)
         # get A* posterior probs
         preds = Predictive(
             self.cut_posterior_net_model,

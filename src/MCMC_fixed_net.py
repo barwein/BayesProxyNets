@@ -70,8 +70,6 @@ class mcmc_fixed_net:
         )
         mcmc_.run(self.rng_key, self.df_nodes, self.adj_mat, self.data.Y)
 
-        mcmc_.print_summary()
-
         return mcmc_.get_samples()
 
     def new_intervention_error_stats(self, new_z, true_estimands):

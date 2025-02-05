@@ -17,7 +17,7 @@ def one_simulation_iter(
         n_warmup=2000,
         n_samples=2500,
         num_chains=2,
-        progress_bar=True,
+        progress_bar=False,
     )
 
     true_net_dynamic_stats = mcmc_true.new_intervention_error_stats(
@@ -58,7 +58,7 @@ def one_simulation_iter(
         n_warmup=2000,
         n_samples=2500,
         num_chains=2,
-        progress_bar=True,
+        progress_bar=False,
     )
 
     obs_net_dynamic_stats = mcmc_obs.new_intervention_error_stats(
