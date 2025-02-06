@@ -93,7 +93,12 @@ def one_simulation_iter(
     print("@@@ Getting MWG init params @@@")
 
     mwg_init = MWG_init(
-        rng_key=rng_key, data=data, num_chains_networks=2, progress_bar=True
+        rng_key=rng_key,
+        data=data,
+        n_warmup_networks=1000,
+        n_samples_networks=1000,
+        num_chains_networks=2,
+        progress_bar=True,
     ).get_init_values()
 
     print("@@@ Sampling with MWG @@@")

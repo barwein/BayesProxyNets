@@ -6,7 +6,6 @@ import jax
 import numpyro
 import numpyro.distributions as dist
 import src.utils as utils
-from numpyro.distributions.util import clamp_probs
 
 
 ### --- Probabilistic models --- ###
@@ -47,15 +46,11 @@ def network_only_models_marginalized(data):
     gamma = numpyro.sample("gamma", dist.Normal(0, 5).expand([3]))
 
     # P(A*_ij=1)
-    star_logits = theta[0] + theta[1] * data.x2_or
-    # star_logits = jnp.clip(star_logits, -20.0, 20.0)  # for numerical stability
-    star_probs = jax.nn.sigmoid(star_logits)
+    star_probs = jax.nn.sigmoid(theta[0] + theta[1] * data.x2_or)
     star_probs = jnp.clip(star_probs, 1e-6, 1 - 1e-6)
 
     # P(A_ij = 1 | A*_ij = 0)
-    obs_logits_k0 = gamma[1] + gamma[2] * data.x_diff
-    # obs_logits_k0 = jnp.clip(obs_logits_k0, -20.0, 20.0)  # for numerical stability
-    obs_probs_k0 = jax.nn.sigmoid(obs_logits_k0)
+    obs_probs_k0 = jax.nn.sigmoid(gamma[1] + gamma[2] * data.x_diff)
     obs_probs_k0 = jnp.clip(obs_probs_k0, 1e-6, 1 - 1e-6)
 
     # P(A_ij = 1 | A*_ij = 1)
@@ -65,10 +60,6 @@ def network_only_models_marginalized(data):
     # marginalized probs P(A_ij=1)
     mixed_probs = star_probs * obs_probs_k1 + (1 - star_probs) * obs_probs_k0
 
-    # mixed_probs = get_mixed_probs(theta, gamma, data)
-
-    # with numpyro.plate("edges", data.triu_obs.shape[0], subsample_size=N):
-    # with numpyro.plate("edges", data["triu_obs"].shape[0], subsample_size=data["triu_obs"].shape[0]//10):
     with numpyro.plate("edges", data.triu_obs.shape[0]):
         numpyro.sample("obs", dist.BernoulliProbs(mixed_probs), obs=data.triu_obs)
 

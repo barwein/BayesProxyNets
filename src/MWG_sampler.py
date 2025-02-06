@@ -260,7 +260,7 @@ class MWG_init:
             kernel_plugin,
             num_warmup=self.n_warmup_outcome,
             num_samples=self.n_samples_outcome,
-            num_chains=self.num_chains,
+            num_chains=self.num_chains_outcome,
             progress_bar=self.progress_bar,
         )
         mcmc_plugin.run(
@@ -319,8 +319,8 @@ class MWG_init:
             self.sig_inv,
         )
 
-        if self.num_chains > 1:
-            return replicate_params(init_params, self.num_chains)
+        if self.num_chains_outcome > 1:
+            return replicate_params(init_params, self.num_chains_outcome)
         else:
             return init_params
 
