@@ -113,10 +113,21 @@ def generate_proxy_networks(rng, triu_dim, triu_star, gamma, x_diff, Z):
     obs_exposures = utils.compute_exposures(triu_obs, Z)
 
     # repeated proxy
-    # TODO: probs_obs_rep =
-    # TODO: triu_obs_rep
-    # TODO: return triu_obs, triu_obs_rep
-    return {"triu_obs": triu_obs, "obs_exposures": obs_exposures}
+    probs_obs_rep = jnp.where(
+        triu_star == 1.0,
+        expit(gamma[3] + gamma[4] * triu_obs),
+        expit(gamma[5] + gamma[6] * triu_obs),
+    )
+
+    triu_obs_rep = jnp.array(
+        rng.binomial(n=1, p=probs_obs_rep, size=triu_dim), dtype=jnp.float32
+    )
+
+    return {
+        "triu_obs": triu_obs,
+        "obs_exposures": obs_exposures,
+        "triu_obs_rep": triu_obs_rep,
+    }
 
 
 def data_for_sim(fixed_data_dict, obs_triu_dict):
@@ -127,6 +138,7 @@ def data_for_sim(fixed_data_dict, obs_triu_dict):
         x2_or=fixed_data_dict["x2_or"],
         triu_star=fixed_data_dict["triu_star"],
         triu_obs=obs_triu_dict["triu_obs"],
+        triu_obs_rep=obs_triu_dict["triu_obs_rep"],
         Z=fixed_data_dict["Z"],
         obs_exposures=obs_triu_dict["obs_exposures"],
         true_exposures=fixed_data_dict["true_exposures"],

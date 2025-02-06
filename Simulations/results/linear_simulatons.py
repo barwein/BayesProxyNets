@@ -25,9 +25,10 @@ TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2, 1])
 # GAMMA_FIX = jnp.array([logit(0.9), logit(0.1), 1])
-GAMMA_FIX = jnp.array([logit(0.9), logit(0.1)])
+GAMMA_F = jnp.array([logit(0.8), logit(0.05)])
+GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.15), 1])
 # GAMMA_X_NOISES = jnp.arange(0.2, 2.2, 0.2)
-GAMMA_X_NOISES = jnp.arange(0.2, 1.1, 0.1)
+GAMMA_X_NOISES = jnp.arange(0.5, 2.75, 0.25)
 
 ETA = jnp.array([-1, 3, -0.25, 2])
 SIG_INV = 2 / 3
@@ -68,7 +69,7 @@ for i in range(N_ITER):
 
         # update gamma
         # param["gamma"] = jnp.append(GAMMA_FIX, GAMMA_X_NOISES[i])
-        cur_gamma = jnp.append(GAMMA_FIX, GAMMA_X_NOISES[j])
+        cur_gamma = jnp.append(GAMMA_F, GAMMA_X_NOISES[j], )
         print(f"cur_gamma: {cur_gamma}")
 
         # sample proxy networks with current gamma

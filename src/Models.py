@@ -320,6 +320,8 @@ def cond_logpost_a_star(triu_star, data, param):
         - sig_inv: Conditional precision parameter
 
     """
+
+    # TODO: optimize it this model using jax.nn.log_sigmoid insteap of log(exp) stuff
     # p(A*|X,\theta)
     logits_a_star = param.theta[0] + param.theta[1] * data.x2_or
     a_star_logpmf = triu_star * logits_a_star - jnp.log1p(jnp.exp(logits_a_star))

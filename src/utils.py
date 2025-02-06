@@ -25,7 +25,7 @@ class DataTuple(NamedTuple):
     x2_or: jnp.ndarray
     triu_star: jnp.ndarray
     triu_obs: jnp.ndarray
-    # TODO: triu_obs_rep: jnp.ndarray
+    triu_obs_rep: jnp.ndarray
     Z: jnp.ndarray
     obs_exposures: jnp.ndarray
     true_exposures: jnp.ndarray
