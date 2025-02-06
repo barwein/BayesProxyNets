@@ -43,72 +43,52 @@ def network_only_models_marginalized(data):
            - triu_obs: a 1D array of observed edge indicators (binary; one per edge).
     """
     # --- Priors ---
-    # theta: parameters for the latent network A*
-    theta = numpyro.sample("theta", dist.Normal(0, 3).expand([2]))
-    # gamma: parameters for the edge likelihood given A*
-    gamma = numpyro.sample("gamma", dist.Normal(0, 3).expand([3]))
+    theta = numpyro.sample("theta", dist.Normal(0, 5).expand([2]))
+    gamma = numpyro.sample("gamma", dist.Normal(0, 5).expand([3]))
 
-    # --- Latent network A* prior embedded in the mixture weights ---
-    # Compute the logits for the latent A* for each edge.
+    # P(A*_ij=1)
     star_logits = theta[0] + theta[1] * data.x2_or
-    star_logits = jnp.clip(star_logits, -20, 20)  # avoid overflow
+    # star_logits = jnp.clip(star_logits, -20.0, 20.0)  # for numerical stability
+    star_probs = jax.nn.sigmoid(star_logits)
+    star_probs = jnp.clip(star_probs, 1e-6, 1 - 1e-6)
 
-    prior_Astar_1 = jax.nn.sigmoid(star_logits)
-    # Mixture probabilities: first component corresponds to A* = 0, second to A* = 1.
-    mix_probs = jnp.stack([1 - prior_Astar_1, prior_Astar_1], axis=-1)
-
-    # # The probability that A* = 1 is sigmoid(star_logits)
-    # # Create a 2-element vector of mixture weights for each edge:
-    # # component 0 (A* = 0) gets weight 1 - sigmoid(star_logits)
-    # # component 1 (A* = 1) gets weight sigmoid(star_logits)
-    # mix_probs = jnp.stack([1 - jax.nn.sigmoid(star_logits),
-    #                        jax.nn.sigmoid(star_logits)], axis=-1)
-
-    # --- Likelihood for A given A* ---
-    # When A* = 0, we use a logistic regression with linear predictor:
+    # P(A_ij = 1 | A*_ij = 0)
     obs_logits_k0 = gamma[1] + gamma[2] * data.x_diff
-    obs_logits_k0 = jnp.clip(obs_logits_k0, -20, 20)  # avoid overflow
+    # obs_logits_k0 = jnp.clip(obs_logits_k0, -20.0, 20.0)  # for numerical stability
+    obs_probs_k0 = jax.nn.sigmoid(obs_logits_k0)
+    obs_probs_k0 = jnp.clip(obs_probs_k0, 1e-6, 1 - 1e-6)
 
-    # When A* = 1, the likelihood is given by a fixed Bernoulli with logit gamma[0].
-    comp_logits = jnp.stack(
-        [obs_logits_k0, gamma[0] * jnp.ones_like(obs_logits_k0)], axis=-1
-    )
+    # P(A_ij = 1 | A*_ij = 1)
+    obs_probs_k1 = jax.nn.sigmoid(gamma[0])
+    obs_probs_k1 = jnp.clip(obs_probs_k1, 1e-6, 1 - 1e-6)
 
-    # --- Define the mixture distribution ---
-    # The mixture is over two Bernoulli components.
-    mixture_dist = dist.MixtureSameFamily(
-        # The categorical mixing distribution with probabilities given per edge.
-        mixing_distribution=dist.Categorical(probs=mix_probs),
-        # The two components: Bernoulli with logits defined in comp_logits.
-        component_distribution=dist.Bernoulli(logits=comp_logits),
-    )
+    # marginalized probs P(A_ij=1)
+    mixed_probs = star_probs * obs_probs_k1 + (1 - star_probs) * obs_probs_k0
 
-    # --- Observation ---
-    # Each edge is conditionally independent.
+    # mixed_probs = get_mixed_probs(theta, gamma, data)
+
+    # with numpyro.plate("edges", data.triu_obs.shape[0], subsample_size=N):
+    # with numpyro.plate("edges", data["triu_obs"].shape[0], subsample_size=data["triu_obs"].shape[0]//10):
     with numpyro.plate("edges", data.triu_obs.shape[0]):
-        numpyro.sample("obs", mixture_dist, obs=data.triu_obs)
+        numpyro.sample("obs", dist.BernoulliProbs(mixed_probs), obs=data.triu_obs)
 
-    # --- Compute the posterior probabilities for A* ---
-    # Compute the log-likelihoods for each component for each edge.
-    # For component 0 (A* = 0):
-    log_lik_0 = data.triu_obs * obs_logits_k0 - jax.nn.softplus(obs_logits_k0)
-    # For component 1 (A* = 1):
-    log_lik_1 = data.triu_obs * gamma[0] - jax.nn.softplus(gamma[0])
+    # save posterior A_star probs
+    # let  p_1 = P(A*_ij=1)*P(A_ij| A*_ij=1)
+    #      p_0 = P(A*_ij=0 )*P(A_ij| A*_ij=0)
+    # then posterior probs P(A*_ij | A, \theta,\ gamma) = p_1 / (p_1 + p_0)
 
-    # Incorporate the log prior probabilities:
-    log_prior_0 = jnp.log(1 - prior_Astar_1)
-    log_prior_1 = jnp.log(prior_Astar_1)
+    # numerator aka p_1
+    numerator = jnp.where(
+        data.triu_obs == 1.0, star_probs * obs_probs_k1, star_probs * (1 - obs_probs_k1)
+    )
+    # denominator aka p_1 + p_0
+    denominator = numerator + jnp.where(
+        data.triu_obs == 1.0,
+        (1 - star_probs) * obs_probs_k0,
+        (1 - star_probs) * (1 - obs_probs_k0),
+    )
 
-    log_joint_0 = log_prior_0 + log_lik_0
-    log_joint_1 = log_prior_1 + log_lik_1
-
-    # Normalizing constant per edge:
-    log_norm = jnp.logaddexp(log_joint_0, log_joint_1)
-    # Posterior probability for A* = 1:
-    astar_probs = jnp.exp(log_joint_1 - log_norm)
-
-    # Return as a deterministic output (for each edge)
-    numpyro.deterministic("triu_star_probs", astar_probs)
+    numpyro.deterministic("triu_star_probs", numerator / denominator)
 
 
 # def network_only_models_marginalized(data):
@@ -184,7 +164,7 @@ def plugin_outcome_model(df_nodes, adj_mat, Y):
 
     # priors
     with numpyro.plate("eta_plate", df_nodes.shape[1]):
-        eta = numpyro.sample("eta", dist.Normal(0, 3))
+        eta = numpyro.sample("eta", dist.Normal(0, 5))
 
     rho = numpyro.sample("rho", dist.Beta(2, 2))
 
@@ -223,7 +203,7 @@ def combined_model(data):
     # True network model
     # priors
     with numpyro.plate("theta_plate", 2):
-        theta = numpyro.sample("theta", dist.Normal(0, 3))
+        theta = numpyro.sample("theta", dist.Normal(0, 5))
 
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
@@ -238,7 +218,7 @@ def combined_model(data):
 
     # priors
     with numpyro.plate("eta_plate", df_nodes.shape[1]):
-        eta = numpyro.sample("eta", dist.Normal(0, 3))
+        eta = numpyro.sample("eta", dist.Normal(0, 5))
 
     rho = numpyro.sample("rho", dist.Beta(2, 2))
 

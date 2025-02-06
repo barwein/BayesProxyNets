@@ -19,8 +19,8 @@ from numpyro.infer import (
     Predictive,
 )
 from numpyro.infer.hmc_gibbs import HMCGibbs
-from numpyro.optim import ClippedAdam
-from numpyro.infer.autoguide import AutoDelta, AutoNormal
+from numpyro.optim import ClippedAdam, Adam
+from numpyro.infer.autoguide import AutoDelta, AutoNormal, AutoMultivariateNormal
 
 import src.Models as models
 import src.utils as utils
@@ -71,7 +71,7 @@ class MWG_init:
         cut_posterior_net_model=models.network_only_models_marginalized,
         cut_posterior_outcome_model=models.plugin_outcome_model,
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
-        n_iter_networks=15000,
+        n_iter_networks=10000,
         n_nets_samples=3000,
         n_warmup_outcome=2000,
         n_samples_outcome=2500,
@@ -109,14 +109,23 @@ class MWG_init:
         runkey, sampkey = random.split(self.rng_key)
 
         # Define guide
-        guide = AutoDelta(self.cut_posterior_net_model)
+        # init_vals = {
+        #     "theta": jnp.zeros(2),
+        #     "gamma": jnp.zeros(3),
+        # }
+        # guide = AutoDelta(
+        #     self.cut_posterior_net_model,
+        #     init_loc_fn=numpyro.infer.init_to_value(values=init_vals),
+        # )
+        guide = AutoMultivariateNormal(self.cut_posterior_net_model)
         # guide = AutoNormal(self.cut_posterior_net_model)
 
         # Define SVI
         svi = SVI(
             model=self.cut_posterior_net_model,
             guide=guide,
-            optim=ClippedAdam(self.learning_rate),
+            # optim=ClippedAdam(self.learning_rate),
+            optim=Adam(self.learning_rate),
             loss=Trace_ELBO(),
         )
 
@@ -126,33 +135,34 @@ class MWG_init:
         )
 
         # Get MAP of theta and gamma
-        map_params = guide.median(svi_results.params)
+        # map_params = guide.median(svi_results.params)
 
-        self.theta = map_params["theta"]
-        self.gamma = map_params["gamma"]
+        # self.theta = map_params["theta"]
+        # self.gamma = map_params["gamma"]
 
         # # Sample from posterior and compute means
-        # posterior_samples = guide.sample_posterior(
-        #     sampkey,
-        #     svi_results.params,
-        #     sample_shape=(self.n_nets_samples,),  # number of samples to draw
-        # )
+        posterior_samples = guide.sample_posterior(
+            sampkey,
+            svi_results.params,
+            sample_shape=(self.n_nets_samples,),  # number of samples to draw
+        )
 
         # # Get mean of posterior samples
-        # self.theta = jnp.mean(posterior_samples["theta"], axis=0)
-        # self.gamma = jnp.mean(posterior_samples["gamma"], axis=0)
+        self.theta = jnp.mean(posterior_samples["theta"], axis=0)
+        self.gamma = jnp.mean(posterior_samples["gamma"], axis=0)
 
-        print("map_params", map_params)
-        # get A* posterior probs
-        preds = Predictive(
-            self.cut_posterior_net_model,
-            guide=guide,
-            params=svi_results.params,
-            # params=map_params,
-            num_samples=1,
-        )
-        predictions = preds(sampkey, self.data)
-        self.triu_star_probs = predictions["triu_star_probs"][0]
+        self.triu_star_probs = jnp.mean(posterior_samples["triu_star_probs"], axis=0)
+        # print("map_params", map_params)
+        # # get A* posterior probs
+        # preds = Predictive(
+        #     self.cut_posterior_net_model,
+        #     guide=guide,
+        #     params=svi_results.params,
+        #     # params=map_params,
+        #     num_samples=1,
+        # )
+        # predictions = preds(sampkey, self.data)
+        # self.triu_star_probs = predictions["triu_star_probs"][0]
         # with numpyro.handlers.substitute(data=map_params):
         #     predictions = self.cut_posterior_net_model(self.data)
         # self.triu_star_probs = predictions["triu_star_probs"]

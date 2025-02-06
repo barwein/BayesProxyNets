@@ -4,6 +4,7 @@
 
 import jax.numpy as jnp
 from jax.scipy.special import expit
+from jax import random
 import numpy as np
 import src.utils as utils
 
@@ -100,9 +101,14 @@ def generate_fixed_data(rng, n, param, pz=0.5):
 
 def generate_proxy_networks(rng, triu_dim, triu_star, gamma, x_diff, Z):
     # first proxy
-    probs_obs = expit(
-        triu_star * gamma[0] + (1 - triu_star) * (gamma[1] + gamma[2] * x_diff)
+    probs_obs = jnp.where(
+        triu_star == 1.0,
+        expit(gamma[0] + 0.3 * x_diff),
+        expit(gamma[1] + gamma[2] * x_diff),
     )
+    # probs_obs = expit(
+    #     triu_star * gamma[0] + (1.0 - triu_star) * (gamma[1] + gamma[2] * x_diff)
+    # )
     triu_obs = jnp.array(
         rng.binomial(n=1, p=probs_obs, size=triu_dim), dtype=jnp.float32
     )

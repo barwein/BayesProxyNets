@@ -25,9 +25,9 @@ TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2, 1])
 # GAMMA_FIX = jnp.array([logit(0.9), logit(0.1), 1])
-GAMMA_FIX = jnp.array([logit(0.85), logit(0.15)])
+GAMMA_FIX = jnp.array([logit(0.9), logit(0.1)])
 # GAMMA_X_NOISES = jnp.arange(0.2, 2.2, 0.2)
-GAMMA_X_NOISES = jnp.arange(0, 1.1, 0.1)
+GAMMA_X_NOISES = jnp.arange(0.2, 1.1, 0.1)
 
 ETA = jnp.array([-1, 3, -0.25, 2])
 SIG_INV = 2 / 3
