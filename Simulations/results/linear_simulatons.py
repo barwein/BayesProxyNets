@@ -88,6 +88,7 @@ for i in range(N_ITER):
         idx = i * N_ITER + j * N_GAMMAS
 
         one_simulation_iter(
+            iter=i,
             idx=idx,
             rng_key=rng_key,
             data=data_sim,

@@ -4,7 +4,7 @@ import pandas as pd
 
 
 def one_simulation_iter(
-    idx, rng_key, data, new_interventions, cur_gamma_noise, file_path
+    iter, idx, rng_key, data, new_interventions, cur_gamma_noise, file_path
 ):
     results = []
 
@@ -93,7 +93,7 @@ def one_simulation_iter(
     print("@@@ Getting MWG init params @@@")
 
     mwg_init = MWG_init(
-        rng_key=rng_key, data=data, num_chains=2, progress_bar=True
+        rng_key=rng_key, data=data, num_chains_networks=2, progress_bar=True
     ).get_init_values()
 
     print("@@@ Sampling with MWG @@@")
@@ -140,5 +140,5 @@ def one_simulation_iter(
 
     # save results and write to csv
     results_df = pd.DataFrame(results)
-    file_name = f"{file_path}/linear_car_results_{idx}.csv"
+    file_name = f"{file_path}/linear_car_results_{iter}.csv"
     results_df.to_csv(file_name, index=False, mode="a")

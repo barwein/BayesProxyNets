@@ -71,12 +71,15 @@ class MWG_init:
         cut_posterior_net_model=models.network_only_models_marginalized,
         cut_posterior_outcome_model=models.plugin_outcome_model,
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
-        n_iter_networks=10000,
+        # n_iter_networks=10000,
+        n_warmup_networks=2000,
+        n_samples_networks=2500,
         n_nets_samples=3000,
         n_warmup_outcome=2000,
         n_samples_outcome=2500,
-        num_chains=4,
-        learning_rate=0.001,
+        num_chains_networks=4,
+        num_chains_outcome=4,
+        # learning_rate=0.001,
         progress_bar=False,
     ):
         self.rng_key = rng_key
@@ -84,12 +87,15 @@ class MWG_init:
         self.cut_posterior_net_model = cut_posterior_net_model
         self.cut_posterior_outcome_model = cut_posterior_outcome_model
         self.triu_star_log_posterior_fn = triu_star_log_posterior_fn
-        self.n_iter_networks = n_iter_networks
+        # self.n_iter_networks = n_iter_networks
+        self.n_warmup_networks = n_warmup_networks
+        self.n_samples_networks = n_samples_networks
         self.n_nets_samples = n_nets_samples
         self.n_warmup_outcome = n_warmup_outcome
         self.n_samples_outcome = n_samples_outcome
-        self.num_chains = num_chains
-        self.learning_rate = learning_rate
+        self.num_chains_networks = num_chains_networks
+        self.num_chains_outcome = num_chains_outcome
+        # self.learning_rate = learning_rate
         self.progress_bar = progress_bar
 
         # initial parameters
@@ -109,49 +115,45 @@ class MWG_init:
         runkey, sampkey = random.split(self.rng_key)
 
         # Define guide
-        # init_vals = {
-        #     "theta": jnp.zeros(2),
-        #     "gamma": jnp.zeros(3),
-        # }
+
         # guide = AutoDelta(
         #     self.cut_posterior_net_model,
         #     init_loc_fn=numpyro.infer.init_to_value(values=init_vals),
         # )
-        guide = AutoMultivariateNormal(self.cut_posterior_net_model)
-        # guide = AutoNormal(self.cut_posterior_net_model)
+        # guide = AutoMultivariateNormal(self.cut_posterior_net_model)
 
         # Define SVI
-        svi = SVI(
-            model=self.cut_posterior_net_model,
-            guide=guide,
-            # optim=ClippedAdam(self.learning_rate),
-            optim=Adam(self.learning_rate),
-            loss=Trace_ELBO(),
-        )
+        # # svi = SVI(
+        # #     model=self.cut_posterior_net_model,
+        # #     guide=guide,
+        # #     # optim=ClippedAdam(self.learning_rate),
+        # #     optim=Adam(self.learning_rate),
+        # #     loss=Trace_ELBO(),
+        # # )
 
-        # Run SVI
-        svi_results = svi.run(
-            runkey, self.n_iter_networks, self.data, progress_bar=self.progress_bar
-        )
+        # # Run SVI
+        # # svi_results = svi.run(
+        # #     runkey, self.n_iter_networks, self.data, progress_bar=self.progress_bar
+        # # )
 
-        # Get MAP of theta and gamma
-        # map_params = guide.median(svi_results.params)
+        # # Get MAP of theta and gamma
+        # # map_params = guide.median(svi_results.params)
 
-        # self.theta = map_params["theta"]
-        # self.gamma = map_params["gamma"]
+        # # self.theta = map_params["theta"]
+        # # self.gamma = map_params["gamma"]
 
-        # # Sample from posterior and compute means
-        posterior_samples = guide.sample_posterior(
-            sampkey,
-            svi_results.params,
-            sample_shape=(self.n_nets_samples,),  # number of samples to draw
-        )
+        # # # Sample from posterior and compute means
+        # posterior_samples = guide.sample_posterior(
+        #     sampkey,
+        #     svi_results.params,
+        #     sample_shape=(self.n_nets_samples,),  # number of samples to draw
+        # )
 
         # # Get mean of posterior samples
-        self.theta = jnp.mean(posterior_samples["theta"], axis=0)
-        self.gamma = jnp.mean(posterior_samples["gamma"], axis=0)
+        # self.theta = jnp.mean(posterior_samples["theta"], axis=0)
+        # self.gamma = jnp.mean(posterior_samples["gamma"], axis=0)
 
-        self.triu_star_probs = jnp.mean(posterior_samples["triu_star_probs"], axis=0)
+        # self.triu_star_probs = jnp.mean(posterior_samples["triu_star_probs"], axis=0)
         # print("map_params", map_params)
         # # get A* posterior probs
         # preds = Predictive(
@@ -166,6 +168,35 @@ class MWG_init:
         # with numpyro.handlers.substitute(data=map_params):
         #     predictions = self.cut_posterior_net_model(self.data)
         # self.triu_star_probs = predictions["triu_star_probs"]
+
+        # init with nuts
+
+        kernel_nets = NUTS(self.cut_posterior_net_model)
+        mcmc_nets = MCMC(
+            kernel_nets,
+            num_warmup=self.n_warmup_networks,
+            num_samples=self.n_samples_networks,
+            num_chains=self.num_chains_networks,
+            progress_bar=self.progress_bar,
+        )
+        mcmc_nets.run(runkey, self.data)
+
+        post_samples = mcmc_nets.get_samples()
+
+        self.theta = post_samples["theta"].mean(axis=0)
+        self.gamma = post_samples["gamma"].mean(axis=0)
+
+        post_means = {
+            "theta": self.theta[None, :],
+            "gamma": self.gamma[None, :],
+        }
+
+        self.triu_star_probs = Predictive(
+            model=self.cut_posterior_net_model,
+            posterior_samples=post_means,
+            num_samples=1,
+            return_sites=["triu_star_probs"],
+        )(sampkey, self.data)["triu_star_probs"][0]
 
         print(
             "triustar probs mean",
