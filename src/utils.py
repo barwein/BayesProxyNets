@@ -13,7 +13,6 @@ from typing import NamedTuple
 # --- Global variables ---
 
 N = 500  # Number of nodes
-# N = 1000  # Number of nodes
 
 # --- Data and Param namedtuples classes ---
 

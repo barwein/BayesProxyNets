@@ -7,26 +7,17 @@
 import jax
 import jax.numpy as jnp
 from jax import random, vmap
-import numpy as np
-import numpyro
 from numpyro.infer import (
-    SVI,
-    Trace_ELBO,
-    # TraceEnum_ELBO,
     MCMC,
     NUTS,
     HMC,
     Predictive,
 )
 from numpyro.infer.hmc_gibbs import HMCGibbs
-from numpyro.optim import ClippedAdam, Adam
-from numpyro.infer.autoguide import AutoDelta, AutoNormal, AutoMultivariateNormal
 
 import src.Models as models
 import src.utils as utils
-from src.GWG import make_gwg_gibbs_fn
-
-from tqdm import tqdm
+from src.GWG import make_gwg_gibbs_fn, make_gwg_gibbs_fn_rep
 
 
 # Init values from the cut-posterior
@@ -68,18 +59,16 @@ class MWG_init:
         self,
         rng_key,
         data,
-        cut_posterior_net_model=models.network_only_models_marginalized,
+        cut_posterior_net_model=models.networks_marginalized_model,
         cut_posterior_outcome_model=models.plugin_outcome_model,
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
-        # n_iter_networks=10000,
-        n_warmup_networks=2000,
+        n_warmup_networks=1500,
         n_samples_networks=2500,
         n_nets_samples=3000,
         n_warmup_outcome=2000,
         n_samples_outcome=2500,
         num_chains_networks=4,
         num_chains_outcome=4,
-        # learning_rate=0.001,
         progress_bar=False,
     ):
         self.rng_key = rng_key
@@ -87,7 +76,6 @@ class MWG_init:
         self.cut_posterior_net_model = cut_posterior_net_model
         self.cut_posterior_outcome_model = cut_posterior_outcome_model
         self.triu_star_log_posterior_fn = triu_star_log_posterior_fn
-        # self.n_iter_networks = n_iter_networks
         self.n_warmup_networks = n_warmup_networks
         self.n_samples_networks = n_samples_networks
         self.n_nets_samples = n_nets_samples
@@ -95,7 +83,6 @@ class MWG_init:
         self.n_samples_outcome = n_samples_outcome
         self.num_chains_networks = num_chains_networks
         self.num_chains_outcome = num_chains_outcome
-        # self.learning_rate = learning_rate
         self.progress_bar = progress_bar
 
         # initial parameters
@@ -114,61 +101,6 @@ class MWG_init:
         """
         runkey, sampkey = random.split(self.rng_key)
 
-        # Define guide
-
-        # guide = AutoDelta(
-        #     self.cut_posterior_net_model,
-        #     init_loc_fn=numpyro.infer.init_to_value(values=init_vals),
-        # )
-        # guide = AutoMultivariateNormal(self.cut_posterior_net_model)
-
-        # Define SVI
-        # # svi = SVI(
-        # #     model=self.cut_posterior_net_model,
-        # #     guide=guide,
-        # #     # optim=ClippedAdam(self.learning_rate),
-        # #     optim=Adam(self.learning_rate),
-        # #     loss=Trace_ELBO(),
-        # # )
-
-        # # Run SVI
-        # # svi_results = svi.run(
-        # #     runkey, self.n_iter_networks, self.data, progress_bar=self.progress_bar
-        # # )
-
-        # # Get MAP of theta and gamma
-        # # map_params = guide.median(svi_results.params)
-
-        # # self.theta = map_params["theta"]
-        # # self.gamma = map_params["gamma"]
-
-        # # # Sample from posterior and compute means
-        # posterior_samples = guide.sample_posterior(
-        #     sampkey,
-        #     svi_results.params,
-        #     sample_shape=(self.n_nets_samples,),  # number of samples to draw
-        # )
-
-        # # Get mean of posterior samples
-        # self.theta = jnp.mean(posterior_samples["theta"], axis=0)
-        # self.gamma = jnp.mean(posterior_samples["gamma"], axis=0)
-
-        # self.triu_star_probs = jnp.mean(posterior_samples["triu_star_probs"], axis=0)
-        # print("map_params", map_params)
-        # # get A* posterior probs
-        # preds = Predictive(
-        #     self.cut_posterior_net_model,
-        #     guide=guide,
-        #     params=svi_results.params,
-        #     # params=map_params,
-        #     num_samples=1,
-        # )
-        # predictions = preds(sampkey, self.data)
-        # self.triu_star_probs = predictions["triu_star_probs"][0]
-        # with numpyro.handlers.substitute(data=map_params):
-        #     predictions = self.cut_posterior_net_model(self.data)
-        # self.triu_star_probs = predictions["triu_star_probs"]
-
         # init with nuts
 
         kernel_nets = NUTS(self.cut_posterior_net_model)
@@ -186,24 +118,19 @@ class MWG_init:
         self.theta = post_samples["theta"].mean(axis=0)
         self.gamma = post_samples["gamma"].mean(axis=0)
 
+        # get posterior mean of theta and gamma
         post_means = {
             "theta": self.theta[None, :],
             "gamma": self.gamma[None, :],
         }
 
+        # get posterior probabilities for triu_star
         self.triu_star_probs = Predictive(
             model=self.cut_posterior_net_model,
             posterior_samples=post_means,
             num_samples=1,
             return_sites=["triu_star_probs"],
         )(sampkey, self.data)["triu_star_probs"][0]
-
-        print(
-            "triustar probs mean",
-            self.triu_star_probs.mean(),
-            "trriu_star_probs shape",
-            self.triu_star_probs.shape,
-        )
 
     def init_triu_star_and_exposures(self):
         """
@@ -219,23 +146,12 @@ class MWG_init:
         self.exposures = exposures_samps.mean(axis=0)
         # self.exposures = jnp.median(exposures_samps, axis=0)
 
-        print("init mwg exposure mean", self.exposures.mean())
-
         # get triu_star --> init is the posterior triu_star with largest log-posterior density
         triu_star_log_post = self.triu_star_log_posterior_fn(
             triu_star_samps, self.theta, self.gamma, self.data
         )
+
         best_idx = jnp.argmax(triu_star_log_post)
-
-        worst_idx = jnp.argmin(triu_star_log_post)
-
-        print(
-            "best logposterior:",
-            triu_star_log_post[best_idx],
-            "\n",
-            "worst logposterior:",
-            triu_star_log_post[worst_idx],
-        )
 
         self.triu_star = triu_star_samps[best_idx]
 
@@ -334,6 +250,7 @@ class MWG_sampler:
         rng_key,
         data,
         init_params,
+        gwg_fn=make_gwg_gibbs_fn,
         combined_model=models.combined_model,
         n_warmup=2000,
         n_samples=2500,
@@ -352,7 +269,7 @@ class MWG_sampler:
         self.progress_bar = progress_bar
 
         #  init function for mwg
-        self.gwg_fn = make_gwg_gibbs_fn(data)
+        self.gwg_fn = gwg_fn(data)
         self.continuous_kernel = self.make_continuous_kernel()
         #  get posterior samples
         self.posterior_samples = self.get_samples()

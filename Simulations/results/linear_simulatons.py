@@ -20,15 +20,12 @@ os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 # --- Global variables ---
 
 N = 500
-# N = 1000
 TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2, 1])
-# GAMMA_FIX = jnp.array([logit(0.9), logit(0.1), 1])
 GAMMA_F = jnp.array([logit(0.8), logit(0.05)])
 GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.15), 1])
-# GAMMA_X_NOISES = jnp.arange(0.2, 2.2, 0.2)
-GAMMA_X_NOISES = jnp.arange(0.5, 2.75, 0.25)
+GAMMA_X_NOISES = jnp.arange(0.25, 2.75 + 1e-6, 0.5)
 
 ETA = jnp.array([-1, 3, -0.25, 2])
 SIG_INV = 2 / 3
@@ -47,19 +44,17 @@ FILEPATH = "Simulations/results"
 N_ITER = 1
 N_GAMMAS = GAMMA_X_NOISES.shape[0]
 
-# TODO: check why MWG_init with svi in network module is not stable and not working that well!
-
 for i in range(N_ITER):
     # Set keys
     rng_key = random.PRNGKey(i)
     rng = np.random.default_rng(i)
 
-    # gen data (not depedent on gamma)
+    # generate data (not depedent on gamma)
     fixed_data = dg.generate_fixed_data(rng, N, PARAM, PZ)
 
     print(f"mean true exposures: {jnp.mean(fixed_data['true_exposures'])}")
 
-    # gen new interventions
+    # generate new interventions
     new_interventions = dg.new_interventions_estimands(
         rng, N, fixed_data["x"], fixed_data["triu_star"], ETA
     )
@@ -68,9 +63,9 @@ for i in range(N_ITER):
         print(f"### iteration {i}, gamma noise {j} ###")
 
         # update gamma
-        # param["gamma"] = jnp.append(GAMMA_FIX, GAMMA_X_NOISES[i])
-        cur_gamma = jnp.append(GAMMA_F, GAMMA_X_NOISES[j], )
-        print(f"cur_gamma: {cur_gamma}")
+        cur_gamma = jnp.concatenate(
+            [GAMMA_F, jnp.array([GAMMA_X_NOISES[j]]), GAMMA_REP]
+        )
 
         # sample proxy networks with current gamma
         proxy_nets = dg.generate_proxy_networks(
