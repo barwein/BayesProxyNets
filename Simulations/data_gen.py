@@ -84,7 +84,7 @@ def generate_fixed_data(rng, n, param, pz=0.5):
 
     # outcomes + exposures
     Y, true_exposures = generate_outcomes_n_exposures(
-        rng, n, x, Z, triu_star, param["eta"], param["rho"], param["rho"]
+        rng, n, x, Z, triu_star, param["eta"], param["rho"], param["sig_inv"]
     )
 
     return {

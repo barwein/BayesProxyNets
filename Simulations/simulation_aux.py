@@ -3,6 +3,7 @@ from src.MCMC_fixed_net import mcmc_fixed_net
 import src.Models as models
 import src.GWG as gwg
 import pandas as pd
+from jax import random
 
 
 def one_simulation_iter(
@@ -10,8 +11,8 @@ def one_simulation_iter(
 ):
     results = []
 
-    # print("--- fixed true net ---")
-
+    print("--- fixed true net ---")
+    rng_key = random.split(rng_key)[0]
     # --- fixed true network ---
     mcmc_true = mcmc_fixed_net(
         rng_key=rng_key,
@@ -51,8 +52,9 @@ def one_simulation_iter(
         }
     )
 
-    # print("--- fixed obs net ---")
+    print("--- fixed obs net ---")
     # --- observed network ---
+    rng_key = random.split(rng_key)[0]
 
     mcmc_obs = mcmc_fixed_net(
         rng_key=rng_key,
@@ -93,7 +95,9 @@ def one_simulation_iter(
     )
 
     # --- MWG sampler (single proxy) ---
-    # print("--- MWG init params (single proxy) ---")
+    print("--- MWG init params (single proxy) ---")
+
+    rng_key = random.split(rng_key)[1]
 
     mwg_init = MWG_init(
         rng_key=rng_key,
@@ -101,21 +105,23 @@ def one_simulation_iter(
         # n_warmup_networks=20,
         # n_samples_networks=20,
         # num_chains_networks=2,
-        # progress_bar=True,
+        progress_bar=True,
     ).get_init_values()
 
-    # print("--- Sampling with MWG (single proxy) ---")
+    print("--- Sampling with MWG (single proxy) ---")
+
+    rng_key = random.split(rng_key)[1]
 
     mwg_sampler = MWG_sampler(
         rng_key=rng_key,
         data=data,
         init_params=mwg_init,
         # n_warmup=2000,
-        # n_warmup=10,
+        n_warmup=10,
         # n_samples=2500,
-        # n_samples=10,
-        # num_chains=4,
-        # progress_bar=True,
+        n_samples=10,
+        num_chains=4,
+        progress_bar=True,
     )
 
     mwg_dynamic_stats = mwg_sampler.new_intervention_error_stats(
@@ -147,7 +153,9 @@ def one_simulation_iter(
     )
 
     # --- MWG sampler (multiple proxies) ---
-    # print("--- MWG init params (multiple proxies) ---")
+    print("--- MWG init params (multiple proxies) ---")
+
+    rng_key = random.split(rng_key)[1]
 
     mwg_init_rep = MWG_init(
         rng_key=rng_key,
@@ -157,19 +165,21 @@ def one_simulation_iter(
         # n_warmup_networks=20,
         # n_samples_networks=20,
         # num_chains_networks=2,
-        # progress_bar=True,
+        progress_bar=True,
     ).get_init_values()
 
     # print("--- Sampling with MWG (multiple proxies) ---")
+    rng_key = random.split(rng_key)[1]
+
     mwg_sampler_rep = MWG_sampler(
         rng_key=rng_key,
         data=data,
         init_params=mwg_init_rep,
         gwg_fn=gwg.make_gwg_gibbs_fn_rep,
         combined_model=models.combined_model_rep,
-        # n_warmup=10,
-        # n_samples=10,
-        # num_chains=4,
+        n_warmup=10,
+        n_samples=10,
+        num_chains=4,
         # progress_bar=True,
     )
 

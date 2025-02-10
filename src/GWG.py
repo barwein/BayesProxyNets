@@ -168,6 +168,7 @@ def make_gwg_gibbs_fn(data):
         )
 
         # Run GWG (N_STEPS times)
+        rng_key, _ = random.split(rng_key)
         new_state, _ = GWG_kernel(
             rng_key=rng_key, state=state, data=data, param=cur_param
         )
@@ -291,6 +292,7 @@ def make_gwg_gibbs_fn_rep(data):
         )
 
         # Run GWG (N_STEPS times)
+        rng_key, _ = random.split(rng_key)
         new_state, _ = GWG_kernel_rep(
             rng_key=rng_key, state=state, data=data, param=cur_param
         )

@@ -7,12 +7,9 @@
 import jax
 import jax.numpy as jnp
 from jax import random, vmap
-from numpyro.infer import (
-    MCMC,
-    NUTS,
-    HMC,
-    Predictive,
-)
+from numpyro.infer import MCMC, NUTS, HMC, Predictive, SVI, Trace_ELBO
+from numpyro.infer.autoguide import AutoMultivariateNormal
+from numpyro.optim import ClippedAdam, Adam
 from numpyro.infer.hmc_gibbs import HMCGibbs
 
 import src.Models as models
@@ -29,10 +26,10 @@ def sample_posterior_triu_star(key, probs, num_samples=2000):
 
     Args:
         key: JAX PRNGKey
-        probs: array of shape (n_samples, M) with probabilities
+        probs: array of posterior probabilities (N(N-1)/2)
 
     Returns:
-        array of shape (n_samples, M) with Bernoulli samples
+        array of shape (n_samples, N(N-1)/2) with Bernoulli samples
     """
     # Split key for each sample
     keys = random.split(key, num_samples)
@@ -62,26 +59,30 @@ class MWG_init:
         cut_posterior_net_model=models.networks_marginalized_model,
         cut_posterior_outcome_model=models.plugin_outcome_model,
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
-        n_warmup_networks=1500,
-        n_samples_networks=2500,
+        # n_warmup_networks=1500,
+        # n_samples_networks=1500,
+        n_iter_networks=15000,
         n_nets_samples=3000,
         n_warmup_outcome=2000,
         n_samples_outcome=2500,
-        num_chains_networks=4,
+        # num_chains_networks=2,
+        learning_rate=0.001,
         num_chains_outcome=4,
         progress_bar=False,
     ):
-        self.rng_key = rng_key
+        self.rng_key = random.split(rng_key)[0]
         self.data = data
         self.cut_posterior_net_model = cut_posterior_net_model
         self.cut_posterior_outcome_model = cut_posterior_outcome_model
         self.triu_star_log_posterior_fn = triu_star_log_posterior_fn
-        self.n_warmup_networks = n_warmup_networks
-        self.n_samples_networks = n_samples_networks
+        # self.n_warmup_networks = n_warmup_networks
+        # self.n_samples_networks = n_samples_networks
+        self.n_iter_networks = n_iter_networks
         self.n_nets_samples = n_nets_samples
         self.n_warmup_outcome = n_warmup_outcome
         self.n_samples_outcome = n_samples_outcome
-        self.num_chains_networks = num_chains_networks
+        # self.num_chains_networks = num_chains_networks
+        self.learning_rate = learning_rate
         self.num_chains_outcome = num_chains_outcome
         self.progress_bar = progress_bar
 
@@ -99,43 +100,84 @@ class MWG_init:
         """
         Initialize network parameters from cut-posterior
         """
-        runkey, sampkey = random.split(self.rng_key)
+
+        # init with SVI with AutoMultivariateNormal guide
+        guide = AutoMultivariateNormal(self.cut_posterior_net_model)
+
+        # optimizer = ClippedAdam(step_size=self.learning_rate)
+        optimizer = Adam(step_size=self.learning_rate)
+
+        svi = SVI(
+            model=self.cut_posterior_net_model,
+            guide=guide,
+            optim=optimizer,
+            loss=Trace_ELBO(),
+        )
+
+        self.rng_key, _ = random.split(self.rng_key)
+
+        svi_results = svi.run(
+            rng_key=self.rng_key,
+            num_steps=self.n_iter_networks,
+            progress_bar=self.progress_bar,
+            data=self.data,
+        )
+
+        map_params = guide.median(svi_results.params)
+
+        self.rng_key, _ = random.split(self.rng_key)
+
+        preds = Predictive(
+            model=self.cut_posterior_net_model,
+            guide=guide,
+            params=svi_results.params,
+            num_samples=1,
+        )(self.rng_key, self.data)
+
+        self.triu_star_probs = preds["triu_star_probs"][0]
+        self.theta = map_params["theta"]
+        self.gamma = map_params["gamma"]
 
         # init with nuts
 
-        kernel_nets = NUTS(self.cut_posterior_net_model)
-        mcmc_nets = MCMC(
-            kernel_nets,
-            num_warmup=self.n_warmup_networks,
-            num_samples=self.n_samples_networks,
-            num_chains=self.num_chains_networks,
-            progress_bar=self.progress_bar,
-        )
-        mcmc_nets.run(runkey, self.data)
+        # kernel_nets = NUTS(self.cut_posterior_net_model)
+        # mcmc_nets = MCMC(
+        #     kernel_nets,
+        #     num_warmup=self.n_warmup_networks,
+        #     num_samples=self.n_samples_networks,
+        #     num_chains=self.num_chains_networks,
+        #     progress_bar=self.progress_bar,
+        # )
+        # mcmc_nets.run(self.rng_key, self.data)
 
-        post_samples = mcmc_nets.get_samples()
+        # post_samples = mcmc_nets.get_samples()
 
-        self.theta = post_samples["theta"].mean(axis=0)
-        self.gamma = post_samples["gamma"].mean(axis=0)
+        # self.theta = post_samples["theta"].mean(axis=0)
+        # self.gamma = post_samples["gamma"].mean(axis=0)
 
         # get posterior mean of theta and gamma
-        post_means = {
-            "theta": self.theta[None, :],
-            "gamma": self.gamma[None, :],
-        }
+        # post_means = {
+        #     "theta": self.theta[None, :],
+        #     "gamma": self.gamma[None, :],
+        # }
 
         # get posterior probabilities for triu_star
-        self.triu_star_probs = Predictive(
-            model=self.cut_posterior_net_model,
-            posterior_samples=post_means,
-            num_samples=1,
-            return_sites=["triu_star_probs"],
-        )(sampkey, self.data)["triu_star_probs"][0]
+        # self.rng_key, _ = random.split(self.rng_key)
+
+        # self.triu_star_probs = Predictive(
+        #     model=self.cut_posterior_net_model,
+        #     posterior_samples=post_means,
+        #     num_samples=1,
+        #     return_sites=["triu_star_probs"],
+        # )(self.rng_key, self.data)["triu_star_probs"][0]
 
     def init_triu_star_and_exposures(self):
         """
         Initialize triu_star and exposures using theta and gamma samples
         """
+
+        self.rng_key, _ = random.split(self.rng_key)
+
         triu_star_samps = sample_posterior_triu_star(
             self.rng_key, self.triu_star_probs, self.n_nets_samples
         )
@@ -177,8 +219,12 @@ class MWG_init:
             num_warmup=self.n_warmup_outcome,
             num_samples=self.n_samples_outcome,
             num_chains=self.num_chains_outcome,
-            progress_bar=self.progress_bar,
+            # progress_bar=self.progress_bar,
+            progress_bar=False,
         )
+
+        self.rng_key, _ = random.split(self.rng_key)
+
         mcmc_plugin.run(
             self.rng_key, df_nodes, utils.Triu_to_mat(self.triu_star), self.data.Y
         )
@@ -258,7 +304,7 @@ class MWG_sampler:
         continuous_sampler="NUTS",  # one of "NUTS" or "HMC"
         progress_bar=False,
     ):
-        self.rng_key = rng_key
+        self.rng_key = random.split(rng_key)[0]
         self.data = data
         self.init_params = init_params
         self.combined_model = combined_model
@@ -296,6 +342,8 @@ class MWG_sampler:
             num_chains=self.num_chains,
             progress_bar=self.progress_bar,
         )
+
+        self.rng_key, _ = random.split(self.rng_key)
 
         mwg_mcmc.run(self.rng_key, self.data, init_params=self.init_params)
 
