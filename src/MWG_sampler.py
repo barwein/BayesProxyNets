@@ -11,6 +11,7 @@ from numpyro.infer import MCMC, NUTS, HMC, Predictive, SVI, Trace_ELBO
 from numpyro.infer.autoguide import AutoMultivariateNormal
 from numpyro.optim import ClippedAdam, Adam
 from numpyro.infer.hmc_gibbs import HMCGibbs
+import numpyro.handlers as handlers
 
 import src.Models as models
 import src.utils as utils
@@ -51,6 +52,14 @@ def replicate_params(init_params, num_chains):
     return jax.tree.map(lambda x: jnp.repeat(x[None], num_chains, axis=0), init_params)
 
 
+def get_gamma_length(model, data):
+    # Use a dummy random key
+    rng_key = jax.random.PRNGKey(0)
+    # Run the model under a trace handler to record sample sites.
+    tr = handlers.trace(handlers.seed(model, rng_key)).get_trace(data)
+    return tr["gamma"]["value"].shape[0]
+
+
 class MWG_init:
     def __init__(
         self,
@@ -61,12 +70,12 @@ class MWG_init:
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
         # n_warmup_networks=1500,
         # n_samples_networks=1500,
-        n_iter_networks=15000,
+        n_iter_networks=20000,
         n_nets_samples=3000,
         n_warmup_outcome=2000,
         n_samples_outcome=2500,
         # num_chains_networks=2,
-        learning_rate=0.001,
+        learning_rate=0.0005,
         num_chains_outcome=4,
         progress_bar=False,
     ):
@@ -100,12 +109,17 @@ class MWG_init:
         """
         Initialize network parameters from cut-posterior
         """
+        gamma_len = get_gamma_length(self.cut_posterior_net_model, self.data)
+        init_vals = {
+            "theta": jnp.zeros(2),
+            "gamma": jnp.zeros(gamma_len),
+        }
 
         # init with SVI with AutoMultivariateNormal guide
         guide = AutoMultivariateNormal(self.cut_posterior_net_model)
 
-        # optimizer = ClippedAdam(step_size=self.learning_rate)
-        optimizer = Adam(step_size=self.learning_rate)
+        optimizer = ClippedAdam(self.learning_rate)
+        # optimizer = Adam(self.learning_rate)
 
         svi = SVI(
             model=self.cut_posterior_net_model,
@@ -121,6 +135,7 @@ class MWG_init:
             num_steps=self.n_iter_networks,
             progress_bar=self.progress_bar,
             data=self.data,
+            init_params=init_vals,
         )
 
         map_params = guide.median(svi_results.params)
