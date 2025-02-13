@@ -6,7 +6,7 @@ from numpyro.infer import MCMC, NUTS, Predictive, SVI, TraceEnum_ELBO, TraceGrap
 import pyro
 import torch
 from tqdm import tqdm
-import models_for_data_analysis as models
+import Data.Palluck_et_al.models_for_data_analysis as models
 from src.Aux_functions import N_CORES
 
 # --- Global variables ---
@@ -15,16 +15,19 @@ N_CORES = 8
 os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 rng = np.random.default_rng(151)
 
+
 # --- Utility functions ---
 def n_edges_to_n_nodes(n_edges):
     """Compute the number of nodes from the number of edges"""
-    return int((1 + jnp.sqrt(1 + 8*n_edges))/2)
+    return int((1 + jnp.sqrt(1 + 8 * n_edges)) / 2)
+
 
 def Triu_to_mat(triu_v, n):
     """Convert a vector of the upper triangular part of a matrix to a symmetric matrix"""
-    adj_mat = jnp.zeros((n,n))
+    adj_mat = jnp.zeros((n, n))
     adj_mat = adj_mat.at[np.triu_indices(n=n, k=1)].set(triu_v)
     return adj_mat + adj_mat.T
+
 
 @jit
 def eigen_centrality(adj_mat):
@@ -40,6 +43,7 @@ def eigen_centrality(adj_mat):
     scaled_eigenvector = largest_eigenvector / norm
     return scaled_eigenvector
 
+
 @jit
 def zeigen_value(Z, adj_mat):
     """Compute the Z-eigenvalue centrality"""
@@ -49,64 +53,134 @@ def zeigen_value(Z, adj_mat):
     elif Z.ndim == 2:  # Case when Z has shape (M, N)
         return jnp.dot(Z * eig_cen, adj_mat.T)  # Transpose A_mat for correct dimensions
 
+
 def stochastic_intervention(alpha, n, n_approx=1000):
     z_stoch = rng.binomial(n=1, p=alpha, size=(n_approx, n))
     # z_stoch shape is (n_approx, n)
     return z_stoch
 
+
 def trt_and_exposures_of_elig(new_trts_arr, new_exposures_arr, df):
     """Get the treatments and exposures of the eligible students"""
-    elig_mask = df['ELIGIBLE'].values == 1
-    elig_trts = new_trts_arr[:,:,elig_mask]
-    elig_exposures = new_exposures_arr[:,:,elig_mask]
+    elig_mask = df["ELIGIBLE"].values == 1
+    elig_trts = new_trts_arr[:, :, elig_mask]
+    elig_exposures = new_exposures_arr[:, :, elig_mask]
     return elig_trts, elig_exposures
 
+
 # --- MCMC aux functions ---
-def linear_model_samples_parallel(key, trts, exposures, sch_treat, fixed_df, grade, school, Y):
+def linear_model_samples_parallel(
+    key, trts, exposures, sch_treat, fixed_df, grade, school, Y
+):
     """Run the parallel MCMC for the linear model"""
     kernel_outcome = NUTS(models.outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=2000, num_samples=2500,num_chains=4, progress_bar=False)
-    lin_mcmc.run(key, trts=trts, exposures=exposures, sch_treat=sch_treat,
-                 fixed_df=fixed_df, grade=grade, school=school, Y=Y)
+    lin_mcmc = MCMC(
+        kernel_outcome,
+        num_warmup=2000,
+        num_samples=2500,
+        num_chains=4,
+        progress_bar=False,
+    )
+    lin_mcmc.run(
+        key,
+        trts=trts,
+        exposures=exposures,
+        sch_treat=sch_treat,
+        fixed_df=fixed_df,
+        grade=grade,
+        school=school,
+        Y=Y,
+    )
     lin_mcmc.print_summary()
     return lin_mcmc.get_samples()
 
+
 @jit
-def linear_model_samples_vectorized(key, trts, exposures, sch_treat, fixed_df, grade, school, Y):
+def linear_model_samples_vectorized(
+    key, trts, exposures, sch_treat, fixed_df, grade, school, Y
+):
     """Run the vectorized MCMC for the linear model"""
     kernel_outcome = NUTS(models.outcome_model)
-    lin_mcmc = MCMC(kernel_outcome, num_warmup=1000, num_samples=250, num_chains=1,
-                    progress_bar=False, chain_method="vectorized")
-    lin_mcmc.run(key, trts=trts, exposures=exposures, sch_treat=sch_treat,
-                 fixed_df=fixed_df, grade=grade, school=school, Y=Y)
+    lin_mcmc = MCMC(
+        kernel_outcome,
+        num_warmup=1000,
+        num_samples=250,
+        num_chains=1,
+        progress_bar=False,
+        chain_method="vectorized",
+    )
+    lin_mcmc.run(
+        key,
+        trts=trts,
+        exposures=exposures,
+        sch_treat=sch_treat,
+        fixed_df=fixed_df,
+        grade=grade,
+        school=school,
+        Y=Y,
+    )
     return lin_mcmc.get_samples()
 
+
 @jit
-def outcome_jit_pred(trts, exposures, sch_treat, fixed_df, grade, school, post_samples, key):
+def outcome_jit_pred(
+    trts, exposures, sch_treat, fixed_df, grade, school, post_samples, key
+):
     """Predictive function for the outcome model"""
     pred_func = Predictive(models.outcome_model, post_samples)
-    return pred_func(key, trts=trts, exposures=exposures, sch_treat=sch_treat,
-                     fixed_df=fixed_df, grade=grade, school=school)["Y"]
+    return pred_func(
+        key,
+        trts=trts,
+        exposures=exposures,
+        sch_treat=sch_treat,
+        fixed_df=fixed_df,
+        grade=grade,
+        school=school,
+    )["Y"]
 
-linear_model_pred = vmap(outcome_jit_pred, in_axes=(0, 0, None, None, None, None, None, None))
+
+linear_model_pred = vmap(
+    outcome_jit_pred, in_axes=(0, 0, None, None, None, None, None, None)
+)
+
 
 def linear_pred(trts, exposures, sch_treat, fixed_df, grade, school, post_samples, key):
     """Predictive function for the linear model"""
     if trts.ndim == 2:
-        return jnp.mean(linear_model_pred(trts, exposures, sch_treat, fixed_df,
-                                                  grade, school, post_samples, key), axis=0)
+        return jnp.mean(
+            linear_model_pred(
+                trts, exposures, sch_treat, fixed_df, grade, school, post_samples, key
+            ),
+            axis=0,
+        )
     if trts.ndim == 1:
         n_trts = trts.shape[0]
-        return linear_model_pred(trts.reshape((1, n_trts)), exposures.reshape((1, n_trts)),
-                                 sch_treat, fixed_df,
-                                 grade, school, post_samples, key).squeeze()
+        return linear_model_pred(
+            trts.reshape((1, n_trts)),
+            exposures.reshape((1, n_trts)),
+            sch_treat,
+            fixed_df,
+            grade,
+            school,
+            post_samples,
+            key,
+        ).squeeze()
 
 
 # --- Network and outcome wrappers ---
 
+
 class Network_SVI:
     """Class for training the network module and obtaining samples"""
-    def __init__(self, x_df, triu_obs, n_iter=20000, n_samples=10000, network_model=models.one_noisy_networks_model):
+
+    def __init__(
+        self,
+        x_df,
+        triu_obs,
+        n_iter=20000,
+        n_samples=10000,
+        network_model=models.one_noisy_networks_model,
+    ):
         self.x_df = x_df
         self.triu_obs = triu_obs
         self.N_edges = self.x_df.shape[0]
@@ -118,9 +192,10 @@ class Network_SVI:
         self.guide = self.get_guide()
 
     def get_guide(self):
-        return pyro.infer.autoguide.AutoLowRankMultivariateNormal(pyro.poutine.block(self.network_model,
-                                                              hide=["triu_star"]),
-                                      init_loc_fn = pyro.infer.autoguide.init_to_median())
+        return pyro.infer.autoguide.AutoLowRankMultivariateNormal(
+            pyro.poutine.block(self.network_model, hide=["triu_star"]),
+            init_loc_fn=pyro.infer.autoguide.init_to_median(),
+        )
 
     def train_model(self):
         pyro.clear_param_store()
@@ -139,36 +214,45 @@ class Network_SVI:
         # for _ in range(self.n_samples):
         for _ in tqdm(range(self.n_samples), desc="Sampling A*"):
             # Get a trace from the guide
-            guide_trace = pyro.poutine.trace(self.guide).get_trace(self.x_df, self.triu_obs, self.N)
+            guide_trace = pyro.poutine.trace(self.guide).get_trace(
+                self.x_df, self.triu_obs, self.N
+            )
             # Run infer_discrete
-            inferred_model = pyro.infer.infer_discrete(pyro.poutine.replay(self.network_model, guide_trace),
-                                            first_available_dim=-2)
+            inferred_model = pyro.infer.infer_discrete(
+                pyro.poutine.replay(self.network_model, guide_trace),
+                first_available_dim=-2,
+            )
             # Get a trace from the inferred model
-            model_trace = pyro.poutine.trace(inferred_model).get_trace(self.x_df, self.triu_obs, self.N)
+            model_trace = pyro.poutine.trace(inferred_model).get_trace(
+                self.x_df, self.triu_obs, self.N
+            )
             # Extract triu_star from the trace
-            triu_star_samples.append(model_trace.nodes['triu_star']['value'])
+            triu_star_samples.append(model_trace.nodes["triu_star"]["value"])
         # Convert to jnp array
         return jnp.stack(jnp.array(triu_star_samples))
 
     def sample_triu_obs_predictive(self, num_samples=1000):
         """Sample triu_obs for posterior predictive checks"""
-        predictive = pyro.infer.Predictive(self.network_model, guide=self.guide, num_samples=num_samples)
+        predictive = pyro.infer.Predictive(
+            self.network_model, guide=self.guide, num_samples=num_samples
+        )
         # Generate samples
         with torch.no_grad():
             posterior_samples = predictive(self.x_df, None, self.N)
 
         # Extract triu_obs samples
         if self.triu_obs.ndim == 1:
-            triu_obs_samples = posterior_samples['obs_triu']
+            triu_obs_samples = posterior_samples["obs_triu"]
         else:
-            triu_obs_A1 = posterior_samples['obs_triu_A1']
-            triu_obs_A2 = posterior_samples['obs_triu_A2']
+            triu_obs_A1 = posterior_samples["obs_triu_A1"]
+            triu_obs_A2 = posterior_samples["obs_triu_A2"]
             triu_obs_samples = torch.stack([triu_obs_A1, triu_obs_A2])
         return triu_obs_samples
 
 
 class Outcome_MCMC:
     """Class for training the outcome module and obtaining samples"""
+
     def __init__(self, data, rng_key):
         self.fixed_df = data["X"]
         self.school = data["school"]
@@ -178,23 +262,45 @@ class Outcome_MCMC:
         self.exposures = data["exposures"]
         self.Y = data["Y"]
         self.rng_key = rng_key
-        self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, trts=self.trts, exposures=self.exposures,
-                                                                 sch_treat=self.sch_trts, fixed_df=self.fixed_df,
-                                                                 grade=self.grade, school=self.school,
-                                                                 Y=self.Y)
+        self.linear_post_samples = linear_model_samples_parallel(
+            key=self.rng_key,
+            trts=self.trts,
+            exposures=self.exposures,
+            sch_treat=self.sch_trts,
+            fixed_df=self.fixed_df,
+            grade=self.grade,
+            school=self.school,
+            Y=self.Y,
+        )
 
     def get_predicted_values(self, trts, exposures):
         if trts.ndim in [1, 2]:
-            predictions = linear_pred(trts=trts, exposures=exposures, sch_treat=self.sch_trts,
-                                      fixed_df=self.fixed_df, grade=self.grade, school=self.school,
-                                      post_samples=self.linear_post_samples, key=self.rng_key)
+            predictions = linear_pred(
+                trts=trts,
+                exposures=exposures,
+                sch_treat=self.sch_trts,
+                fixed_df=self.fixed_df,
+                grade=self.grade,
+                school=self.school,
+                post_samples=self.linear_post_samples,
+                key=self.rng_key,
+            )
             return predictions
         elif trts.ndim == 3:
             preds_list = []
             for i in range(trts.shape[0]):
-                preds_list.append(linear_pred(trts=trts[i], exposures=exposures[i], sch_treat=self.sch_trts,
-                                              fixed_df=self.fixed_df, grade=self.grade, school=self.school,
-                                              post_samples=self.linear_post_samples, key=self.rng_key))
+                preds_list.append(
+                    linear_pred(
+                        trts=trts[i],
+                        exposures=exposures[i],
+                        sch_treat=self.sch_trts,
+                        fixed_df=self.fixed_df,
+                        grade=self.grade,
+                        school=self.school,
+                        post_samples=self.linear_post_samples,
+                        key=self.rng_key,
+                    )
+                )
             return jnp.stack(preds_list)
         # return predictions
         else:
@@ -204,6 +310,7 @@ class Outcome_MCMC:
 
 # --- Multistage and onestage inference ---
 
+
 # @jit
 def posterior_exposures(triu_sample, trts, n):
     """Compute the posterior exposures values"""
@@ -211,12 +318,24 @@ def posterior_exposures(triu_sample, trts, n):
     zeigen = zeigen_value(trts, curr_Astar)
     return zeigen
 
+
 parallel_post_exposures = pmap(posterior_exposures, in_axes=(0, None, None))
 vectorized_post_exposures = vmap(posterior_exposures, in_axes=(0, None, None))
 
+
 @jit
-def one_linear_run(post_exposures, post_new_exposures, obs_trts, new_trts, sch_trts,
-                   fixed_df, grade, school, Y, key) -> jnp.ndarray:
+def one_linear_run(
+    post_exposures,
+    post_new_exposures,
+    obs_trts,
+    new_trts,
+    sch_trts,
+    fixed_df,
+    grade,
+    school,
+    Y,
+    key,
+) -> jnp.ndarray:
     """
     Run one iteration of the multistage linear model
     @param post_exposures: posterior exposures samples
@@ -225,15 +344,23 @@ def one_linear_run(post_exposures, post_new_exposures, obs_trts, new_trts, sch_t
     @param new_trts: posterior new treatments samples, shape is (G,M,N) where G is the number of new treatments
     """
     # get samples from outcome model
-    lin_samples = linear_model_samples_vectorized(key, obs_trts, post_exposures, sch_trts,
-                                                  fixed_df, grade, school, Y)
+    lin_samples = linear_model_samples_vectorized(
+        key, obs_trts, post_exposures, sch_trts, fixed_df, grade, school, Y
+    )
     # get predictions
     num_new_trts = new_trts.shape[0]
     preds = []
     for i in range(num_new_trts):
-        lin_pred = linear_pred(new_trts[i], post_new_exposures[i], sch_trts, fixed_df,
-                               grade, school,
-                               lin_samples, key)
+        lin_pred = linear_pred(
+            new_trts[i],
+            post_new_exposures[i],
+            sch_trts,
+            fixed_df,
+            grade,
+            school,
+            lin_samples,
+            key,
+        )
         # lin_pred shape is (B, N)
         preds.append(lin_pred)
 
@@ -241,33 +368,56 @@ def one_linear_run(post_exposures, post_new_exposures, obs_trts, new_trts, sch_t
     # res shape is (G, B, N) where G = num_new_trts, B = num_post_samples, N = n
     return res
 
-parallel_linear_run = pmap(one_linear_run, in_axes=(0, 0, None, None, None, None, None, None, None, None))
+
+parallel_linear_run = pmap(
+    one_linear_run, in_axes=(0, 0, None, None, None, None, None, None, None, None)
+)
 
 
-def linear_multistage(post_exposures, post_new_exposures, obs_trts, new_trts, sch_trts, fixed_df,
-                      grade, school, Y, key):
+def linear_multistage(
+    post_exposures,
+    post_new_exposures,
+    obs_trts,
+    new_trts,
+    sch_trts,
+    fixed_df,
+    grade,
+    school,
+    Y,
+    key,
+):
     num_net_samples = post_exposures.shape[0]
     n = obs_trts.shape[0]
     results = []
     for i in range(0, num_net_samples, N_CORES):
-    # for i in tqdm(range(0, num_net_samples, N_CORES),desc="Multistage run"):
-        i_results = parallel_linear_run(post_exposures[i:(i + N_CORES)],
-                                        post_new_exposures[i:(i + N_CORES)],
-                                        obs_trts, new_trts, sch_trts,
-                                        fixed_df, grade, school,
-                                        Y, key)
+        # for i in tqdm(range(0, num_net_samples, N_CORES),desc="Multistage run"):
+        i_results = parallel_linear_run(
+            post_exposures[i : (i + N_CORES)],
+            post_new_exposures[i : (i + N_CORES)],
+            obs_trts,
+            new_trts,
+            sch_trts,
+            fixed_df,
+            grade,
+            school,
+            Y,
+            key,
+        )
         results.append(i_results)
     results_arr = jnp.concatenate(results, axis=0)
     result_arr = jnp.transpose(results_arr, axes=(1, 0, 2, 3))
     num_new_trts = new_trts.shape[0]
     num_post_samples = result_arr.shape[-2]
-    result_arr = result_arr.reshape((num_new_trts, num_net_samples*num_post_samples , n))
+    result_arr = result_arr.reshape(
+        (num_new_trts, num_net_samples * num_post_samples, n)
+    )
     return result_arr
 
 
 class Onestage_MCMC:
-    def __init__(self, obs_trts, post_exposures, sch_trts, fixed_df,
-                 grade, school,Y, rng_key):
+    def __init__(
+        self, obs_trts, post_exposures, sch_trts, fixed_df, grade, school, Y, rng_key
+    ):
         self.obs_trts = obs_trts
         self.post_exposures = post_exposures
         self.sch_trts = sch_trts
@@ -276,25 +426,46 @@ class Onestage_MCMC:
         self.school = school
         self.Y = Y
         self.rng_key = rng_key
-        self.linear_post_samples = linear_model_samples_parallel(key=self.rng_key, trts=self.obs_trts,
-                                                                 exposures=self.post_exposures, sch_treat=self.sch_trts,
-                                                                 fixed_df=self.fixed_df, grade=self.grade,
-                                                                 school=self.school,
-                                                                 Y=self.Y)
+        self.linear_post_samples = linear_model_samples_parallel(
+            key=self.rng_key,
+            trts=self.obs_trts,
+            exposures=self.post_exposures,
+            sch_treat=self.sch_trts,
+            fixed_df=self.fixed_df,
+            grade=self.grade,
+            school=self.school,
+            Y=self.Y,
+        )
 
     def get_predicted_values(self, trts, exposures):
         if trts.ndim in [1, 2]:
-            predictions = linear_pred(trts=trts, exposures=exposures, sch_treat=self.sch_trts,
-                                      fixed_df=self.fixed_df, grade=self.grade, school=self.school,
-                                      post_samples=self.linear_post_samples, key=self.rng_key)
+            predictions = linear_pred(
+                trts=trts,
+                exposures=exposures,
+                sch_treat=self.sch_trts,
+                fixed_df=self.fixed_df,
+                grade=self.grade,
+                school=self.school,
+                post_samples=self.linear_post_samples,
+                key=self.rng_key,
+            )
             # prediction shape is (B, N) where B is the number of post samples and N is the number of nodes
             return predictions
         elif trts.ndim == 3:
             preds_list = []
             for i in range(trts.shape[0]):
-                preds_list.append(linear_pred(trts=trts[i], exposures=exposures[i], sch_treat=self.sch_trts,
-                                              fixed_df=self.fixed_df, grade=self.grade, school=self.school,
-                                              post_samples=self.linear_post_samples, key=self.rng_key))
+                preds_list.append(
+                    linear_pred(
+                        trts=trts[i],
+                        exposures=exposures[i],
+                        sch_treat=self.sch_trts,
+                        fixed_df=self.fixed_df,
+                        grade=self.grade,
+                        school=self.school,
+                        post_samples=self.linear_post_samples,
+                        key=self.rng_key,
+                    )
+                )
                 #  prediction shape is (B, N) where B is the number of post samples and N is the number of nodes
             return jnp.stack(preds_list)
         # return predictions
