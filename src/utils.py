@@ -185,3 +185,20 @@ def compute_error_stats(post_estimates, true_estimand):
         "covering": coverage,
         "mean_ind_cover": mean_cover_ind,
     }
+
+
+# TODO: 
+def compute_posterior_mmd(post_samples, true_params):
+    """
+    Compute MMD between posterior samples and true parameters
+
+    Args:
+    post_samples: Dict ofpPosterior samples of parameters. 
+                    Each key is a parameter name and values are samples with shape (M, k) 
+
+    true_params: Dict of true parameters. Each key is a parameter name and values are true values with shape (k,)
+
+    Returns:
+    Dict: MMD value 
+
+    """

@@ -15,8 +15,8 @@ import jax.numpy as jnp
 from jax import random
 from jax.scipy.special import logit
 
-from simulation_aux import one_simulation_iter
-import data_gen as dg
+from Simulations.simulation_aux import one_simulation_iter
+import Simulations.data_gen as dg
 
 
 # --- Global variables ---
