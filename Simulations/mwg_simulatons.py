@@ -15,8 +15,8 @@ import jax.numpy as jnp
 from jax import random
 from jax.scipy.special import logit
 
-from Simulations.simulation_aux import one_simulation_iter
-import Simulations.data_gen as dg
+from simulation_aux import one_simulation_iter
+import data_gen as dg
 
 
 # --- Global variables ---
@@ -25,9 +25,14 @@ N = 500
 TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2.5, 1])
-GAMMA_F = jnp.array([logit(0.85), logit(0.1)])
+# GAMMA_F = jnp.array([logit(0.85), logit(0.1)])
+GAMMA_BASELINE = jnp.array([logit(0.95), logit(0.05)])
+
 GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.2), 1])
 GAMMA_X_NOISES = jnp.arange(1, 3.5 + 1e-6, 0.5)
+
+GAMMA_B_NOISE_0 = GAMMA_BASELINE[0] - GAMMA_X_NOISES / 2
+GAMMA_B_NOISE_1 = GAMMA_BASELINE[1] + GAMMA_X_NOISES / 2
 
 # ETA = jnp.array([-1, 3, -0.25, 2])
 ETA = jnp.array([-1, 3, -0.5, 2])
@@ -60,6 +65,14 @@ for i in range(N_ITER):
     rng_key, _ = random.split(rng_key)
     fixed_data = dg.generate_fixed_data(rng_key, N, PARAM, PZ)
 
+    # true_vals for wasserstein distance
+    true_vals = {
+        "eta": ETA,
+        "rho": jnp.array([RHO]),
+        "sig_inv": jnp.array([SIG_INV]),
+        "triu_star": fixed_data["triu_star"],
+    }
+
     print(f"mean true exposures: {jnp.mean(fixed_data['true_exposures'])}")
 
     # generate new interventions
@@ -73,7 +86,13 @@ for i in range(N_ITER):
 
         # update gamma
         cur_gamma = jnp.concatenate(
-            [GAMMA_F, jnp.array([GAMMA_X_NOISES[j]]), GAMMA_REP]
+            # [GAMMA_F, jnp.array([GAMMA_X_NOISES[j]]), GAMMA_REP]
+            [
+                jnp.array([GAMMA_B_NOISE_0[j]]),
+                jnp.array([GAMMA_B_NOISE_1[j]]),
+                jnp.array([GAMMA_X_NOISES[j]]),
+                GAMMA_REP,
+            ]
         )
 
         print("cur gamma: ", cur_gamma)
@@ -94,7 +113,8 @@ for i in range(N_ITER):
 
         # run one iteration
         rng_key = random.split(rng_key)[0]
-        idx = i * N_ITER + j * N_GAMMAS
+        # idx = i * N_ITER + j * N_GAMMAS
+        idx = str(i) + "_" + str(j)
 
         one_simulation_iter(
             iter=i,
@@ -103,5 +123,6 @@ for i in range(N_ITER):
             data=data_sim,
             new_interventions=new_interventions,
             cur_gamma_noise=GAMMA_X_NOISES[j],
+            true_vals=true_vals,
             file_path=FILEPATH,
         )

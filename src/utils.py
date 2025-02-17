@@ -132,13 +132,14 @@ def get_estimates(z_diff, expos_diff, eta_samps):
 get_estimates_vmap = vmap(get_estimates, in_axes=(0, 0, None))
 
 
-def compute_error_stats(post_estimates, true_estimand):
+def compute_error_stats(post_estimates, true_estimand, wasserstein_dist):
     """
     Compute error metrics for posterior estimates
 
     Args:
     post_estimates: Posterior estimates with shape (M, N) where M is the number of samples
     true_estimand: True estimand with shape (N,)
+    wasserstein_dist: Wasserstein distance between posterior samples and true values
 
     """
     # mean values
@@ -184,21 +185,74 @@ def compute_error_stats(post_estimates, true_estimand):
         "q975": q975,
         "covering": coverage,
         "mean_ind_cover": mean_cover_ind,
+        "w_dist": wasserstein_dist,
     }
 
 
-# TODO: 
-def compute_posterior_mmd(post_samples, true_params):
+@jax.jit
+def compute_1w_distance(
+    posterior_samples: dict, true_vals: dict, lambda_discrete: float = 1.0
+) -> float:
     """
-    Compute MMD between posterior samples and true parameters
+    Compute the 1-Wasserstein distance (average distance) between
+    posterior samples and the true parameters, assuming exactly one
+    discrete key called 'triu_star' and all other keys are continuous.
 
-    Args:
-    post_samples: Dict ofpPosterior samples of parameters. 
-                    Each key is a parameter name and values are samples with shape (M, k) 
+    Parameters
+    ----------
+    posterior_samples : dict of jnp.ndarray
+        Each entry has shape (M, k_i).
+        E.g.:
+          - 'theta': (M, 2)
+          - 'eta':   (M, 4)
+          - ...
+          - 'triu_star': (M, 124750)  <-- discrete/binary or categorical
 
-    true_params: Dict of true parameters. Each key is a parameter name and values are true values with shape (k,)
+    true_vals : dict of jnp.ndarray
+        Each entry has shape (k_i,).
+        E.g.:
+          - 'theta': (2,)
+          - 'eta':   (4,)
+          - ...
+          - 'triu_star': (124750,)
 
-    Returns:
-    Dict: MMD value 
+    lambda_discrete : float
+        Weight for discrete mismatch distance.
 
+    Returns
+    -------
+    float
+        The 1-Wasserstein distance = mean of the mixed distance
+        from each sample to the true parameters (point mass).
     """
+    # Get all keys from the posterior_samples dict
+    sample_keys = list(posterior_samples.keys())
+    # Assume M (number of samples) is consistent across keys
+    M = posterior_samples[sample_keys[0]].shape[0]
+
+    # This function computes the distance for the sample at index `m`
+    def single_sample_distances(m: int) -> float:
+        dist_m = 0.0
+        # Loop over every key in the dict
+        for key in sample_keys:
+            sample_val = posterior_samples[key][m]  # shape (k_i,)
+            true_val = true_vals[key]  # shape (k_i,)
+
+            if key == "triu_star":
+                # Discrete distance:
+                # Fraction of mismatches (Hamming distance normalized by length)
+                mismatches = jnp.sum(sample_val != true_val)
+                frac_mismatch = mismatches / sample_val.size
+                dist_m += lambda_discrete * frac_mismatch
+            else:
+                # Continuous distance (Euclidean norm)
+                dist_m += jnp.linalg.norm(sample_val - true_val, ord=2)
+
+        return dist_m
+
+    # Vectorize the distance computation over all sample indices [0..M-1]
+    indices = jnp.arange(M)
+    distances = jax.vmap(single_sample_distances)(indices)
+
+    # 1-Wasserstein distance = mean of these distances
+    return jnp.mean(distances)

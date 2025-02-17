@@ -24,7 +24,8 @@ import src.utils as utils
 # rho ~ Beta(2, 2)
 # sig_inv ~ Gamma(2, 2)
 
-PRIOR_SCALE = jnp.sqrt(3).item()
+# PRIOR_SCALE = jnp.sqrt(3).item()
+PRIOR_SCALE = jnp.sqrt(5).item()
 
 ### --- NumPyro models --- ###
 

@@ -72,7 +72,21 @@ class mcmc_fixed_net:
 
         return mcmc_.get_samples()
 
-    def new_intervention_error_stats(self, new_z, true_estimands):
+    def wasserstein_distance(self, true_vals):
+        post_samps = self.samples.copy()
+        post_samps['triu_star'] = jnp.repeat(jnp.array([self.triu]), 
+                                                self.n_samples*self.num_chains,
+                                                axis=0)
+        post_samps["rho"] = post_samps["rho"][:, None]
+        post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
+
+        return utils.compute_1w_distance(post_samps, true_vals)
+
+
+
+    def new_intervention_error_stats(self, new_z, true_estimands, true_vals):
+        wasser_dist = self.wasserstein_distance(true_vals)
+
         if new_z.ndim == 3:  # stoch intervention
             # compute exposures for new interventions
             expos_1 = utils.compute_exposures(self.triu, new_z[0, :, :])
@@ -83,13 +97,13 @@ class mcmc_fixed_net:
                 z_diff, expos_diff, self.samples["eta"]
             ).mean(axis=0)
             # estimates should have shape (M,n) where M is number of posterior samples
-            return utils.compute_error_stats(estimates, true_estimands)
+            return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
         elif new_z.ndim == 2:  # dynamic intervention
             expos_1 = utils.compute_exposures(self.triu, new_z[0, :])
             expos_2 = utils.compute_exposures(self.triu, new_z[1, :])
             expos_diff = expos_1 - expos_2
             z_diff = new_z[0, :] - new_z[1, :]
             estimates = utils.get_estimates(z_diff, expos_diff, self.samples["eta"])
-            return utils.compute_error_stats(estimates, true_estimands)
+            return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
         else:
             raise ValueError("Invalid dimension for new interventions")
