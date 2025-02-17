@@ -52,9 +52,6 @@ FILEPATH = "Simulations/results"
 N_ITER = 1
 N_GAMMAS = GAMMA_X_NOISES.shape[0]
 
-# TODO: add MMD as summarizing metric for model
-# TODO: change names to 'stoch'
-# TODO: fix rng_key numbers and 'idx' in results
 
 for i in range(N_ITER):
     # Set keys
