@@ -145,18 +145,23 @@ def compute_error_stats(post_estimates, true_estimand, wasserstein_dist):
     # mean values
     mean_estimand = jnp.mean(true_estimand)  # scalar
     mean_of_units = jnp.mean(post_estimates, axis=1)  # shape (M,)
+    mean_of_samples = jnp.mean(post_estimates, axis=0)  # shape (N,)
     mean_all = jnp.mean(post_estimates)  # scalar
     median_all = jnp.median(post_estimates)  # scalar
 
     # raw errors
     units_error = mean_of_units - mean_estimand
     units_rel_error = (mean_of_units - mean_estimand) / mean_estimand
+    unit_level_error = mean_of_samples - true_estimand
+    unit_level_rel_error = (mean_of_samples - true_estimand) / (true_estimand + 1e-6)
 
     # error metrics
     rmse = jnp.round(jnp.sqrt(jnp.mean(jnp.square(units_error))), 5)
     rmse_rel = jnp.round(jnp.sqrt(jnp.mean(jnp.square(units_rel_error))), 5)
-    mae = jnp.round(jnp.mean(jnp.abs(units_error)), 5)
-    mape = jnp.round(jnp.mean(jnp.abs(units_rel_error)), 5)
+    # mae = jnp.round(jnp.mean(jnp.abs(units_error)), 5)
+    mae = jnp.round(jnp.mean(jnp.abs(unit_level_error)), 5)
+    # mape = jnp.round(jnp.mean(jnp.abs(units_rel_error)), 5)
+    mape = jnp.round(jnp.mean(jnp.abs(unit_level_rel_error)), 5)
 
     bias = jnp.round(mean_all - mean_estimand, 5)
     std = jnp.round(jnp.std(mean_of_units), 5)
