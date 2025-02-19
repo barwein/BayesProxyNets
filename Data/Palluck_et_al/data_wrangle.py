@@ -32,6 +32,9 @@ ST_W2_COLS = [
     "ST10W2",
 ]
 BF_COLS = ["BF1", "BF2"]
+BF_W2_COLS = ["BF1W2", "BF2W2"]
+
+# TODO: add more covariates!
 COV_FOR_NETWORK = [
     ["GENC"],
     ["ETHW", "ETHB", "ETHH", "ETHA", "ETHC", "ETHSA"],
