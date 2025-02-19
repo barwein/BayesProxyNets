@@ -94,7 +94,8 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     )
 
     # Get subset of relevant columns for analysis (outcome, treatents, covariates)
-    data_subset = data_cleaned[REL_VARIABLES + ST_COLS + ST_W2_COLS + BF_COLS]
+    # data_subset = data_cleaned[REL_VARIABLES + ST_COLS + ST_W2_COLS + BF_COLS]
+    data_subset = data_cleaned[REL_VARIABLES + ST_COLS + ST_W2_COLS + BF_COLS + BF_W2_COLS]
     for cov in COV_LIST:
         if type(data_cleaned[cov].iloc[1]) == str:
             val = data_cleaned[cov].apply(extract_numeric).fillna(0.0).astype(int)
