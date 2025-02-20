@@ -25,7 +25,8 @@ import src.utils as utils
 # sig_inv ~ Gamma(2, 2)
 
 # PRIOR_SCALE = jnp.sqrt(3).item()
-PRIOR_SCALE = jnp.sqrt(5).item()
+# PRIOR_SCALE = jnp.sqrt(5).item()
+PRIOR_SCALE = 3
 
 ### --- NumPyro models --- ###
 

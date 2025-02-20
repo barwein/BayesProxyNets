@@ -93,36 +93,51 @@ class mcmc_fixed_net:
         assert new_z.shape[0] == 2
 
         if new_z.ndim == 2:  # dynamic treatmets
+            new_expos = utils.vmap_compute_exposures_new_z(self.triu, new_z)
             rng_keys = random.split(self.rng_key, 2)
-            data_list = jax.vmap(utils.get_data_new_z, in_axes=(0, None))(
-                new_z, self.data
-            )
-            pred_samples = jax.vmap(lambda rk, d: self.pred_func(rk, d)["Y"])(
-                rng_keys, data_list
-            )
+            df_list = utils.vmap_df_new_z(new_z, new_expos, self.data.x)
+
+            pred_samples = jax.vmap(
+                lambda rk, df: self.pred_func(rk, df, self.adj_mat, None)["Y"]
+            )(rng_keys, df_list)
             preds = pred_samples[0] - pred_samples[1]
 
-        elif new_z.ndim == 3:  # stoch treatments
+        elif new_z.ndim == 3:
+            # Case: new_z has shape (2, n_approx, n)
             n_approx = new_z.shape[1]
+
+            # Generate independent RNG keys for all 2 * n_approx calls
             rng_keys = random.split(self.rng_key, 2 * n_approx).reshape(2, n_approx, -1)
-            vmap_func = jax.vmap(
+
+            # Fully vectorized computation over (2, n_approx)
+            vmap_exposures = jax.vmap(
+                utils.vmap_compute_exposures_new_z, in_axes=(None, 0)
+            )
+            new_expos = vmap_exposures(self.triu, new_z)  # Shape (2, n_approx, n)
+
+            vmap_df = jax.vmap(utils.vmap_df_new_z, in_axes=(0, 0, None))
+            df_list = vmap_df(
+                new_z, new_expos, self.data.x
+            )  # Shape (2, n_approx, n, 4)
+
+            # Fully vectorized function with correct in_axes
+            vmap_pred = jax.vmap(
                 jax.vmap(
-                    lambda zk, rk: self.pred_func(
-                        rk, utils.get_data_new_z(zk, self.data)
-                    )["Y"],
+                    lambda rk, df: self.pred_func(rk, df, self.adj_mat, None)["Y"],
                     in_axes=(0, 0),  # Maps over n_approx
                 ),
-                in_axes=(0, 0),  # Maps over the intervention groups (2)
+                in_axes=(0, 0),  # Maps over intervention groups (2)
             )
-            pred_samples = vmap_func(
-                new_z, rng_keys
-            )  # Expected shape (2, n_approx, m, n)
-            preds_diff = pred_samples[0] - pred_samples[1]
-            # return mean across n_approx (number of stoch treatments approx)
+
+            pred_samples = vmap_pred(rng_keys, df_list)  # Shape (2, n_approx, m, n)
+
+            preds_diff = (
+                pred_samples[0] - pred_samples[1]
+            )  # Output shape (n_approx, m, n)
             preds = preds_diff.mean(axis=0)
 
         else:
-            raise ValueError("new_z should have shape (2,n) or (2, n_approx, n)")
+            raise ValueError("new_z should have shape (2, n) or (2, n_approx, n)")
 
         return preds
 

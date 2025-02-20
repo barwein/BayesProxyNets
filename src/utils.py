@@ -103,6 +103,8 @@ def compute_exposures(triu_star, Z):
 
 vmap_compute_exposures = vmap(compute_exposures, in_axes=(0, None))
 
+vmap_compute_exposures_new_z = vmap(compute_exposures, in_axes=(None, 0))
+
 
 def get_data_new_z(new_z, data):
     """
@@ -126,6 +128,24 @@ def get_data_new_z(new_z, data):
         true_exposures=data.true_exposures,
         Y=None,
     )
+
+
+@jit
+def df_node_new_z(new_z, new_expos, x):
+    n = x.shape[0]
+    return jnp.transpose(
+        jnp.stack(
+            [
+                jnp.ones(n),
+                new_z,
+                x,
+                new_expos,
+            ]
+        )
+    )
+
+
+vmap_df_new_z = vmap(df_node_new_z, in_axes=(0, 0, None))
 
 
 @jit
@@ -167,11 +187,11 @@ def compute_error_stats(post_estimates, true_estimand, wasserstein_dist):
 
     """
     # mean values
-    mean_estimand = jnp.mean(true_estimand)  # scalar
-    mean_of_units = jnp.mean(post_estimates, axis=1)  # shape (M,)
-    mean_of_samples = jnp.mean(post_estimates, axis=0)  # shape (N,)
-    mean_all = jnp.mean(post_estimates)  # scalar
-    median_all = jnp.median(post_estimates)  # scalar
+    mean_estimand = jnp.nanmean(true_estimand)  # scalar
+    mean_of_units = jnp.nanmean(post_estimates, axis=1)  # shape (M,)
+    mean_of_samples = jnp.nanmean(post_estimates, axis=0)  # shape (N,)
+    mean_all = jnp.nanmean(post_estimates)  # scalar
+    median_all = jnp.nanmedian(post_estimates)  # scalar
 
     # raw errors
     units_error = mean_of_units - mean_estimand
@@ -180,25 +200,25 @@ def compute_error_stats(post_estimates, true_estimand, wasserstein_dist):
     unit_level_rel_error = (mean_of_samples - true_estimand) / (true_estimand + 1e-6)
 
     # error metrics
-    rmse = jnp.round(jnp.sqrt(jnp.mean(jnp.square(units_error))), 5)
-    rmse_rel = jnp.round(jnp.sqrt(jnp.mean(jnp.square(units_rel_error))), 5)
+    rmse = jnp.round(jnp.sqrt(jnp.nanmean(jnp.square(units_error))), 5)
+    rmse_rel = jnp.round(jnp.sqrt(jnp.nanmean(jnp.square(units_rel_error))), 5)
     # mae = jnp.round(jnp.mean(jnp.abs(units_error)), 5)
-    mae = jnp.round(jnp.mean(jnp.abs(unit_level_error)), 5)
+    mae = jnp.round(jnp.nanmean(jnp.abs(unit_level_error)), 5)
     # mape = jnp.round(jnp.mean(jnp.abs(units_rel_error)), 5)
-    mape = jnp.round(jnp.mean(jnp.abs(unit_level_rel_error)), 5)
+    mape = jnp.round(jnp.nanmean(jnp.abs(unit_level_rel_error)), 5)
 
     bias = jnp.round(mean_all - mean_estimand, 5)
-    std = jnp.round(jnp.std(mean_of_units), 5)
+    std = jnp.round(jnp.nanstd(mean_of_units), 5)
 
     # coverage
-    q025 = jnp.quantile(mean_of_units, 0.025)
-    q975 = jnp.quantile(mean_of_units, 0.975)
+    q025 = jnp.nanquantile(mean_of_units, 0.025)
+    q975 = jnp.nanquantile(mean_of_units, 0.975)
     coverage = (q025 <= mean_estimand) & (mean_estimand <= q975)
 
-    q025_ind = jnp.quantile(post_estimates, 0.025, axis=0)
-    q975_ind = jnp.quantile(post_estimates, 0.975, axis=0)
+    q025_ind = jnp.nanquantile(post_estimates, 0.025, axis=0)
+    q975_ind = jnp.nanquantile(post_estimates, 0.975, axis=0)
     coverage_ind = (q025_ind <= true_estimand) & (true_estimand <= q975_ind)
-    mean_cover_ind = jnp.round(jnp.mean(coverage_ind), 5)
+    mean_cover_ind = jnp.round(jnp.nanmean(coverage_ind), 5)
 
     return {
         "mean": jnp.round(mean_all, 5),
