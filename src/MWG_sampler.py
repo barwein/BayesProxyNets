@@ -313,7 +313,7 @@ class MWG_sampler:
         init_params,
         gwg_fn=make_gwg_gibbs_fn,
         combined_model=models.combined_model,
-        n_warmup=2000,
+        n_warmup=3000,
         n_samples=2500,
         num_chains=4,
         continuous_sampler="NUTS",  # one of "NUTS" or "HMC"

@@ -30,7 +30,7 @@ GAMMA_BASELINE = jnp.array([logit(0.95), logit(0.05)])
 # GAMMA_BASELINE = jnp.array([logit(0.98), logit(0.02)])
 
 # GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.2), 1])
-GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.15), 1])
+GAMMA_REP = jnp.array([logit(0.8), 1.5, logit(0.2), 1.5])
 # GAMMA_X_NOISES = jnp.arange(1, 3.5 + 1e-6, 0.5)
 GAMMA_X_NOISES = jnp.arange(2, 4 + 1e-6, 0.5)
 # GAMMA_X_NOISES = jnp.arange(3.0, 5.0 + 1e-6, 0.5)
