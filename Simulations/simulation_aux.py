@@ -18,8 +18,8 @@ def one_simulation_iter(
         rng_key=rng_key,
         data=data,
         net_type="true",
-        n_warmup=2000,
-        n_samples=2500,
+        n_warmup=500,
+        n_samples=500,
         num_chains=4,
         progress_bar=False,
     )
@@ -64,8 +64,8 @@ def one_simulation_iter(
         rng_key=rng_key,
         data=data,
         net_type="obs",
-        n_warmup=2000,
-        n_samples=2500,
+        n_warmup=500,
+        n_samples=500,
         num_chains=4,
         progress_bar=False,
     )
