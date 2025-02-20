@@ -26,10 +26,14 @@ TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2.5, 1])
 # GAMMA_F = jnp.array([logit(0.85), logit(0.1)])
-GAMMA_BASELINE = jnp.array([logit(0.95), logit(0.05)])
+# GAMMA_BASELINE = jnp.array([logit(0.95), logit(0.05)])
+GAMMA_BASELINE = jnp.array([logit(0.98), logit(0.02)])
 
-GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.2), 1])
-GAMMA_X_NOISES = jnp.arange(1, 3.5 + 1e-6, 0.5)
+# GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.2), 1])
+GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.15), 1])
+# GAMMA_X_NOISES = jnp.arange(1, 3.5 + 1e-6, 0.5)
+# GAMMA_X_NOISES = jnp.arange(2.5, 3.5 + 1e-6, 0.5)
+GAMMA_X_NOISES = jnp.arange(3.0, 5.0 + 1e-6, 0.5)
 
 GAMMA_B_NOISE_0 = GAMMA_BASELINE[0] - GAMMA_X_NOISES / 2
 GAMMA_B_NOISE_1 = GAMMA_BASELINE[1] + GAMMA_X_NOISES / 2

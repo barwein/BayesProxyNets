@@ -1,5 +1,7 @@
 import jax.numpy as jnp
-from numpyro.infer import MCMC, NUTS
+import jax
+from jax import random, vmap
+from numpyro.infer import MCMC, NUTS, Predictive
 import src.Models as models
 import src.utils as utils
 
@@ -27,6 +29,10 @@ class mcmc_fixed_net:
 
         self.df_nodes, self.adj_mat, self.triu = self.df_nodes_and_adj_mat()
         self.samples = self.get_samples()
+
+        self.pred_func = Predictive(
+            model=models.plugin_outcome_model, posterior_samples=self.samples
+        )
 
     def df_nodes_and_adj_mat(self):
         if self.net_type == "true":
@@ -74,36 +80,78 @@ class mcmc_fixed_net:
 
     def wasserstein_distance(self, true_vals):
         post_samps = self.samples.copy()
-        post_samps['triu_star'] = jnp.repeat(jnp.array([self.triu]), 
-                                                self.n_samples*self.num_chains,
-                                                axis=0)
+        post_samps["triu_star"] = jnp.repeat(
+            jnp.array([self.triu]), self.n_samples * self.num_chains, axis=0
+        )
         post_samps["rho"] = post_samps["rho"][:, None]
         post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
 
         return utils.compute_1w_distance(post_samps, true_vals)
 
+    def sample_pred_y(self, new_z):
+        # TODO: make it happen the plugin outcome model with new z
+        assert new_z.shape[0] == 2
 
+        if new_z.ndim == 2:  # dynamic treatmets
+            rng_keys = random.split(self.rng_key, 2)
+            data_list = jax.vmap(utils.get_data_new_z, in_axes=(0, None))(
+                new_z, self.data
+            )
+            pred_samples = jax.vmap(lambda rk, d: self.pred_func(rk, d)["Y"])(
+                rng_keys, data_list
+            )
+            preds = pred_samples[0] - pred_samples[1]
+
+        elif new_z.ndim == 3:  # stoch treatments
+            n_approx = new_z.shape[1]
+            rng_keys = random.split(self.rng_key, 2 * n_approx).reshape(2, n_approx, -1)
+            vmap_func = jax.vmap(
+                jax.vmap(
+                    lambda zk, rk: self.pred_func(
+                        rk, utils.get_data_new_z(zk, self.data)
+                    )["Y"],
+                    in_axes=(0, 0),  # Maps over n_approx
+                ),
+                in_axes=(0, 0),  # Maps over the intervention groups (2)
+            )
+            pred_samples = vmap_func(
+                new_z, rng_keys
+            )  # Expected shape (2, n_approx, m, n)
+            preds_diff = pred_samples[0] - pred_samples[1]
+            # return mean across n_approx (number of stoch treatments approx)
+            preds = preds_diff.mean(axis=0)
+
+        else:
+            raise ValueError("new_z should have shape (2,n) or (2, n_approx, n)")
+
+        return preds
 
     def new_intervention_error_stats(self, new_z, true_estimands, true_vals):
         wasser_dist = self.wasserstein_distance(true_vals)
 
-        if new_z.ndim == 3:  # stoch intervention
-            # compute exposures for new interventions
-            expos_1 = utils.compute_exposures(self.triu, new_z[0, :, :])
-            expos_2 = utils.compute_exposures(self.triu, new_z[1, :, :])
-            expos_diff = expos_1 - expos_2
-            z_diff = new_z[0, :, :] - new_z[1, :, :]
-            estimates = utils.get_estimates_vmap(
-                z_diff, expos_diff, self.samples["eta"]
-            ).mean(axis=0)
-            # estimates should have shape (M,n) where M is number of posterior samples
-            return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
-        elif new_z.ndim == 2:  # dynamic intervention
-            expos_1 = utils.compute_exposures(self.triu, new_z[0, :])
-            expos_2 = utils.compute_exposures(self.triu, new_z[1, :])
-            expos_diff = expos_1 - expos_2
-            z_diff = new_z[0, :] - new_z[1, :]
-            estimates = utils.get_estimates(z_diff, expos_diff, self.samples["eta"])
-            return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
-        else:
-            raise ValueError("Invalid dimension for new interventions")
+        post_y_preds = self.sample_pred_y(new_z)
+        return utils.compute_error_stats(post_y_preds, true_estimands, wasser_dist)
+
+    # def new_intervention_error_stats(self, new_z, true_estimands, true_vals):
+    #     wasser_dist = self.wasserstein_distance(true_vals)
+
+    #     if new_z.ndim == 3:  # stoch intervention
+    #         # compute exposures for new interventions
+    #         expos_1 = utils.compute_exposures(self.triu, new_z[0, :, :])
+    #         expos_2 = utils.compute_exposures(self.triu, new_z[1, :, :])
+    #         expos_diff = expos_1 - expos_2
+    #         z_diff = new_z[0, :, :] - new_z[1, :, :]
+    #         estimates = utils.get_estimates_vmap(
+    #             z_diff, expos_diff, self.samples["eta"]
+    #         ).mean(axis=0)
+    #         # estimates should have shape (M,n) where M is number of posterior samples
+    #         return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
+    #     elif new_z.ndim == 2:  # dynamic intervention
+    #         expos_1 = utils.compute_exposures(self.triu, new_z[0, :])
+    #         expos_2 = utils.compute_exposures(self.triu, new_z[1, :])
+    #         expos_diff = expos_1 - expos_2
+    #         z_diff = new_z[0, :] - new_z[1, :]
+    #         estimates = utils.get_estimates(z_diff, expos_diff, self.samples["eta"])
+    #         return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
+    #     else:
+    #         raise ValueError("Invalid dimension for new interventions")

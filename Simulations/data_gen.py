@@ -58,6 +58,7 @@ def generate_outcomes_n_exposures(rng, n, x, z, triu_star, eta, rho, sig_inv):
     mean_y = df_nodes @ eta
 
     y_cov = CAR_cov(triu_star, sig_inv, rho, n)
+    # y_cov = jnp.eye(n) * sig_inv
 
     # Generate observed outcomes
     # y = jnp.array(

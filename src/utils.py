@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import jax
 from jax import jit, vmap
 import numpy as np
-from typing import NamedTuple
+from typing import NamedTuple, Any
 # from functools import partial
 
 
@@ -28,7 +28,7 @@ class DataTuple(NamedTuple):
     Z: jnp.ndarray
     obs_exposures: jnp.ndarray
     true_exposures: jnp.ndarray
-    Y: jnp.ndarray
+    Y: Any
 
 
 class ParamTuple(NamedTuple):
@@ -102,6 +102,30 @@ def compute_exposures(triu_star, Z):
 
 
 vmap_compute_exposures = vmap(compute_exposures, in_axes=(0, None))
+
+
+def get_data_new_z(new_z, data):
+    """
+    Get new data tuple for new interventions
+
+    Args:
+    new_z: new interventions with shape (n,)
+    data: data tuple
+
+    """
+    return DataTuple(
+        x=data.x,
+        x2=data.x2,
+        x_diff=data.x_diff,
+        x2_or=data.x2_or,
+        triu_star=data.triu_star,
+        triu_obs=data.triu_obs,
+        triu_obs_rep=data.triu_obs_rep,
+        Z=new_z,
+        obs_exposures=data.obs_exposures,
+        true_exposures=data.true_exposures,
+        Y=None,
+    )
 
 
 @jit

@@ -189,6 +189,7 @@ def networks_marginalized_model_rep(data):
     numpyro.deterministic("triu_star_probs", posterior_star)
 
 
+# def plugin_outcome_model(df_nodes, adj_mat, Y):
 def plugin_outcome_model(df_nodes, adj_mat, Y):
     """
     Plugin model for outcome given A*
@@ -222,6 +223,9 @@ def plugin_outcome_model(df_nodes, adj_mat, Y):
         obs=Y,
     )
 
+    # with numpyro.plate("Y plate", Y.shape[0]):
+    #     numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=Y)
+
 
 def combined_model(data):
     """
@@ -246,6 +250,7 @@ def combined_model(data):
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
     triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+
     adj_mat = utils.Triu_to_mat(triu_star)
 
     # Outcome model
@@ -275,6 +280,8 @@ def combined_model(data):
         ),
         obs=data.Y,
     )
+    # with numpyro.plate("Y plate", data.Y.shape[0]):
+    #     numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
 
     # === Proxy network model with single measures ===
     # priors
@@ -316,6 +323,7 @@ def combined_model_rep(data):
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
     triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+
     adj_mat = utils.Triu_to_mat(triu_star)
 
     # === Outcome model ===
@@ -345,6 +353,9 @@ def combined_model_rep(data):
         ),
         obs=data.Y,
     )
+
+    # with numpyro.plate("Y plate", data.Y.shape[0]):
+    #     numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
 
     # === Proxy network model with repeated measures ===
     # priors
@@ -417,6 +428,19 @@ def car_logdensity(y, mu, sigma, rho, adj_matrix):
 
 
 @jit
+def iid_logdensity(y, mu, sigma):
+    y_centered = y - mu
+    n = y.shape[0]
+
+    normalizing = -n / 2 * jnp.log(2 * jnp.pi)
+    sig_term = -n * jnp.log(sigma)
+
+    quad_term = (-0.5 / jnp.square(sigma)) * jnp.sum(y_centered**2)
+
+    return normalizing + sig_term + quad_term
+
+
+@jit
 def cond_logpost_a_star(triu_star, data, param):
     """
     Conditional log-posterior for A* given the rest of the parameters and data
@@ -460,6 +484,8 @@ def cond_logpost_a_star(triu_star, data, param):
         jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, data.x, exposures])
     )
     mean_y = jnp.dot(df_nodes, param.eta)
+
+    # y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
 
     y_logpdf = car_logdensity(
         data.Y, mean_y, param.sig_inv, param.rho, utils.Triu_to_mat(triu_star)
@@ -528,6 +554,8 @@ def cond_logpost_a_star_rep(triu_star, data, param):
         jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, data.x, exposures])
     )
     mean_y = jnp.dot(df_nodes, param.eta)
+
+    # y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
 
     y_logpdf = car_logdensity(
         data.Y, mean_y, param.sig_inv, param.rho, utils.Triu_to_mat(triu_star)
