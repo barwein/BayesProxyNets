@@ -283,6 +283,13 @@ def data_for_network_analysis(df: pd.DataFrame)-> dict:
     }
 
 def network_triu_multiple_schools(df: pd.DataFrame) -> dict:
+    """
+    Create upper triangular values of four networks for multiple schools
+    also save (ij) indices for each edge
+    :param df: data frame 
+    :return: dictionary containing upper triangular values of
+             four networks and (ij) indices for each edge
+    """
 
     ij_indices = jnp.array([])
 
@@ -316,6 +323,21 @@ def network_triu_multiple_schools(df: pd.DataFrame) -> dict:
         "BFW2_triu": bfw2_triu,
         "ij_indices": ij_indices
     }
+
+def school_id_by_edge(df_dict: dict) -> jnp.ndarray:
+    """
+    Get standardized school IDs for each edge in the network (from 0)
+    :param df_dict: dictionary containing school data
+    :return: standardized school IDs for each edge
+    """
+
+    sch_ids = jnp.array([], dtype=jnp.int32)
+    for i in range(df_dict["n_schools"]):
+        cur_sch_ids = jnp.repeat(df_dict["schid_s"][df_dict["offsets"][i]],
+                                 df_dict["total_edges_list"][i])
+        sch_ids = jnp.concatenate([sch_ids, cur_sch_ids])
+    
+    return sch_ids
 
 
 def adj_to_triu(mat: np.ndarray) -> torch.tensor:
