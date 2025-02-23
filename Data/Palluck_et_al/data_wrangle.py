@@ -219,21 +219,83 @@ def cov_for_net(df, cov_name_list):
              - Each subsequent column is a binary indicator for covariate equality.
     """
 
-    # Get upper triangle index pairs (i, j) for all unique pairs of rows (i < j)
-    idx = jnp.triu_indices(n=df.shape[0], k=1)
+    dfs = []
 
-    # Initialize list with a column of ones (intercept)
-    cov_list = [jnp.ones(idx[0].shape[0], dtype=jnp.float32)]
+    for s_id in df["SCHID"].unique():
+        df_s = df[df["SCHID"] == s_id]
+        # Get upper triangle index pairs (i, j) for all unique pairs of rows (i < j)
+        idx = jnp.triu_indices(n=df_s.shape[0], k=1)
 
-    for cov in cov_name_list:
-        # Compute pairwise equality indicator for current covariate group
-        cur_cov = jnp.all(
-            df[cov].values[idx[0]] == df[cov].values[idx[1]], axis=1
-        ).astype(jnp.float32)
-        cov_list.append(cur_cov)
+        # Initialize list with a column of ones (intercept)
+        cov_list = [jnp.ones(idx[0].shape[0], dtype=jnp.float32)]
 
-    # Stack the indicators into a single 2D JAX array (num_edges, num_covariates + 1)
-    return jnp.stack(cov_list, axis=1)
+        for cov in cov_name_list:
+            # Compute pairwise equality indicator for current covariate group
+            cur_cov = jnp.all(
+                df_s[cov].values[idx[0]] == df_s[cov].values[idx[1]], axis=1
+            ).astype(jnp.float32)
+            cov_list.append(cur_cov)
+
+        # Stack the indicators into a single 2D JAX array (num_edges, num_covariates + 1)
+        dfs.append(jnp.stack(cov_list, axis=1))
+    
+    return jnp.vstack(dfs)
+
+def data_for_network_analysis(df: pd.DataFrame)-> dict:
+    
+    # number of schools
+    n_schools = df["SCHID"].nunique()
+    # number of students within each school
+    n_within_school = df.groupby("SCHID").size().values
+    # idx offset for later stacking of edges
+    offsets = jnp.concatenate([jnp.array([0]), jnp.cumsum(jnp.array(n_within_school))[:-1]]) 
+    # total units
+    total_n = df.shape[0]
+    # total edges 
+    total_edges = n_within_school * (n_within_school - 1) // 2
+
+    # schid to standardized range
+    schid_s = transform_schid(jnp.array(df["SCHID"].values, dtype=jnp.int32))
+
+    return {
+        "n_schools": n_schools,
+        "n_nodes_sch" : n_within_school,
+        "offsets": offsets,
+        "total_n": total_n,
+        "total_edges_list": total_edges,
+        "total_edges_sum": total_edges.sum(),
+        "schid_s": schid_s
+    }
+
+def network_triu_multiple_schools(df: pd.DataFrame) -> dict:
+
+    st_triu = jnp.array([])
+    stw2_triu = jnp.array([])
+    bf_triu = jnp.array([])
+    bfw2_triu = jnp.array([])
+
+    for s_id in df["SCHID"].unique():
+        df_s = df[df["SCHID"] == s_id]
+        triu_idx = np.triu_indices(df_s.shape[0], 1)
+        
+        st_net = network_by_school(df_s, ST_COLS, False)
+        st_triu = jnp.concatenate([st_triu, jnp.array(st_net[triu_idx], dtype=jnp.float32)])
+
+        stw2_net = network_by_school(df_s, ST_W2_COLS, False)
+        stw2_triu = jnp.concatenate([stw2_triu, jnp.array(stw2_net[triu_idx], dtype=jnp.float32)])
+
+        bf_net = network_by_school(df_s, BF_COLS, False)
+        bf_triu = jnp.concatenate([bf_triu, jnp.array(bf_net[triu_idx], dtype=jnp.float32)])
+
+        bfw2_net = network_by_school(df_s, BF_W2_COLS, False)
+        bfw2_triu = jnp.concatenate([bfw2_triu, jnp.array(bfw2_net[triu_idx], dtype=jnp.float32)])
+        
+    return {
+        "ST_triu": st_triu,
+        "STW2_triu": stw2_triu,
+        "BF_triu": bf_triu,
+        "BFW2_triu": bfw2_triu
+    }
 
 
 def adj_to_triu(mat: np.ndarray) -> torch.tensor:
