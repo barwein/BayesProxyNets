@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 import re
-import jax.numpy as jnp
 from itertools import combinations
 import torch
+import jax.numpy as jnp
+import jax
 import networkx as nx
 import Data.Palluck_et_al.utils_for_inference as util
 
@@ -95,7 +96,9 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
 
     # Get subset of relevant columns for analysis (outcome, treatents, covariates)
     # data_subset = data_cleaned[REL_VARIABLES + ST_COLS + ST_W2_COLS + BF_COLS]
-    data_subset = data_cleaned[REL_VARIABLES + ST_COLS + ST_W2_COLS + BF_COLS + BF_W2_COLS]
+    data_subset = data_cleaned[
+        REL_VARIABLES + ST_COLS + ST_W2_COLS + BF_COLS + BF_W2_COLS
+    ]
     for cov in COV_LIST:
         if type(data_cleaned[cov].iloc[1]) == str:
             val = data_cleaned[cov].apply(extract_numeric).fillna(0.0).astype(int)
@@ -168,35 +171,69 @@ def network_by_school(
     return nx.to_numpy_array(school_network)
 
 
-def cov_equal(X: pd.DataFrame, idx_pairs: list) -> list[int]:
-    """
-    Create a list of binary values indicating whether the covariates are equal for each pair of units.
-    :param X: data frame
-    :param idx_pairs: list of indices of pairs
-    :return: list of binary values
-    """
-    return [int(np.all(X.iloc[i] == X.iloc[j])) for i, j in idx_pairs]
+# def cov_equal(X: pd.DataFrame, idx_pairs: list) -> list[int]:
+#     """
+#     Create a list of binary values indicating whether the covariates are equal for each pair of units.
+#     :param X: data frame
+#     :param idx_pairs: list of indices of pairs
+#     :return: list of binary values
+#     """
+#     # return [int(np.all(X.iloc[i] == X.iloc[j])) for i, j in idx_pairs]
+#     return (X.iloc[idx_pairs[0]] == X.iloc[idx_pairs[1]]).all(axis=1).astype(int)
 
 
-def create_net_covar_df(df: pd.DataFrame) -> torch.tensor:
-    """
-    Create a data frame with covariates for network analysis.
-    :param df: data frame
-    :return: data frame of covariates ready for network analysis
-    """
-    # Save subset of df
-    idx_pairs = list(combinations(range(df.shape[0]), 2))
-    cov_eq = [cov_equal(df[cov], idx_pairs) for cov in COV_FOR_NETWORK]
-    df_network = pd.DataFrame(
-        dict(zip(["+".join(cov) for cov in COV_FOR_NETWORK], cov_eq))
-    )
+# def create_net_covar_df(df: pd.DataFrame) -> torch.tensor:
+#     """
+#     Create a data frame with covariates for network analysis.
+#     :param df: data frame
+#     :return: data frame of covariates ready for network analysis
+#     """
+#     # Save subset of df
+#     idx_pairs = list(combinations(range(df.shape[0]), 2))
+#     cov_eq = [cov_equal(df[cov], idx_pairs) for cov in COV_FOR_NETWORK]
+#     df_network = pd.DataFrame(
+#         dict(zip(["+".join(cov) for cov in COV_FOR_NETWORK], cov_eq))
+#     )
 
-    expected_rows = df.shape[0] * (df.shape[0] - 1) // 2
-    assert df_network.shape[0] == expected_rows, (
-        f"Expected {expected_rows} rows, got {df_network.shape[0]}"
-    )
+#     expected_rows = df.shape[0] * (df.shape[0] - 1) // 2
+#     assert df_network.shape[0] == expected_rows, (
+#         f"Expected {expected_rows} rows, got {df_network.shape[0]}"
+#     )
 
-    return torch.tensor(np.array(df_network), dtype=torch.float32)
+#     return torch.tensor(np.array(df_network), dtype=torch.float32)
+
+
+def cov_for_net(df, cov_name_list):
+    """
+    Compute edge-level covariate indicators for network analysis.
+
+    This function creates binary indicators for whether covariates are equal
+    between pairs of units in a dataset. It leverages JAX for fast computation
+    using vectorized operations.
+
+    :param df: A Pandas DataFrame containing covariate data.
+    :param cov_name_list: A list of lists, where each sublist contains
+                          column names for a group of covariates.
+    :return: A JAX array of shape (num_edges, num_covariates + 1), where:
+             - The first column is a vector of ones (bias term).
+             - Each subsequent column is a binary indicator for covariate equality.
+    """
+
+    # Get upper triangle index pairs (i, j) for all unique pairs of rows (i < j)
+    idx = jnp.triu_indices(n=df.shape[0], k=1)
+
+    # Initialize list with a column of ones (intercept)
+    cov_list = [jnp.ones(idx[0].shape[0], dtype=jnp.float32)]
+
+    for cov in cov_name_list:
+        # Compute pairwise equality indicator for current covariate group
+        cur_cov = jnp.all(
+            df[cov].values[idx[0]] == df[cov].values[idx[1]], axis=1
+        ).astype(jnp.float32)
+        cov_list.append(cur_cov)
+
+    # Stack the indicators into a single 2D JAX array (num_edges, num_covariates + 1)
+    return jnp.stack(cov_list, axis=1)
 
 
 def adj_to_triu(mat: np.ndarray) -> torch.tensor:
