@@ -116,7 +116,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
 
 def network_by_school(
     df: pd.DataFrame, cols: list[str], plot_network=False
-) -> np.ndarray:
+) -> tuple:
     """
     Create network adjacency matrix for a given school.
     :param df: data frame
@@ -153,11 +153,25 @@ def network_by_school(
     # Add selfloops
     for id in valid_ids:
         school_edgelist.append((id, id))
+
     # Convert to nx graph
     school_network = nx.Graph(school_edgelist)
     # remove self loops
     school_network.remove_edges_from(nx.selfloop_edges(school_network))
 
+    # Ensure nodes are ordered according to unique_id
+    sorted_nodes = sorted(valid_ids)  
+    adj_matrix = nx.to_numpy_array(school_network, nodelist=sorted_nodes)
+    
+    # Extract upper-triangle values (excluding diagonal)
+    triu_indices = np.triu_indices_from(adj_matrix, k=1)
+    triu_values = adj_matrix[triu_indices]
+
+     # Get the corresponding unique_id pairs (starting from 0, i.e., local indices to school)
+    unique_id_list = np.arange(len(sorted_nodes))  
+    edge_indices = list(zip(unique_id_list[triu_indices[0]], unique_id_list[triu_indices[1]]))
+
+    # Optional: Plot the network
     if plot_network:
         nx.draw_circular(
             school_network,
@@ -168,7 +182,8 @@ def network_by_school(
             width=0.15,
         )
     # return adj. matrix
-    return nx.to_numpy_array(school_network)
+    # return nx.to_numpy_array(school_network)
+    return jnp.array(triu_values, dtype=jnp.float32), jnp.array(edge_indices) 
 
 
 # def cov_equal(X: pd.DataFrame, idx_pairs: list) -> list[int]:
@@ -269,6 +284,8 @@ def data_for_network_analysis(df: pd.DataFrame)-> dict:
 
 def network_triu_multiple_schools(df: pd.DataFrame) -> dict:
 
+    ij_indices = jnp.array([])
+
     st_triu = jnp.array([])
     stw2_triu = jnp.array([])
     bf_triu = jnp.array([])
@@ -276,25 +293,28 @@ def network_triu_multiple_schools(df: pd.DataFrame) -> dict:
 
     for s_id in df["SCHID"].unique():
         df_s = df[df["SCHID"] == s_id]
-        triu_idx = np.triu_indices(df_s.shape[0], 1)
+        # triu_idx = np.triu_indices(df_s.shape[0], 1)
         
-        st_net = network_by_school(df_s, ST_COLS, False)
-        st_triu = jnp.concatenate([st_triu, jnp.array(st_net[triu_idx], dtype=jnp.float32)])
+        st_vals, ij_idx = network_by_school(df_s, ST_COLS, False)
+        st_triu = jnp.concatenate([st_triu, st_vals])
 
-        stw2_net = network_by_school(df_s, ST_W2_COLS, False)
-        stw2_triu = jnp.concatenate([stw2_triu, jnp.array(stw2_net[triu_idx], dtype=jnp.float32)])
+        ij_indices = jnp.vstack([ij_indices, ij_idx]) if ij_indices.size > 0 else ij_idx
 
-        bf_net = network_by_school(df_s, BF_COLS, False)
-        bf_triu = jnp.concatenate([bf_triu, jnp.array(bf_net[triu_idx], dtype=jnp.float32)])
+        stw2_vals, _ = network_by_school(df_s, ST_W2_COLS, False)
+        stw2_triu = jnp.concatenate([stw2_triu, stw2_vals])
 
-        bfw2_net = network_by_school(df_s, BF_W2_COLS, False)
-        bfw2_triu = jnp.concatenate([bfw2_triu, jnp.array(bfw2_net[triu_idx], dtype=jnp.float32)])
+        bf_vals, _ = network_by_school(df_s, BF_COLS, False)
+        bf_triu = jnp.concatenate([bf_triu, bf_vals])
+
+        bfw2_vals, _ = network_by_school(df_s, BF_W2_COLS, False)
+        bfw2_triu = jnp.concatenate([bfw2_triu, bfw2_vals])
         
     return {
         "ST_triu": st_triu,
         "STW2_triu": stw2_triu,
         "BF_triu": bf_triu,
-        "BFW2_triu": bfw2_triu
+        "BFW2_triu": bfw2_triu,
+        "ij_indices": ij_indices
     }
 
 
