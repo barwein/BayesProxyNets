@@ -18,7 +18,25 @@ REL_VARIABLES = [
     "ELIGIBLE",
     "WRISTOW2_NUMERIC",
 ]
-COV_LIST = ["GENC", "GRC", "ETHW", "ETHB", "ETHH", "ETHA", "ETHC", "ETHSA", "GAME"]
+COV_LIST = [
+    "GENC",
+    "GRC",
+    "ETHW",
+    "ETHB",
+    "ETHH",
+    "ETHA",
+    "ETHC",
+    "ETHSA",
+    "MOVE",
+    "ACTSS",
+    "ACTSO",
+    "ACTM",
+    "ACTT",
+    "ACTC",
+    "ACTR",
+    "TOMESG",
+    "GAME",
+]
 ST_COLS = ["ST1", "ST2", "ST3", "ST4", "ST5", "ST6", "ST7", "ST8", "ST9", "ST10"]
 ST_W2_COLS = [
     "ST1W2",
@@ -39,7 +57,13 @@ BF_W2_COLS = ["BF1W2", "BF2W2"]
 COV_FOR_NETWORK = [
     ["GENC"],
     ["ETHW", "ETHB", "ETHH", "ETHA", "ETHC", "ETHSA"],
-    # ["ACTSS", "ACTT", "ACTM", "ACTR"],
+    ["MOVE"],
+    ["ACTSS", "ACTSO"],
+    ["ACTM"],
+    ["ACTT"],
+    ["ACTC"],
+    ["ACTR"],
+    ["TOMESG"],
     ["GAME"],
     ["GRC_6", "GRC_7", "GRC_8"],
 ]
@@ -114,9 +138,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     return data_subset
 
 
-def network_by_school(
-    df: pd.DataFrame, cols: list[str], plot_network=False
-) -> tuple:
+def network_by_school(df: pd.DataFrame, cols: list[str], plot_network=False) -> tuple:
     """
     Create network adjacency matrix for a given school.
     :param df: data frame
@@ -160,16 +182,18 @@ def network_by_school(
     school_network.remove_edges_from(nx.selfloop_edges(school_network))
 
     # Ensure nodes are ordered according to unique_id
-    sorted_nodes = sorted(valid_ids)  
+    sorted_nodes = sorted(valid_ids)
     adj_matrix = nx.to_numpy_array(school_network, nodelist=sorted_nodes)
-    
+
     # Extract upper-triangle values (excluding diagonal)
     triu_indices = np.triu_indices_from(adj_matrix, k=1)
     triu_values = adj_matrix[triu_indices]
 
-     # Get the corresponding unique_id pairs (starting from 0, i.e., local indices to school)
-    unique_id_list = np.arange(len(sorted_nodes))  
-    edge_indices = list(zip(unique_id_list[triu_indices[0]], unique_id_list[triu_indices[1]]))
+    # Get the corresponding unique_id pairs (starting from 0, i.e., local indices to school)
+    unique_id_list = np.arange(len(sorted_nodes))
+    edge_indices = list(
+        zip(unique_id_list[triu_indices[0]], unique_id_list[triu_indices[1]])
+    )
 
     # Optional: Plot the network
     if plot_network:
@@ -183,7 +207,7 @@ def network_by_school(
         )
     # return adj. matrix
     # return nx.to_numpy_array(school_network)
-    return jnp.array(triu_values, dtype=jnp.float32), jnp.array(edge_indices) 
+    return jnp.array(triu_values, dtype=jnp.float32), jnp.array(edge_indices)
 
 
 # def cov_equal(X: pd.DataFrame, idx_pairs: list) -> list[int]:
@@ -253,20 +277,22 @@ def cov_for_net(df, cov_name_list):
 
         # Stack the indicators into a single 2D JAX array (num_edges, num_covariates + 1)
         dfs.append(jnp.stack(cov_list, axis=1))
-    
+
     return jnp.vstack(dfs)
 
-def data_for_network_analysis(df: pd.DataFrame)-> dict:
-    
+
+def data_for_network_analysis(df: pd.DataFrame) -> dict:
     # number of schools
     n_schools = df["SCHID"].nunique()
     # number of students within each school
     n_within_school = df.groupby("SCHID").size().values
     # idx offset for later stacking of edges
-    offsets = jnp.concatenate([jnp.array([0]), jnp.cumsum(jnp.array(n_within_school))[:-1]]) 
+    offsets = jnp.concatenate(
+        [jnp.array([0]), jnp.cumsum(jnp.array(n_within_school))[:-1]]
+    )
     # total units
     total_n = df.shape[0]
-    # total edges 
+    # total edges
     total_edges = n_within_school * (n_within_school - 1) // 2
 
     # schid to standardized range
@@ -274,19 +300,20 @@ def data_for_network_analysis(df: pd.DataFrame)-> dict:
 
     return {
         "n_schools": n_schools,
-        "n_nodes_sch" : n_within_school,
+        "n_nodes_sch": n_within_school,
         "offsets": offsets,
         "total_n": total_n,
         "total_edges_list": total_edges,
         "total_edges_sum": total_edges.sum(),
-        "schid_s": schid_s
+        "schid_s": schid_s,
     }
+
 
 def network_triu_multiple_schools(df: pd.DataFrame) -> dict:
     """
     Create upper triangular values of four networks for multiple schools
     also save (ij) indices for each edge
-    :param df: data frame 
+    :param df: data frame
     :return: dictionary containing upper triangular values of
              four networks and (ij) indices for each edge
     """
@@ -301,7 +328,7 @@ def network_triu_multiple_schools(df: pd.DataFrame) -> dict:
     for s_id in df["SCHID"].unique():
         df_s = df[df["SCHID"] == s_id]
         # triu_idx = np.triu_indices(df_s.shape[0], 1)
-        
+
         st_vals, ij_idx = network_by_school(df_s, ST_COLS, False)
         st_triu = jnp.concatenate([st_triu, st_vals])
 
@@ -315,14 +342,15 @@ def network_triu_multiple_schools(df: pd.DataFrame) -> dict:
 
         bfw2_vals, _ = network_by_school(df_s, BF_W2_COLS, False)
         bfw2_triu = jnp.concatenate([bfw2_triu, bfw2_vals])
-        
+
     return {
         "ST_triu": st_triu,
         "STW2_triu": stw2_triu,
         "BF_triu": bf_triu,
         "BFW2_triu": bfw2_triu,
-        "ij_indices": ij_indices
+        "ij_indices": ij_indices,
     }
+
 
 def school_id_by_edge(df_dict: dict) -> jnp.ndarray:
     """
@@ -333,10 +361,11 @@ def school_id_by_edge(df_dict: dict) -> jnp.ndarray:
 
     sch_ids = jnp.array([], dtype=jnp.int32)
     for i in range(df_dict["n_schools"]):
-        cur_sch_ids = jnp.repeat(df_dict["schid_s"][df_dict["offsets"][i]],
-                                 df_dict["total_edges_list"][i])
+        cur_sch_ids = jnp.repeat(
+            df_dict["schid_s"][df_dict["offsets"][i]], df_dict["total_edges_list"][i]
+        )
         sch_ids = jnp.concatenate([sch_ids, cur_sch_ids])
-    
+
     return sch_ids
 
 
