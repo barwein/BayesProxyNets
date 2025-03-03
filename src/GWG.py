@@ -1,6 +1,6 @@
 ###
 # Gibbs-With-Gradients sampler for discerte (binary) parameters (A* in our case)
-# GWG is a specfic case of Informed Proposals (IP) samplers for discrete variables
+# GWG is a specfic case of Locally Informed Proposals (LIP) samplers for discrete variables
 ###
 
 import jax.numpy as jnp
@@ -60,10 +60,9 @@ def propsal_logprobs(idx, scores):
     return log_probs[idx].sum()
 
 
-# --- GWG samplers ---
+# --- GWG samplers (Locally Informed Proposals) ---
 
 ### No repeated measures ###
-
 
 @jit
 def GWG_step(rng_key, state, data, param):
