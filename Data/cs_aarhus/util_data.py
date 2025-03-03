@@ -133,6 +133,29 @@ def compute_deg(triu):
 vmap_deg = jax.vmap(compute_deg)
 
 
+def get_df_nodes(Z, expos):
+    return jnp.transpose(jnp.stack([jnp.ones(N_NODES), Z, expos]))
+
+
+vmap_df_nodes = jax.vmap(get_df_nodes, in_axes=(0, 0))
+
+
+def get_data_new_z(new_z, data):
+    """
+    Get new data tuple for new interventions
+
+    Args:
+    new_z: new interventions with shape (n,)
+    data: data tuple
+
+    """
+    return {
+        "Z": new_z,
+        "Y": None,
+        "triu_vals": data["triu_vals"],
+    }
+
+
 # --- Aggregate multilayers networks (OR/AND) ---
 
 
@@ -185,6 +208,8 @@ def compute_exposures(triu_star, Z):
 
 vmap_compute_exposures = jax.vmap(compute_exposures, in_axes=(0, None))
 
+vmap_compute_exposures_new_z = jax.vmap(compute_exposures, in_axes=(None, 0))
+
 
 def CAR_cov(triu_vals, sig_inv, rho):
     # Cov(Y) = \Sigma = sig_inv * (D - rho*A)^-1
@@ -196,10 +221,6 @@ def CAR_cov(triu_vals, sig_inv, rho):
     precis_ = sig_inv * (degs_diag - rho * adj_mat)
     # Return Sigma
     return jnp.linalg.inv(precis_)
-
-
-def get_df_nodes(Z, expos):
-    return jnp.transpose(jnp.stack([jnp.ones(N_NODES), Z, expos]))
 
 
 def generate_data(key, triu_star, eta, rho, sig_inv):

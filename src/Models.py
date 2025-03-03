@@ -12,7 +12,7 @@ import src.utils as utils
 
 # True network: p(A*|X,\theta) \propto expit(theta_0 + theta_1 * x2_or)
 # Proxy network: p(A_ij|A*_{ij},X,\gamma) \propto expit(gamma_0 * A*_{ij} + (1-A*_{ij}) * (gamma_1 + gamma_2 * x_diff))
-# TODO: Proxy network (rep): p(A^{rep}_{ij} | )
+# Proxy network (rep): P(A^r_ij|A*_{ij}, A_{ij}, X, \gamma)
 # Outcome: p(Y|A*,X,Z,\eta,\rho,\sig_inv) \propto N(Y|mu; Sigma)
 # where mu = df @ eta, with df = [1, Z, X, exposures] and exposures = compute_exposures(A*, Z) (weighted sum of Z by deg cen)
 # and Sigma = [sig_inv(D - rho * A*]^{-1}, with D=diag(degrees(A*)) --> CAR model

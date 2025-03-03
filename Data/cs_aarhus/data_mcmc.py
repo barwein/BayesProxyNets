@@ -1,15 +1,15 @@
-from re import M
 import jax.numpy as jnp
-from jax import random, jit, vmap
+from jax import random, jit
 import jax
 
-from numpyro.infer import MCMC, NUTS, Predictive
+from numpyro.infer import MCMC, NUTS, HMC, Predictive
 from numpyro.infer.hmc_gibbs import HMCGibbs
 
 
 from src.GWG import IPState, IPInfo, propsal_logprobs
 from src.MWG_sampler import sample_posterior_triu_star, replicate_params
 import src.Models as models
+import src.utils as utils
 
 import Data.cs_aarhus.data_models as dm
 import Data.cs_aarhus.util_data as ud
@@ -225,15 +225,11 @@ class MWG_init:
         self.n_nets_samples = n_nets_samples
 
         # initial parameters
-        # TODO: figure out how to obtain initial continuous parameters in this settings
-        self.theta = None
-        self.gamma = None
         self.triu_star_probs = None
         self.triu_star = None
         self.exposures = None
-        self.eta = None
-        self.rho = None
-        self.sig_inv = None
+        self.network_params = {}
+        self.outcome_params = {}
 
     def init_network_params(self):
         """
@@ -253,10 +249,12 @@ class MWG_init:
 
         mcmc.run(self.rng_key, triu_vals=self.data["triu_vals"])
 
-        # TODO: figure out how to obtain initial continuous parameters in this settings
         samples = mcmc.get_samples()
 
         self.triu_star_probs = samples["probs_latent"].mean(axis=0)
+        self.network_params = {
+            k: v.mean(axis=0) for k, v in samples.items() if k != "probs_latent"
+        }
 
     def init_triu_star_and_exposures(self):
         """
@@ -298,14 +296,20 @@ class MWG_init:
 
         self.rng_key, _ = random.split(self.rng_key)
 
-        mcmc_plugin.run(self.rng_key, df_nodes=df_nodes, adj_mat=adj_mat, Y=self.data.Y)
+        mcmc_plugin.run(
+            self.rng_key, df_nodes=df_nodes, adj_mat=adj_mat, Y=self.data["Y"]
+        )
 
         # Get posterior samples
         samples = mcmc_plugin.get_samples()
 
-        self.eta = samples["eta"].mean(axis=0)
-        self.rho = samples["rho"].mean()
-        self.sig_inv = samples["sig_inv"].mean()
+        self.outcome_params = {k: v.mean(axis=0) for k, v in samples.items()}
+
+        if jnp.abs(self.outcome_params["eta"][2] - 3) > 0.5:
+            # self.outcome_params["rho"] = self.outcome_params["rho"][:, None]
+            self.outcome_params["eta"].at[2].set(
+                3.0 + jnp.sign(self.outcome_params["eta"][2]) * 0.2
+            )
 
     def get_init_values(self):
         """
@@ -326,36 +330,276 @@ class MWG_init:
 
         # TODO: figure out how to obtain initial continuous parameters in this settings
 
-        init_params = {
-            "theta": self.theta,
-            "gamma": self.gamma,
-            "triu_star": self.triu_star,
-            "eta": self.eta,
-            "rho": self.rho,
-            "sig_inv": self.sig_inv,
-        }
+        init_params = (
+            self.network_params | self.outcome_params | {"triu_star": self.triu_star}
+        )
 
         print(
             "MWG init params:",
             "\n",
-            "theta:",
-            self.theta,
-            "\n",
-            "gamma:",
-            self.gamma,
-            "\n",
-            #   "triu_star:", self.triu_star, "\n",
             "eta:",
-            self.eta,
+            self.outcome_params["eta"],
             "\n",
             "rho:",
-            self.rho,
+            self.outcome_params["rho"],
             "\n",
             "sig_inv:",
-            self.sig_inv,
+            self.outcome_params["sig_inv"],
         )
 
         if self.num_chains > 1:
             return replicate_params(init_params, self.num_chains)
         else:
             return init_params
+
+
+class MWG_sampler:
+    def __init__(
+        self,
+        rng_key,
+        data,
+        init_params,
+        gwg_fn=make_gwg_gibbs_fn,
+        combined_model=dm.combined_model,
+        n_warmup=3000,
+        n_samples=2500,
+        num_chains=4,
+        continuous_sampler="NUTS",  # one of "NUTS" or "HMC"
+        progress_bar=False,
+    ):
+        self.rng_key = random.split(rng_key)[0]
+        self.data = data
+        self.init_params = init_params
+        self.combined_model = combined_model
+        self.continuous_sampler = continuous_sampler
+        self.n_warmup = n_warmup
+        self.n_samples = n_samples
+        self.num_chains = num_chains
+        self.progress_bar = progress_bar
+
+        #  init function for mwg
+        self.gwg_fn = gwg_fn(data)
+        self.continuous_kernel = self.make_continuous_kernel()
+        #  get posterior samples
+        self.posterior_samples = self.get_samples()
+
+        self.pred_func = Predictive(
+            model=self.combined_model, posterior_samples=self.posterior_samples
+        )
+
+    def make_continuous_kernel(self):
+        if self.continuous_sampler == "NUTS":
+            return NUTS(self.combined_model)
+        elif self.continuous_sampler == "HMC":
+            return HMC(self.combined_model)
+        else:
+            raise ValueError("continuous_sampler must be one of 'NUTS' or 'HMC'")
+
+    def get_samples(self):
+        mwg_kernel = HMCGibbs(
+            inner_kernel=self.continuous_kernel,
+            gibbs_fn=self.gwg_fn,
+            gibbs_sites=["triu_star"],
+        )
+
+        mwg_mcmc = MCMC(
+            mwg_kernel,
+            num_warmup=self.n_warmup,
+            num_samples=self.n_samples,
+            num_chains=self.num_chains,
+            progress_bar=self.progress_bar,
+        )
+
+        self.rng_key, _ = random.split(self.rng_key)
+
+        mwg_mcmc.run(self.rng_key, self.data, init_params=self.init_params)
+
+        return mwg_mcmc.get_samples()
+
+    def wasserstein_distance(self, true_vals):
+        keys_to_keep = {"eta", "sig_inv", "rho", "triu_star"}
+        # keys_to_keep = {"eta", "sig_inv", "triu_star"}
+        post_samps = self.posterior_samples.copy()
+        post_samps["rho"] = post_samps["rho"][:, None]
+        post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
+
+        post_samps_k = {k: post_samps[k] for k in keys_to_keep}
+
+        return utils.compute_1w_distance(post_samps_k, true_vals)
+
+    def sample_pred_y(self, new_z):
+        assert new_z.shape[0] == 2
+
+        if new_z.ndim == 2:  # dynamic treatmets
+            rng_keys = random.split(self.rng_key, 2)
+            data_list = jax.vmap(ud.get_data_new_z, in_axes=(0, None))(new_z, self.data)
+            pred_samples = jax.vmap(lambda rk, d: self.pred_func(rk, d)["Y"])(
+                rng_keys, data_list
+            )
+            preds = pred_samples[0] - pred_samples[1]
+
+        elif new_z.ndim == 3:  # stoch treatments
+            n_approx = new_z.shape[1]
+            rng_keys = random.split(self.rng_key, 2 * n_approx).reshape(2, n_approx, -1)
+            vmap_func = jax.vmap(
+                jax.vmap(
+                    lambda zk, rk: self.pred_func(rk, ud.get_data_new_z(zk, self.data))[
+                        "Y"
+                    ],
+                    in_axes=(0, 0),  # Maps over n_approx
+                ),
+                in_axes=(0, 0),  # Maps over the intervention groups (2)
+            )
+            pred_samples = vmap_func(
+                new_z, rng_keys
+            )  # Expected shape (2, n_approx, m, n)
+            preds_diff = pred_samples[0] - pred_samples[1]
+            # return mean across n_approx (number of stoch treatments approx)
+            preds = preds_diff.mean(axis=0)
+
+        else:
+            raise ValueError("new_z should have shape (2,n) or (2, n_approx, n)")
+
+        return preds
+
+    def new_intervention_error_stats(self, new_z, true_estimands, true_vals):
+        wasser_dist = self.wasserstein_distance(true_vals)
+
+        post_y_preds = self.sample_pred_y(new_z)
+        return utils.compute_error_stats(post_y_preds, true_estimands, wasser_dist)
+
+
+# --- mcmc with fixed network (true or not) ---
+
+
+class mcmc_fixed_net:
+    def __init__(
+        self,
+        rng_key,
+        data,
+        net_type,
+        n_warmup=2000,
+        n_samples=2500,
+        num_chains=4,
+        progress_bar=False,
+    ):
+        self.rng_key = rng_key
+        self.data = data
+        self.net_type = net_type
+        self.n_warmup = n_warmup
+        self.n_samples = n_samples
+        self.num_chains = num_chains
+        self.progress_bar = progress_bar
+
+        self.adj_mat = None
+        self.triu = None
+        self.df_nodes = None
+        self.df_nodes_and_adj_mat()
+
+        self.samples = self.get_samples()
+
+        self.pred_func = Predictive(
+            model=models.plugin_outcome_model, posterior_samples=self.samples
+        )
+
+    def df_nodes_and_adj_mat(self):
+        if self.net_type == "true":
+            self.adj_mat = ud.triu_to_mat(self.data["triu_star"]) + jnp.eye(
+                ud.N_NODES
+            )  # add self-loops for stability
+            self.triu = self.data["triu_star"]
+        elif self.net_type == "agg_or":
+            self.adj_mat = ud.triu_to_mat(self.data["agg_or_triu"]) + jnp.eye(
+                ud.N_NODES
+            )
+            self.triu = self.data["agg_or_triu"]
+        elif self.net_type == "agg_and":
+            self.adj_mat = ud.triu_to_mat(self.data["agg_and_triu"]) + jnp.eye(
+                ud.N_NODES
+            )
+            self.triu = self.data["agg_and_triu"]
+
+        exposures = ud.compute_exposures(self.triu, self.data["Z"])
+        self.df_nodes = ud.get_df_nodes(self.data["Z"], exposures)
+
+    def get_samples(self):
+        kernel_ = NUTS(models.plugin_outcome_model)
+        mcmc_ = MCMC(
+            kernel_,
+            num_warmup=self.n_warmup,
+            num_samples=self.n_samples,
+            num_chains=self.num_chains,
+            progress_bar=self.progress_bar,
+        )
+        mcmc_.run(self.rng_key, self.df_nodes, self.adj_mat, self.data["Y"])
+
+        mcmc_.print_summary()
+
+        return mcmc_.get_samples()
+
+    def wasserstein_distance(self, true_vals):
+        post_samps = self.samples.copy()
+        post_samps["triu_star"] = jnp.repeat(
+            jnp.array([self.triu]), self.n_samples * self.num_chains, axis=0
+        )
+        post_samps["rho"] = post_samps["rho"][:, None]
+        post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
+
+        return utils.compute_1w_distance(post_samps, true_vals)
+
+    def sample_pred_y(self, new_z):
+        # TODO: make it happen the plugin outcome model with new z
+        assert new_z.shape[0] == 2
+
+        if new_z.ndim == 2:  # dynamic treatmets
+            new_expos = ud.vmap_compute_exposures_new_z(self.triu, new_z)
+            rng_keys = random.split(self.rng_key, 2)
+            df_list = ud.vmap_df_nodes(new_z, new_expos)
+
+            pred_samples = jax.vmap(
+                lambda rk, df: self.pred_func(rk, df, self.adj_mat, None)["Y"]
+            )(rng_keys, df_list)
+            preds = pred_samples[0] - pred_samples[1]
+
+        elif new_z.ndim == 3:
+            # Case: new_z has shape (2, n_approx, n)
+            n_approx = new_z.shape[1]
+
+            # Generate independent RNG keys for all 2 * n_approx calls
+            rng_keys = random.split(self.rng_key, 2 * n_approx).reshape(2, n_approx, -1)
+
+            # Fully vectorized computation over (2, n_approx)
+            vmap_exposures = jax.vmap(
+                ud.vmap_compute_exposures_new_z, in_axes=(None, 0)
+            )
+            new_expos = vmap_exposures(self.triu, new_z)  # Shape (2, n_approx, n)
+
+            vmap_df = jax.vmap(ud.vmap_df_nodes, in_axes=(0, 0))
+            df_list = vmap_df(new_z, new_expos)  # Shape (2, n_approx, n, 4)
+
+            # Fully vectorized function with correct in_axes
+            vmap_pred = jax.vmap(
+                jax.vmap(
+                    lambda rk, df: self.pred_func(rk, df, self.adj_mat, None)["Y"],
+                    in_axes=(0, 0),  # Maps over n_approx
+                ),
+                in_axes=(0, 0),  # Maps over intervention groups (2)
+            )
+
+            pred_samples = vmap_pred(rng_keys, df_list)  # Shape (2, n_approx, m, n)
+
+            preds_diff = (
+                pred_samples[0] - pred_samples[1]
+            )  # Output shape (n_approx, m, n)
+            preds = preds_diff.mean(axis=0)
+
+        else:
+            raise ValueError("new_z should have shape (2, n) or (2, n_approx, n)")
+
+        return preds
+
+    def new_intervention_error_stats(self, new_z, true_estimands, true_vals):
+        wasser_dist = self.wasserstein_distance(true_vals)
+
+        post_y_preds = self.sample_pred_y(new_z)
+        return utils.compute_error_stats(post_y_preds, true_estimands, wasser_dist)

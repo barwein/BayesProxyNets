@@ -42,10 +42,12 @@ def cutposterior_multilayer(triu_vals, K=2):
     theta1 = []
     for k in range(n_layers + 1):
         theta0_k_nrm = numpyro.sample(f"theta0_{k}_nrm", dist.Normal())
-        theta0_k = numpyro.deterministic(f"theta0_{k}", theta0_k_nrm * sigma0 + mu0)
+        # theta0_k = numpyro.deterministic(f"theta0_{k}", theta0_k_nrm * sigma0 + mu0)
+        theta0_k = theta0_k_nrm * sigma0 + mu0
         # t1_k = numpyro.sample(f"theta1_{k}", dist.Normal(mu1, sigma1))
         theta1_k_nrm = numpyro.sample(f"theta1_{k}_nrm", dist.Normal())
-        theta1_k = numpyro.deterministic(f"theta1_{k}", theta1_k_nrm * sigma1 + mu1)
+        # theta1_k = numpyro.deterministic(f"theta1_{k}", theta1_k_nrm * sigma1 + mu1)
+        theta1_k = theta1_k_nrm * sigma1 + mu1
         # t1_k = t1_k * sigma1 + mu1
         theta0.append(theta0_k)
         theta1.append(theta1_k)
@@ -66,9 +68,10 @@ def cutposterior_multilayer(triu_vals, K=2):
     # ------------------------
 
     for k in range(n_layers):
-        logits_k = numpyro.deterministic(
-            f"logits_{k}", theta0[k] - jnp.exp(theta1[k]) * V_norm
-        )
+        # logits_k = numpyro.deterministic(
+        #     f"logits_{k}", theta0[k] - jnp.exp(theta1[k]) * V_norm
+        # )
+        logits_k = theta0[k] - jnp.exp(theta1[k]) * V_norm
         numpyro.sample(f"obs_{k}", dist.Bernoulli(logits=logits_k), obs=triu_vals[k])
 
     # ------------------------
@@ -113,10 +116,12 @@ def combined_model(data, K=2):
     theta1 = []
     for k in range(n_layers + 1):
         theta0_k_nrm = numpyro.sample(f"theta0_{k}_nrm", dist.Normal())
-        theta0_k = numpyro.deterministic(f"theta0_{k}", theta0_k_nrm * sigma0 + mu0)
+        # theta0_k = numpyro.deterministic(f"theta0_{k}", theta0_k_nrm * sigma0 + mu0)
+        theta0_k = theta0_k_nrm * sigma0 + mu0
         # t1_k = numpyro.sample(f"theta1_{k}", dist.Normal(mu1, sigma1))
         theta1_k_nrm = numpyro.sample(f"theta1_{k}_nrm", dist.Normal())
-        theta1_k = numpyro.deterministic(f"theta1_{k}", theta1_k_nrm * sigma1 + mu1)
+        # theta1_k = numpyro.deterministic(f"theta1_{k}", theta1_k_nrm * sigma1 + mu1)
+        theta1_k = theta1_k_nrm * sigma1 + mu1
         # t1_k = t1_k * sigma1 + mu1
         theta0.append(theta0_k)
         theta1.append(theta1_k)
