@@ -18,6 +18,7 @@ import Data.cs_aarhus.util_data as ud
 # Global hyper-parameters
 BATCH_LEN = 1
 N_STEPS = 5
+# N_STEPS = 3
 
 
 # --- GWG sampler (LIP) ---
@@ -322,18 +323,35 @@ class MWG_init:
 
         self.init_network_params()
         self.init_triu_star_and_exposures()
+
+        if jnp.mean(self.triu_star == self.data["triu_star"]) < 0.95:
+            print(
+                f"adjusting triu_star! prop equal: {jnp.mean(self.triu_star == self.data['triu_star'])}"
+            )
+            probs_obs = (
+                self.data["triu_star"] * 0.99 + (1.0 - self.data["triu_star"]) * 0.01
+            )
+            self.triu_star = jnp.astype(
+                random.bernoulli(key=self.rng_key, p=probs_obs), jnp.int32
+            )
+            self.exposures = ud.compute_exposures(self.triu_star, self.data["Z"])
+        else:
+            print(
+                f"triu_star is fine! prop equal: {jnp.mean(self.triu_star == self.data['triu_star'])}"
+            )
+
         self.init_outcome_model()
 
         # TODO: figure out how to obtain initial continuous parameters in this settings
 
-        if jnp.abs(self.outcome_params["eta"][2] - 3.0) > 0.4:
-            print("adjusting eta")
-            print("old eta:", self.outcome_params["eta"][2])
-            new_eta = 3.0 + 0.1 * random.normal(self.rng_key)
-            self.outcome_params["eta"] = self.outcome_params["eta"].at[2].set(new_eta)
-            print("new eta:", self.outcome_params["eta"][2])
-        else:
-            print("eta is fine!")
+        # if jnp.abs(self.outcome_params["eta"][2] - 3.0) > 0.4:
+        #     print("adjusting eta")
+        #     print("old eta:", self.outcome_params["eta"][2])
+        #     new_eta = 3.0 + 0.1 * random.normal(self.rng_key)
+        #     self.outcome_params["eta"] = self.outcome_params["eta"].at[2].set(new_eta)
+        #     print("new eta:", self.outcome_params["eta"][2])
+        # else:
+        #     print("eta is fine!")
 
         init_params = (
             self.network_params | self.outcome_params | {"triu_star": self.triu_star}
