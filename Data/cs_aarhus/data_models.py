@@ -52,33 +52,78 @@ def cutposterior_multilayer(triu_vals, K=2):
         theta0.append(theta0_k)
         theta1.append(theta1_k)
 
-    # ------------------------
-    # Shared latent positions
-    # ------------------------
-    # shape: (n, K)
-    with numpyro.plate("nodes", N_NODES):
-        V = numpyro.sample("V", dist.MultivariateNormal(0.0, jnp.eye(K)))
+    # # ------------------------
+    # # Shared latent positions
+    # # ------------------------
+    # # shape: (n, K)
+    # with numpyro.plate("nodes", N_NODES):
+    #     V = numpyro.sample("V", dist.MultivariateNormal(0.0, jnp.eye(K)))
 
-    idx = jnp.triu_indices(n=N_NODES, k=1)
-    V_diff = V[idx[0]] - V[idx[1]]
-    V_norm = jnp.linalg.norm(V_diff, axis=1)
+    # idx = jnp.triu_indices(n=N_NODES, k=1)
+    # V_diff = V[idx[0]] - V[idx[1]]
+    # V_norm = jnp.linalg.norm(V_diff, axis=1)
+
+    # ------------------------
+    # Global latent positions: shape (N_NODES, K)
+    # ------------------------
+    with numpyro.plate("nodes_global", N_NODES):
+        u_loc = numpyro.sample(
+            "u_loc",
+            dist.MultivariateNormal(loc=jnp.zeros(K), covariance_matrix=jnp.eye(K)),
+        )
+
+    # ------------------------
+    # Layer-specific offsets: shape (n_layers+1, N_NODES, K)
+    # We give each layer's offsets a shrinkage prior, pushing them near 0.
+    # ------------------------
+    with numpyro.plate("layers_offsets", n_layers + 1, dim=-2):
+        with numpyro.plate("nodes_layer", N_NODES, dim=-1):
+            U = numpyro.sample(
+                "U",
+                dist.MultivariateNormal(loc=jnp.zeros(K), covariance_matrix=jnp.eye(K)),
+            )
+    # Now U has shape (n_layers+1, N_NODES, K).
+    # We build the actual position in layer ell as V[ell, i] = G[i] + U[ell, i].
+    # We'll compute distances on the upper triangle index to match your triu_vals.
+    idx = jnp.triu_indices(N_NODES, k=1)
+
+    # Distances for each layer (n_layers+1). We'll store them or compute them on the fly:
+    def layer_distance(ell):
+        # V_ell shape (N_NODES, K)
+        V_ell = u_loc + U[ell]  # broadcast addition
+        # subtract positions
+        diffs = V_ell[idx[0]] - V_ell[idx[1]]  # shape (#edges, K)
+        dist_ell = jnp.linalg.norm(diffs, axis=1)
+        return dist_ell
+
+    # ------------------------
+    # Likelihood for each *observed* layer
+    # ------------------------
+    for ell in range(n_layers):
+        # distance among nodes i, j in layer ell
+        dist_ell = layer_distance(ell)
+        # logit_ell = theta0[ell] - exp(theta1[ell]) * dist_ell
+        logits = theta0[ell] - jnp.exp(theta1[ell]) * dist_ell
+        numpyro.sample(f"obs_{ell}", dist.Bernoulli(logits=logits), obs=triu_vals[ell])
 
     # ------------------------
     # Likelihood for observed networks
     # ------------------------
 
-    for k in range(n_layers):
-        # logits_k = numpyro.deterministic(
-        #     f"logits_{k}", theta0[k] - jnp.exp(theta1[k]) * V_norm
-        # )
-        logits_k = theta0[k] - jnp.exp(theta1[k]) * V_norm
-        numpyro.sample(f"obs_{k}", dist.Bernoulli(logits=logits_k), obs=triu_vals[k])
+    # for k in range(n_layers):
+    #     # logits_k = numpyro.deterministic(
+    #     #     f"logits_{k}", theta0[k] - jnp.exp(theta1[k]) * V_norm
+    #     # )
+    #     logits_k = theta0[k] - jnp.exp(theta1[k]) * V_norm
+    #     numpyro.sample(f"obs_{k}", dist.Bernoulli(logits=logits_k), obs=triu_vals[k])
 
     # ------------------------
     # Deterministic: Posterior p(A*_{ij} = 1)
     # (latent network edges, no likelihood)
     # ------------------------
-    logits_latent = theta0[-1] - jnp.exp(theta1[-1]) * V_norm
+    # logits_latent = theta0[-1] - jnp.exp(theta1[-1]) * V_norm
+    dist_latent = layer_distance(n_layers)  # index n_layers => the *extra* layer
+    logits_latent = theta0[-1] - jnp.exp(theta1[-1]) * dist_latent
     numpyro.deterministic("probs_latent", jax.nn.sigmoid(logits_latent))
 
 
@@ -130,31 +175,81 @@ def combined_model(data, K=2):
     # Shared latent positions
     # ------------------------
     # shape: (n, K)
-    with numpyro.plate("nodes", N_NODES):
-        V = numpyro.sample("V", dist.MultivariateNormal(0.0, jnp.eye(K)))
+    # with numpyro.plate("nodes", N_NODES):
+    #     V = numpyro.sample("V", dist.MultivariateNormal(0.0, jnp.eye(K)))
 
-    idx = jnp.triu_indices(n=N_NODES, k=1)
-    V_diff = V[idx[0]] - V[idx[1]]
-    V_norm = jnp.linalg.norm(V_diff, axis=1)
+    # idx = jnp.triu_indices(n=N_NODES, k=1)
+    # V_diff = V[idx[0]] - V[idx[1]]
+    # V_norm = jnp.linalg.norm(V_diff, axis=1)
 
     # ------------------------
     # Likelihood for observed networks
     # ------------------------
 
-    for k in range(n_layers):
-        logits_k = numpyro.deterministic(
-            f"logits_{k}", theta0[k] - jnp.exp(theta1[k]) * V_norm
+    # for k in range(n_layers):
+    #     logits_k = numpyro.deterministic(
+    #         f"logits_{k}", theta0[k] - jnp.exp(theta1[k]) * V_norm
+    #     )
+    #     numpyro.sample(
+    #         f"obs_{k}", dist.Bernoulli(logits=logits_k), obs=data["triu_vals"][k]
+    #     )
+
+    # ------------------------
+    # Global latent positions: shape (N_NODES, K)
+    # ------------------------
+    with numpyro.plate("nodes_global", N_NODES):
+        u_loc = numpyro.sample(
+            "u_loc",
+            dist.MultivariateNormal(loc=jnp.zeros(K), covariance_matrix=jnp.eye(K)),
         )
+
+    # ------------------------
+    # Layer-specific offsets: shape (n_layers+1, N_NODES, K)
+    # We give each layer's offsets a shrinkage prior, pushing them near 0.
+    # ------------------------
+    with numpyro.plate("layers_offsets", n_layers + 1, dim=-2):
+        with numpyro.plate("nodes_layer", N_NODES, dim=-1):
+            U = numpyro.sample(
+                "U",
+                dist.MultivariateNormal(loc=jnp.zeros(K), covariance_matrix=jnp.eye(K)),
+            )
+    # Now U has shape (n_layers+1, N_NODES, K).
+    # We build the actual position in layer ell as V[ell, i] = G[i] + U[ell, i].
+    # We'll compute distances on the upper triangle index to match your triu_vals.
+    idx = jnp.triu_indices(N_NODES, k=1)
+
+    # Distances for each layer (n_layers+1). We'll store them or compute them on the fly:
+    def layer_distance(ell):
+        # V_ell shape (N_NODES, K)
+        V_ell = u_loc + U[ell]  # broadcast addition
+        # subtract positions
+        diffs = V_ell[idx[0]] - V_ell[idx[1]]  # shape (#edges, K)
+        dist_ell = jnp.linalg.norm(diffs, axis=1)
+        return dist_ell
+
+    # ------------------------
+    # Likelihood for each *observed* layer
+    # ------------------------
+    for ell in range(n_layers):
+        # distance among nodes i, j in layer ell
+        dist_ell = layer_distance(ell)
+        # logit_ell = theta0[ell] - exp(theta1[ell]) * dist_ell
+        logits = theta0[ell] - jnp.exp(theta1[ell]) * dist_ell
         numpyro.sample(
-            f"obs_{k}", dist.Bernoulli(logits=logits_k), obs=data["triu_vals"][k]
+            f"obs_{ell}", dist.Bernoulli(logits=logits), obs=data["triu_vals"][ell]
         )
 
     # ------------------------
     # Likelihood for latent network
     # ------------------------
+
+    dist_latent = layer_distance(n_layers)  # index n_layers => the *extra* layer
     logits_star = numpyro.deterministic(
-        "logits_star", theta0[-1] - jnp.exp(theta1[-1]) * V_norm
+        "logits_star", theta0[-1] - jnp.exp(theta1[-1]) * dist_latent
     )
+    # logits_star = numpyro.deterministic(
+    #     "logits_star", theta0[-1] - jnp.exp(theta1[-1]) * V_norm
+    # )
     triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=logits_star))
 
     # ------------------------

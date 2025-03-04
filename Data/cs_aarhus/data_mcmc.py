@@ -249,6 +249,8 @@ class MWG_init:
 
         mcmc.run(self.rng_key, triu_vals=self.data["triu_vals"])
 
+        mcmc.print_summary()
+
         samples = mcmc.get_samples()
 
         self.triu_star_probs = samples["probs_latent"].mean(axis=0)
@@ -300,16 +302,12 @@ class MWG_init:
             self.rng_key, df_nodes=df_nodes, adj_mat=adj_mat, Y=self.data["Y"]
         )
 
+        mcmc_plugin.print_summary()
+
         # Get posterior samples
         samples = mcmc_plugin.get_samples()
 
         self.outcome_params = {k: v.mean(axis=0) for k, v in samples.items()}
-
-        if jnp.abs(self.outcome_params["eta"][2] - 3) > 0.5:
-            # self.outcome_params["rho"] = self.outcome_params["rho"][:, None]
-            self.outcome_params["eta"].at[2].set(
-                3.0 + jnp.sign(self.outcome_params["eta"][2]) * 0.2
-            )
 
     def get_init_values(self):
         """
@@ -382,6 +380,8 @@ class MWG_sampler:
         self.continuous_kernel = self.make_continuous_kernel()
         #  get posterior samples
         self.posterior_samples = self.get_samples()
+
+        print("mean post eta:", self.posterior_samples["eta"].mean(axis=0))
 
         self.pred_func = Predictive(
             model=self.combined_model, posterior_samples=self.posterior_samples
@@ -533,7 +533,7 @@ class mcmc_fixed_net:
         )
         mcmc_.run(self.rng_key, self.df_nodes, self.adj_mat, self.data["Y"])
 
-        mcmc_.print_summary()
+        # mcmc_.print_summary()
 
         return mcmc_.get_samples()
 

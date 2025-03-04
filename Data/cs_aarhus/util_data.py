@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import jax
 from jax import random
-import networkx as nx
+import numpy as np
 import Simulations.data_gen as dg
 import src.utils as utils
 
@@ -243,4 +243,39 @@ def generate_data(key, triu_star, eta, rho, sig_inv):
         "Z": Z,
         "true_exposures": expos,
         "Y": y,
+    }
+
+
+def get_true_estimands(n, z_new, triu_star, eta):
+    if z_new.ndim == 3:  # stoch intervention
+        exposures_new1 = compute_exposures(triu_star, z_new[0, :, :])
+        exposures_new2 = compute_exposures(triu_star, z_new[1, :, :])
+        exposures_diff = exposures_new1 - exposures_new2
+        z_diff = z_new[0, :, :] - z_new[1, :, :]
+        n_stoch = z_new.shape[1]
+        results = np.zeros((n_stoch, n))
+        for i in range(n_stoch):
+            results[i, :] = eta[1] * z_diff[i, :] + eta[2] * exposures_diff[i, :]
+        return jnp.mean(results, axis=0).squeeze()
+    elif z_new.ndim == 2:  # dynamic intervention
+        exposures_new1 = compute_exposures(triu_star, z_new[0, :])
+        exposures_new2 = compute_exposures(triu_star, z_new[1, :])
+        exposures_diff = exposures_new1 - exposures_new2
+        z_diff = z_new[0, :] - z_new[1, :]
+        results = eta[1] * z_diff + eta[2] * exposures_diff
+        return results
+    else:
+        raise ValueError("Invalid dimension for new interventions")
+
+
+def get_intervention_estimand(key, triu_star, eta, n_approx=100):
+    # new stochastic intervention
+    Z_stoch = dg.stochastic_intervention(key, n=N_NODES, n_approx=n_approx)
+
+    # new estimand
+    stoch_estimands = get_true_estimands(N_NODES, Z_stoch, triu_star, eta)
+
+    return {
+        "Z_stoch": Z_stoch,
+        "estimand_stoch": stoch_estimands,
     }
