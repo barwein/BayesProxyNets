@@ -18,6 +18,7 @@ print(f"Jax devices: {jax.devices()}")
 # --- Global parameters ---
 
 ETA = jnp.array([-1, 3, 3])
+# ETA = jnp.array([-1, 3, 2])
 RHO = 0.5
 SIG_INV = 1.0
 
@@ -111,9 +112,7 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
     print("--- Running for Aggregate AND network ---")
 
     rng_key, _ = random.split(rng_key)
-    mcmc_agg_and = dmcmc.mcmc_fixed_net(
-        rng_key=rng_key, data=data, net_type="agg_and"
-    )
+    mcmc_agg_and = dmcmc.mcmc_fixed_net(rng_key=rng_key, data=data, net_type="agg_and")
 
     agg_and_stats = mcmc_agg_and.new_intervention_error_stats(
         new_z=intervention_estimand["Z_stoch"],

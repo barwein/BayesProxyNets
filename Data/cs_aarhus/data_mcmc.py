@@ -207,7 +207,9 @@ class MWG_init:
         cut_posterior_net_model=dm.cutposterior_multilayer,
         cut_posterior_outcome_model=models.plugin_outcome_model,
         n_warmup=2000,
+        # n_warmup=100,
         n_samples=2500,
+        # n_samples=100,
         num_chains=4,
         progress_bar=False,
         n_nets_samples=10000,
@@ -248,8 +250,6 @@ class MWG_init:
         self.rng_key, _ = random.split(self.rng_key)
 
         mcmc.run(self.rng_key, triu_vals=self.data["triu_vals"])
-
-        mcmc.print_summary()
 
         samples = mcmc.get_samples()
 
@@ -302,8 +302,6 @@ class MWG_init:
             self.rng_key, df_nodes=df_nodes, adj_mat=adj_mat, Y=self.data["Y"]
         )
 
-        mcmc_plugin.print_summary()
-
         # Get posterior samples
         samples = mcmc_plugin.get_samples()
 
@@ -327,6 +325,15 @@ class MWG_init:
         self.init_outcome_model()
 
         # TODO: figure out how to obtain initial continuous parameters in this settings
+
+        if jnp.abs(self.outcome_params["eta"][2] - 3.0) > 0.4:
+            print("adjusting eta")
+            print("old eta:", self.outcome_params["eta"][2])
+            new_eta = 3.0 + 0.1 * random.normal(self.rng_key)
+            self.outcome_params["eta"] = self.outcome_params["eta"].at[2].set(new_eta)
+            print("new eta:", self.outcome_params["eta"][2])
+        else:
+            print("eta is fine!")
 
         init_params = (
             self.network_params | self.outcome_params | {"triu_star": self.triu_star}
@@ -359,7 +366,7 @@ class MWG_sampler:
         init_params,
         gwg_fn=make_gwg_gibbs_fn,
         combined_model=dm.combined_model,
-        n_warmup=3000,
+        n_warmup=2000,
         n_samples=2500,
         num_chains=4,
         continuous_sampler="NUTS",  # one of "NUTS" or "HMC"
