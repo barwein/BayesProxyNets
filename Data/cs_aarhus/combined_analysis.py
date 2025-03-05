@@ -18,12 +18,11 @@ print(f"Jax devices: {jax.devices()}")
 # --- Global parameters ---
 
 ETA = jnp.array([-1, 3, 3])
-# ETA = jnp.array([-1, 3, 2])
 RHO = 0.5
 SIG_INV = 1.0
 
 
-N_ITERATION = 1
+N_ITERATION = 100
 
 
 FILE_NAME = "Data/cs_aarhus/cs_analysis_results.csv"
@@ -146,9 +145,9 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
         rng_key=rng_key,
         data=data,
         init_params=mwg_init,
-        n_warmup=2000,
-        n_samples=2500,
-        num_chains=4,
+        # n_warmup=2000,
+        # n_samples=2500,
+        # num_chains=4,
         progress_bar=True,
     )
 

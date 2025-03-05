@@ -17,8 +17,7 @@ import Data.cs_aarhus.util_data as ud
 
 # Global hyper-parameters
 BATCH_LEN = 1
-N_STEPS = 5
-# N_STEPS = 3
+N_STEPS = 1
 
 
 # --- GWG sampler (LIP) ---
@@ -207,13 +206,11 @@ class MWG_init:
         data,
         cut_posterior_net_model=dm.cutposterior_multilayer,
         cut_posterior_outcome_model=models.plugin_outcome_model,
-        n_warmup=2000,
-        # n_warmup=100,
-        n_samples=2500,
-        # n_samples=100,
+        n_warmup=1000,
+        n_samples=1000,
         num_chains=4,
         progress_bar=False,
-        n_nets_samples=10000,
+        n_nets_samples=3000,
     ):
         self.rng_key = random.split(rng_key)[0]
         self.data = data
@@ -261,7 +258,7 @@ class MWG_init:
 
     def init_triu_star_and_exposures(self):
         """
-        Initialize triu_star and exposures using theta and gamma samples
+        Initialize triu_star and exposures using samples from network cut-posterior models
         """
 
         self.rng_key, _ = random.split(self.rng_key)
@@ -312,8 +309,6 @@ class MWG_init:
         """
         Get initial values for the MWG sampler
 
-        Args:
-            num_chains: int, number of chains
 
         Returns:
             dict with initial values for the MWG sampler
@@ -323,35 +318,7 @@ class MWG_init:
 
         self.init_network_params()
         self.init_triu_star_and_exposures()
-
-        if jnp.mean(self.triu_star == self.data["triu_star"]) < 0.95:
-            print(
-                f"adjusting triu_star! prop equal: {jnp.mean(self.triu_star == self.data['triu_star'])}"
-            )
-            probs_obs = (
-                self.data["triu_star"] * 0.99 + (1.0 - self.data["triu_star"]) * 0.01
-            )
-            self.triu_star = jnp.astype(
-                random.bernoulli(key=self.rng_key, p=probs_obs), jnp.int32
-            )
-            self.exposures = ud.compute_exposures(self.triu_star, self.data["Z"])
-        else:
-            print(
-                f"triu_star is fine! prop equal: {jnp.mean(self.triu_star == self.data['triu_star'])}"
-            )
-
         self.init_outcome_model()
-
-        # TODO: figure out how to obtain initial continuous parameters in this settings
-
-        # if jnp.abs(self.outcome_params["eta"][2] - 3.0) > 0.4:
-        #     print("adjusting eta")
-        #     print("old eta:", self.outcome_params["eta"][2])
-        #     new_eta = 3.0 + 0.1 * random.normal(self.rng_key)
-        #     self.outcome_params["eta"] = self.outcome_params["eta"].at[2].set(new_eta)
-        #     print("new eta:", self.outcome_params["eta"][2])
-        # else:
-        #     print("eta is fine!")
 
         init_params = (
             self.network_params | self.outcome_params | {"triu_star": self.triu_star}
@@ -384,8 +351,8 @@ class MWG_sampler:
         init_params,
         gwg_fn=make_gwg_gibbs_fn,
         combined_model=dm.combined_model,
-        n_warmup=2000,
-        n_samples=2500,
+        n_warmup=1000,
+        n_samples=1000,
         num_chains=4,
         continuous_sampler="NUTS",  # one of "NUTS" or "HMC"
         progress_bar=False,
@@ -443,7 +410,6 @@ class MWG_sampler:
 
     def wasserstein_distance(self, true_vals):
         keys_to_keep = {"eta", "sig_inv", "rho", "triu_star"}
-        # keys_to_keep = {"eta", "sig_inv", "triu_star"}
         post_samps = self.posterior_samples.copy()
         post_samps["rho"] = post_samps["rho"][:, None]
         post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
@@ -503,8 +469,8 @@ class mcmc_fixed_net:
         rng_key,
         data,
         net_type,
-        n_warmup=2000,
-        n_samples=2500,
+        n_warmup=1000,
+        n_samples=1000,
         num_chains=4,
         progress_bar=False,
     ):
@@ -573,7 +539,6 @@ class mcmc_fixed_net:
         return utils.compute_1w_distance(post_samps, true_vals)
 
     def sample_pred_y(self, new_z):
-        # TODO: make it happen the plugin outcome model with new z
         assert new_z.shape[0] == 2
 
         if new_z.ndim == 2:  # dynamic treatmets
@@ -618,6 +583,21 @@ class mcmc_fixed_net:
             )  # Output shape (n_approx, m, n)
             preds = preds_diff.mean(axis=0)
 
+        # if new_z.ndim == 3:  # stoch intervention
+        #     # compute exposures for new interventions
+        #     expos_1 = ud.compute_exposures(self.triu, new_z[0, :, :])
+        #     expos_2 = ud.compute_exposures(self.triu, new_z[1, :, :])
+        #     expos_diff = expos_1 - expos_2
+        #     z_diff = new_z[0, :, :] - new_z[1, :, :]
+        #     preds = ud.get_estimates_vmap(z_diff, expos_diff, self.samples["eta"]).mean(
+        #         axis=0
+        #     )
+        # elif new_z.ndim == 2:  # dynamic intervention
+        #     expos_1 = ud.compute_exposures(self.triu, new_z[0, :])
+        #     expos_2 = ud.compute_exposures(self.triu, new_z[1, :])
+        #     expos_diff = expos_1 - expos_2
+        #     z_diff = new_z[0, :] - new_z[1, :]
+        #     preds = ud.get_estimates(z_diff, expos_diff, self.samples["eta"])
         else:
             raise ValueError("new_z should have shape (2, n) or (2, n_approx, n)")
 

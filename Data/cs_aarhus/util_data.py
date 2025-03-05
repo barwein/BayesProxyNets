@@ -72,6 +72,7 @@ def get_adj_mat_dict():
     layers = read_layers_data()
     adjacency_matrices = read_edgelist_data()
     adj_mat_dict = {layers[i + 1]: adjacency_matrices[i] for i in range(5)}
+    # removed 'coauthor' layer as it is contained in the other layers
     adj_mat_dict_filtered = {k: v for k, v in adj_mat_dict.items() if k != "coauthor"}
     return adj_mat_dict_filtered
 
@@ -142,7 +143,8 @@ vmap_df_nodes = jax.vmap(get_df_nodes, in_axes=(0, 0))
 
 def get_data_new_z(new_z, data):
     """
-    Get new data tuple for new interventions
+    Get new data dict for new interventions
+    'Y' is None for sampling from its predictive distribution
 
     Args:
     new_z: new interventions with shape (n,)
@@ -161,14 +163,14 @@ def get_data_new_z(new_z, data):
 
 def aggregate_edges(triu_vals, method="or"):
     """
-    Aggregate edges from multiple layers into a single adjacency matrix.
+    Aggregate edges from multiple layers into a single adjacency matrix (upper triangle values)
 
     Arguments:
     - triu_vals: n_layers x n choose 2 array of edge values.
     - method: "or" or "and" for how to aggregate edges.
 
     Returns:
-    - n x n adjacency matrix of aggregated edges.
+    -upper triangle (triu) values of adjacency matrix of aggregated edges.
     """
     if method == "or":
         return jnp.any(triu_vals, axis=0)
@@ -201,6 +203,17 @@ def degree_centrality(adj_matrix):
 
 @jax.jit
 def compute_exposures(triu_star, Z):
+    """
+    Compute weighted exposures for each node
+
+    Parameters:
+    triu_star (jnp.ndarray): Upper triangular adjacency matrix of latent network
+    Z (jnp.ndarray): Treatment assignments with shape (n,)
+
+    Returns:
+    jnp.ndarray: Vector of weighted exposures for each node
+
+    """
     mat_star = triu_to_mat(triu_star)
     deg_cen = degree_centrality(mat_star)
     return utils.weighted_exposures(Z, deg_cen, mat_star)
@@ -212,6 +225,9 @@ vmap_compute_exposures_new_z = jax.vmap(compute_exposures, in_axes=(None, 0))
 
 
 def CAR_cov(triu_vals, sig_inv, rho):
+    """
+    Compute the covariance matrix of outcomes Y in a Conditional Auto-regressive (CAR) model
+    """
     # Cov(Y) = \Sigma = sig_inv * (D - rho*A)^-1
     # So precision = \Sigma^{-1} = (1/sig_inv) * (D - rho*A)
     adj_mat = triu_to_mat(triu_vals)
@@ -224,6 +240,9 @@ def CAR_cov(triu_vals, sig_inv, rho):
 
 
 def generate_data(key, triu_star, eta, rho, sig_inv):
+    """
+    Generate synthetic data for treatments and outcomes
+    """
     z_key, y_key = random.split(key)
     Z = dg.generate_treatments(rng=z_key, n=N_NODES)
     expos = compute_exposures(triu_star, Z)
@@ -247,6 +266,9 @@ def generate_data(key, triu_star, eta, rho, sig_inv):
 
 
 def get_true_estimands(n, z_new, triu_star, eta):
+    """
+    compute true estimand values given new interventions
+    """
     if z_new.ndim == 3:  # stoch intervention
         exposures_new1 = compute_exposures(triu_star, z_new[0, :, :])
         exposures_new2 = compute_exposures(triu_star, z_new[1, :, :])
@@ -279,3 +301,31 @@ def get_intervention_estimand(key, triu_star, eta, n_approx=100):
         "Z_stoch": Z_stoch,
         "estimand_stoch": stoch_estimands,
     }
+
+
+@jax.jit
+def get_estimates(z_diff, expos_diff, eta_samps):
+    """
+    Get estimates of new interventions given posterior 'eta' samples
+    Args:
+    new_z: New treatment assignments jnp.ndarray with shape (2, n)
+    expos_diff: Difference in exposures jnp.ndarray with shape of (M, n) or (n,) (multi vs fixed nets)
+    eta_samps: Samples of posterior eta parameters with shape (M, 4) where M is number of posterior draws
+
+    Returns:
+    jnp.ndarray: Estimated expected outcomes; shape (M, N) where M is the number of samples
+    """
+    if expos_diff.ndim == 2:
+        return (
+            eta_samps[:, 1][:, None] * z_diff[None, :]
+            + eta_samps[:, 2][:, None] * expos_diff
+        )
+    elif expos_diff.ndim == 1:
+        return (
+            eta_samps[:, 1][:, None] * z_diff[None, :]
+            + eta_samps[:, 2][:, None] * expos_diff[None, :]
+        )
+
+
+# estimates for stochastic interventions with multiple treatments and expos diff
+get_estimates_vmap = jax.vmap(get_estimates, in_axes=(0, 0, None))
