@@ -10,6 +10,11 @@ deg_dist.png
 **/IDASI_2025/
 **/Data/Palluck_et_al/
 cs_a_analysis.ipynb
+Sim_results_analysis.ipynb
+plot_results.ipynb
+Networks_graphic.ipynb
+Simulations\results\lin\
+Simulations\results\lin_no_interfer\
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
