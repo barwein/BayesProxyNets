@@ -6,9 +6,9 @@ TEST.ipynb
 test_cores.py
 test_discrete_sampling.ipynb
 deg_dist.png
-discrete_sampling/
-IDASI_2025/
-Data/Palluck_et_al/
+**/discrete_sampling/
+**/IDASI_2025/
+**/Data/Palluck_et_al/
 cs_a_analysis.ipynb
 
 # Byte-compiled / optimized / DLL files
