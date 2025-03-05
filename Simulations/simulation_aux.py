@@ -110,11 +110,6 @@ def one_simulation_iter(
     mwg_init = MWG_init(
         rng_key=rng_key,
         data=data,
-        n_iter_networks=10000,
-        # n_warmup_networks=20,
-        # n_samples_networks=20,
-        # num_chains_networks=2,
-        progress_bar=True,
     ).get_init_values()
 
     print("--- Sampling with MWG (single proxy) ---")
@@ -125,12 +120,6 @@ def one_simulation_iter(
         rng_key=rng_key,
         data=data,
         init_params=mwg_init,
-        # n_warmup=2000,
-        n_warmup=30,
-        # n_samples=2500,
-        n_samples=30,
-        num_chains=4,
-        progress_bar=True,
     )
 
     mwg_dynamic_stats = mwg_sampler.new_intervention_error_stats(
@@ -175,10 +164,6 @@ def one_simulation_iter(
         data=data,
         cut_posterior_net_model=models.networks_marginalized_model_rep,
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap_rep,
-        n_iter_networks=10000,
-        # n_warmup_networks=20,
-        # n_samples_networks=20,
-        # num_chains_networks=2,
         progress_bar=True,
     ).get_init_values()
 
@@ -191,10 +176,6 @@ def one_simulation_iter(
         init_params=mwg_init_rep,
         gwg_fn=gwg.make_gwg_gibbs_fn_rep,
         combined_model=models.combined_model_rep,
-        n_warmup=30,
-        n_samples=30,
-        num_chains=4,
-        # progress_bar=True,
     )
 
     mwg_dynamic_stats_rep = mwg_sampler_rep.new_intervention_error_stats(

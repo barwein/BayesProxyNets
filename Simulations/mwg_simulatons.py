@@ -15,8 +15,8 @@ import jax.numpy as jnp
 from jax import random
 from jax.scipy.special import logit
 
-from simulation_aux import one_simulation_iter
-import data_gen as dg
+from Simulations.simulation_aux import one_simulation_iter
+import Simulations.data_gen as dg
 
 
 # --- Global variables ---
@@ -57,73 +57,74 @@ N_ITER = 1
 N_GAMMAS = GAMMA_X_NOISES.shape[0]
 
 
-for i in range(N_ITER):
-    # Set keys
-    rng_key = random.PRNGKey(i * 55 + 1)
-    # rng = np.random.default_rng(i)
+if __name__ == "__main__":
+    for i in range(N_ITER):
+        # Set keys
+        rng_key = random.PRNGKey(i * 55 + 1)
+        # rng = np.random.default_rng(i)
 
-    # generate data (not depedent on gamma)
-    rng_key, _ = random.split(rng_key)
-    fixed_data = dg.generate_fixed_data(rng_key, N, PARAM, PZ)
+        # generate data (not depedent on gamma)
+        rng_key, _ = random.split(rng_key)
+        fixed_data = dg.generate_fixed_data(rng_key, N, PARAM, PZ)
 
-    # true_vals for wasserstein distance
-    true_vals = {
-        "eta": ETA,
-        "rho": jnp.array([RHO]),
-        "sig_inv": jnp.array([SIG_INV]),
-        "triu_star": fixed_data["triu_star"],
-    }
+        # true_vals for wasserstein distance
+        true_vals = {
+            "eta": ETA,
+            "rho": jnp.array([RHO]),
+            "sig_inv": jnp.array([SIG_INV]),
+            "triu_star": fixed_data["triu_star"],
+        }
 
-    print(f"mean true exposures: {jnp.mean(fixed_data['true_exposures'])}")
+        print(f"mean true exposures: {jnp.mean(fixed_data['true_exposures'])}")
 
-    # generate new interventions
-    rng_key, _ = random.split(rng_key)
-    new_interventions = dg.new_interventions_estimands(
-        rng_key, N, fixed_data["x"], fixed_data["triu_star"], ETA
-    )
-
-    for j in range(N_GAMMAS):
-        print(f"### iteration {i}, gamma noise {j} ###")
-
-        # update gamma
-        cur_gamma = jnp.concatenate(
-            # [GAMMA_F, jnp.array([GAMMA_X_NOISES[j]]), GAMMA_REP]
-            [
-                jnp.array([GAMMA_B_NOISE_0[j]]),
-                jnp.array([GAMMA_B_NOISE_1[j]]),
-                jnp.array([GAMMA_X_NOISES[j]]),
-                GAMMA_REP,
-            ]
+        # generate new interventions
+        rng_key, _ = random.split(rng_key)
+        new_interventions = dg.new_interventions_estimands(
+            rng_key, N, fixed_data["x"], fixed_data["triu_star"], ETA
         )
 
-        print("cur gamma: ", cur_gamma)
+        for j in range(N_GAMMAS):
+            print(f"### iteration {i}, gamma noise {j} ###")
 
-        rng_key = random.split(rng_key)[0]
-        # sample proxy networks with current gamma
-        proxy_nets = dg.generate_proxy_networks(
-            # rng,
-            rng_key,
-            TRIU_DIM,
-            fixed_data["triu_star"],
-            cur_gamma,
-            fixed_data["x_diff"],
-            fixed_data["Z"],
-        )
+            # update gamma
+            cur_gamma = jnp.concatenate(
+                # [GAMMA_F, jnp.array([GAMMA_X_NOISES[j]]), GAMMA_REP]
+                [
+                    jnp.array([GAMMA_B_NOISE_0[j]]),
+                    jnp.array([GAMMA_B_NOISE_1[j]]),
+                    jnp.array([GAMMA_X_NOISES[j]]),
+                    GAMMA_REP,
+                ]
+            )
 
-        data_sim = dg.data_for_sim(fixed_data, proxy_nets)
+            print("cur gamma: ", cur_gamma)
 
-        # run one iteration
-        rng_key = random.split(rng_key)[0]
-        # idx = i * N_ITER + j * N_GAMMAS
-        idx = str(i) + "_" + str(j)
+            rng_key = random.split(rng_key)[0]
+            # sample proxy networks with current gamma
+            proxy_nets = dg.generate_proxy_networks(
+                # rng,
+                rng_key,
+                TRIU_DIM,
+                fixed_data["triu_star"],
+                cur_gamma,
+                fixed_data["x_diff"],
+                fixed_data["Z"],
+            )
 
-        one_simulation_iter(
-            iter=i,
-            idx=idx,
-            rng_key=rng_key,
-            data=data_sim,
-            new_interventions=new_interventions,
-            cur_gamma_noise=GAMMA_X_NOISES[j],
-            true_vals=true_vals,
-            file_path=FILEPATH,
-        )
+            data_sim = dg.data_for_sim(fixed_data, proxy_nets)
+
+            # run one iteration
+            rng_key = random.split(rng_key)[0]
+            # idx = i * N_ITER + j * N_GAMMAS
+            idx = str(i) + "_" + str(j)
+
+            one_simulation_iter(
+                iter=i,
+                idx=idx,
+                rng_key=rng_key,
+                data=data_sim,
+                new_interventions=new_interventions,
+                cur_gamma_noise=GAMMA_X_NOISES[j],
+                true_vals=true_vals,
+                file_path=FILEPATH,
+            )
