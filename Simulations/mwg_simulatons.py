@@ -6,7 +6,7 @@
 
 import os
 
-N_CORES = 4
+N_CORES = 4  # update accordingly, can use GPU as well
 os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 
 # --- Import libraries ---
@@ -25,26 +25,19 @@ N = 500
 TRIU_DIM = N * (N - 1) // 2
 
 THETA = jnp.array([-2.5, 1])
-# GAMMA_F = jnp.array([logit(0.85), logit(0.1)])
 GAMMA_BASELINE = jnp.array([logit(0.95), logit(0.05)])
-# GAMMA_BASELINE = jnp.array([logit(0.98), logit(0.02)])
 
-# GAMMA_REP = jnp.array([logit(0.8), 1, logit(0.2), 1])
 GAMMA_REP = jnp.array([logit(0.8), 1.5, logit(0.2), 1.5])
-# GAMMA_X_NOISES = jnp.arange(1, 3.5 + 1e-6, 0.5)
 GAMMA_X_NOISES = jnp.arange(2, 4 + 1e-6, 0.5)
-# GAMMA_X_NOISES = jnp.arange(3.0, 5.0 + 1e-6, 0.5)
 
 GAMMA_B_NOISE_0 = GAMMA_BASELINE[0] - GAMMA_X_NOISES / 2
 GAMMA_B_NOISE_1 = GAMMA_BASELINE[1] + GAMMA_X_NOISES / 2
 
-# ETA = jnp.array([-1, 3, -0.25, 2])
 ETA = jnp.array([-1, 3, -0.5, 2])
 SIG_INV = 1.0
 RHO = 0.5
 PZ = 0.5
 
-# param = utils.ParamTuple(theta=THETA, gamma=GAMMA, eta=ETA, rho=RHO, sig_inv=SIG_INV)
 PARAM = {
     "theta": THETA,
     "eta": ETA,
@@ -53,7 +46,7 @@ PARAM = {
 }
 FILEPATH = "Simulations/results"
 
-N_ITER = 1
+N_ITER = 300
 N_GAMMAS = GAMMA_X_NOISES.shape[0]
 
 
@@ -61,7 +54,6 @@ if __name__ == "__main__":
     for i in range(N_ITER):
         # Set keys
         rng_key = random.PRNGKey(i * 55 + 1)
-        # rng = np.random.default_rng(i)
 
         # generate data (not depedent on gamma)
         rng_key, _ = random.split(rng_key)
@@ -88,7 +80,6 @@ if __name__ == "__main__":
 
             # update gamma
             cur_gamma = jnp.concatenate(
-                # [GAMMA_F, jnp.array([GAMMA_X_NOISES[j]]), GAMMA_REP]
                 [
                     jnp.array([GAMMA_B_NOISE_0[j]]),
                     jnp.array([GAMMA_B_NOISE_1[j]]),
@@ -115,7 +106,7 @@ if __name__ == "__main__":
 
             # run one iteration
             rng_key = random.split(rng_key)[0]
-            # idx = i * N_ITER + j * N_GAMMAS
+            # a bit different in final results as it account for cluster job_id
             idx = str(i) + "_" + str(j)
 
             one_simulation_iter(
