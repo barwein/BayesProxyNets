@@ -1,27 +1,28 @@
-# Estimating Causal Effects Using Proxy Interference Networks
 
-Replication files for ``Estimating Causal Effects Using Proxies of the Interference Network``.
+# Estimating Causal Effects Using Proxies of the Interference Network
+
 See preprint at (arXiv link here).
 
 ## Code Structure
 The code is organized as follows:
 - `src`: contains auxiliary scripts used in the numerical illustrations.
-    -- test
-- `Simulations/`: contains the code to run the simulations.
-- `hsgp/`: contains the code to run the HSGP algorithm based on [NumPyro implementation](https://github.com/pyro-ppl/numpyro/tree/master/numpyro/contrib/hsgp).
-- `Data_analysis/`: contains the code to run the data analysis on the [Paluck et el. (2016) study](https://www.pnas.org/doi/abs/10.1073/pnas.1514483113#data-availability).
+- `Simulations/`: contains the code to run the fully-synthetic experiments.
+- `Data/cs_aarhus`: contains the code to run the semi-synthetic experiments.
 
 ## Software Requirements
 The code is written in Python 3.11. The following packages are required to run the code:
-- numpy, jax, torch, numpyro, pyro, scipy, pandas, matplotlib, seaborn, networkx, tqdm, os, itertools, time, pyreadr
+- numpy, jax, numpyro, pandas, matplotlib, seaborn, networkx, tqdm, os, itertools, 
 
-## Running the Code
-- The script `Simulations/linear_dgp_simulations.py` contains the code to run the simulations.
+## Running the Experiments
+- The script `Simulations/mwg_simulations.py` contains the code to run the fully-synthetic experiments.
+- The script `Data/cs_aarhus/combined_analysis.py` contains the code to run the semi-synthetic experiments. 
 
-- The script `Data/Palluck_et_al/run_analysis` contains the code to run the data analysis. 
+Both scripts were executed in a power-cluster with multiple cores. Running them in a PC with CPU might take a while. Adjust parameters accordingly!
 
+## Additional Files
 
-Both scripts were executed in a power-cluster with multiple cores. Running them in a PC might take a while. Adjust parameters accordingly!
+- The file `src/GWG.py' contain the implementation of the Locally Informed Proposals with gradient approximations.
+- The file `src/MWG_sampler.py' contain the implementation of the Block Gibbs algorithm.
 
 ## Data Availability
-The data used in the data analysis is available at the following link: https://www.icpsr.umich.edu/web/ICPSR/studies/37070
+The data used in the semi-synthetic experiments is available at: https://manliodedomenico.com/data.php
