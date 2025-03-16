@@ -21,8 +21,8 @@ Both scripts were executed in a power-cluster with multiple cores. Running them 
 
 ## Additional Files
 
-- The file `src/GWG.py' contain the implementation of the Locally Informed Proposals with gradient approximations.
-- The file `src/MWG_sampler.py' contain the implementation of the Block Gibbs algorithm.
+- The file `src/GWG.py` contain the implementation of the Locally Informed Proposals with gradient approximations.
+- The file `src/MWG_sampler.py` contain the implementation of the Block Gibbs algorithm.
 
 ## Data Availability
 The data used in the semi-synthetic experiments is available at: https://manliodedomenico.com/data.php
