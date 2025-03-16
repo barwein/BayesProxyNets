@@ -14,8 +14,6 @@ import src.utils as utils
 def generate_covariates(rng, n):
     keys = random.split(rng, 2)
     x = jnp.astype(random.normal(key=keys[0], shape=(n,)), jnp.float32)
-    # x = jnp.array(rng.normal(loc=0, scale=1, size=n), dtype=jnp.float32)
-    # x2 = jnp.array(rng.binomial(n=1, p=0.1, size=n), dtype=jnp.float32)
     x2 = jnp.astype(random.bernoulli(key=keys[1], p=0.1, shape=(n,)), jnp.float32)
     return x, x2
 
@@ -60,12 +58,6 @@ def generate_outcomes_n_exposures(rng, n, x, z, triu_star, eta, rho, sig_inv):
     y_cov = CAR_cov(triu_star, sig_inv, rho, n)
     # y_cov = jnp.eye(n) * sig_inv
 
-    # Generate observed outcomes
-    # y = jnp.array(
-    #     # rng.multivariate_normal(mean_y, CAR_cov(triu_star, sig_inv, rho, n)),
-    #     rng.multivariate_normal(mean_y, y_cov),
-    #     dtype=jnp.float32,
-    # )
     y = random.multivariate_normal(key=rng, mean=mean_y, cov=y_cov)
 
     return y, expos
@@ -109,9 +101,6 @@ def generate_fixed_data(rng, n, param, pz=0.5):
 
 def generate_proxy_networks(rng, triu_dim, triu_star, gamma, x_diff, Z):
     # first proxy
-    # probs_obs = jnp.where(
-    #     triu_star == 1.0, expit(gamma[0]), expit(gamma[1] + gamma[2] * x_diff)
-    # )
     keys = random.split(rng, 2)
     probs_obs = expit(
         triu_star * gamma[0] + (1.0 - triu_star) * (gamma[1] + gamma[2] * x_diff)
@@ -119,13 +108,6 @@ def generate_proxy_networks(rng, triu_dim, triu_star, gamma, x_diff, Z):
     # triu_obs = jnp.array(rng.binomial(n=1, p=probs_obs, size=triu_dim), dtype=jnp.float32)
     triu_obs = jnp.astype(random.bernoulli(key=keys[0], p=probs_obs), jnp.float32)
     obs_exposures = utils.compute_exposures(triu_obs, Z)
-
-    # repeated proxy
-    # probs_obs_rep = jnp.where(
-    #     triu_star == 1.0,
-    #     expit(gamma[3] + gamma[4] * triu_obs),
-    #     expit(gamma[5] + gamma[6] * triu_obs),
-    # )
 
     logits_obs_rep = triu_star * (gamma[3] + gamma[4] * triu_obs) + (
         1.0 - triu_star
@@ -136,9 +118,6 @@ def generate_proxy_networks(rng, triu_dim, triu_star, gamma, x_diff, Z):
     triu_obs_rep = jnp.astype(
         random.bernoulli(key=keys[1], p=probs_obs_rep), jnp.float32
     )
-    # triu_obs_rep = jnp.array(
-    #     rng.binomial(n=1, p=probs_obs_rep, size=triu_dim), dtype=jnp.float32
-    # )
 
     return {
         "triu_obs": triu_obs,
@@ -174,8 +153,6 @@ def dynamic_intervention(x, thresholds=(0.75, 1.5)):
 def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=50):
     # Stochastic intervention by 'alpha' values
     keys = random.split(rng, 2)
-    # Z_stoch1 = rng.binomial(n=1, p=alphas[0], size=(n_approx, n))
-    # Z_stoch2 = rng.binomial(n=1, p=alphas[1], size=(n_approx, n))
     Z_stoch1 = jnp.astype(
         random.bernoulli(key=keys[0], p=alphas[0], shape=(n_approx, n)), jnp.float32
     )
