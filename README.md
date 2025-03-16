@@ -1,11 +1,12 @@
 # Estimating Causal Effects Using Proxy Interference Networks
 
-Replication files for ``Estimating Causal Effects Using Proxy Interference Networks`` simulation study and data analysis.
+Replication files for ``Estimating Causal Effects Using Proxies of the Interference Network``.
 See preprint at (arXiv link here).
 
 ## Code Structure
 The code is organized as follows:
-- `src/Aux_functions.py`: contains auxiliary functions used in the simulations and data analysis.
+- `src`: contains auxiliary scripts used in the numerical illustrations.
+    -- test
 - `Simulations/`: contains the code to run the simulations.
 - `hsgp/`: contains the code to run the HSGP algorithm based on [NumPyro implementation](https://github.com/pyro-ppl/numpyro/tree/master/numpyro/contrib/hsgp).
 - `Data_analysis/`: contains the code to run the data analysis on the [Paluck et el. (2016) study](https://www.pnas.org/doi/abs/10.1073/pnas.1514483113#data-availability).
