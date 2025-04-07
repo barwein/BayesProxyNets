@@ -22,7 +22,7 @@ RHO = 0.5
 SIG_INV = 1.0
 
 
-N_ITERATION = 100
+N_ITERATION = 300
 
 
 FILE_NAME = "Data/cs_aarhus/cs_analysis_results.csv"

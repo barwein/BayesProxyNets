@@ -1,0 +1,10 @@
+{
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ],
+    "python.terminal.executeInFileDir": false,
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "terminal.integrated.env.windows": {
+        "PYTHONPATH": "c:\\Users\\bar21\\Dropbox\\My PC (LAPTOP-6NAJD2IQ)\\Desktop\\Gate\\University\\TAU\\PhD\\Writing\\Drafts\\Sampled networks\\Bayes_incorrect_network"
+    }
+}
