@@ -387,7 +387,8 @@ def combined_model_rep(data):
 @jit
 def car_logdensity(y, mu, sigma, rho, adj_matrix):
     """
-    Compute log density of CAR model
+    Compute log density of CAR model using sparse representation
+    https://mc-stan.org/learn-stan/case-studies/mbjoseph-CARStan.html
 
     Args:
         y: array of shape (n,) - observed values
