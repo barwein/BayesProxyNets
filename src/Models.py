@@ -18,9 +18,9 @@ import src.utils as utils
 # and Sigma = [sig_inv(D - rho * A*]^{-1}, with D=diag(degrees(A*)) --> CAR model
 
 # priors are:
-# theta ~ N(0, 3)
-# gamma ~ N(0, 3)
-# eta ~ N(0, 3)
+# theta ~ N(0, 3^2)
+# gamma ~ N(0, 3^2)
+# eta ~ N(0, 3^2)
 # rho ~ Beta(2, 2)
 # sig_inv ~ Gamma(2, 2)
 
