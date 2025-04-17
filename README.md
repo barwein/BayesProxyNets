@@ -29,10 +29,6 @@ graph TD
     D1 --> D1d[data_models.py]
     D1 --> D1e[util_data.py]
     D1 --> D1f[results_analysis.ipynb]
-    D --> D2[Palluck_et_al/]
-    D2 --> D2a[Data_analysis.ipynb]
-    D2 --> D2b[data_wrangle.py]
-    D2 --> D2c[descriptive_plots.ipynb]
 ```
 
 This diagram provides a high-level overview of the main code and data structure. Notebooks are marked with `.ipynb` extensions.
