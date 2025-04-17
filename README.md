@@ -10,8 +10,7 @@ The code is organized as follows:
 - `Data/cs_aarhus`: contains the code to run the semi-synthetic experiments.
 
 ## Software Requirements
-The code is written in Python 3.11. The following packages are required to run the code:
-- numpy, jax, numpyro, pandas, matplotlib, seaborn, networkx, tqdm, os, itertools, 
+The code is written in Python 3.11. Run 'requirement.txt' file to install all required packages. 
 
 ## Running the Experiments
 - The script `Simulations/mwg_simulations.py` contains the code to run the fully-synthetic experiments.
