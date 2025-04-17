@@ -1,9 +1,42 @@
-
 # Estimating Causal Effects Using Proxies of the Interference Network
 
 See preprint at (arXiv link here).
 
 ## Code Structure
+
+```mermaid
+graph TD
+    A[Project Root]
+    A --> B[src/]
+    A --> C[Simulations/]
+    A --> D[Data/]
+    B --> B1[GWG.py]
+    B --> B2[MWG_sampler.py]
+    B --> B3[Models.py]
+    B --> B4[MCMC_fixed_net.py]
+    B --> B5[utils.py]
+    C --> C1[mwg_simulatons.py]
+    C --> C2[data_gen.py]
+    C --> C3[simulation_aux.py]
+    C --> C4[Networks_graphic.ipynb]
+    C --> C5[plot_results.ipynb]
+    C --> C6[Sim_results_analysis.ipynb]
+    C --> C7[additional_figure.ipynb]
+    D --> D1[cs_aarhus/]
+    D1 --> D1a[combined_analysis.py]
+    D1 --> D1b[cs_a_analysis.ipynb]
+    D1 --> D1c[data_mcmc.py]
+    D1 --> D1d[data_models.py]
+    D1 --> D1e[util_data.py]
+    D1 --> D1f[results_analysis.ipynb]
+    D --> D2[Palluck_et_al/]
+    D2 --> D2a[Data_analysis.ipynb]
+    D2 --> D2b[data_wrangle.py]
+    D2 --> D2c[descriptive_plots.ipynb]
+```
+
+This diagram provides a high-level overview of the main code and data structure. Notebooks are marked with `.ipynb` extensions.
+
 The code is organized as follows:
 - `src`: contains auxiliary scripts used in the numerical illustrations.
 - `Simulations/`: contains the code to run the fully-synthetic experiments.
