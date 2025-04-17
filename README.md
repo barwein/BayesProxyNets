@@ -10,7 +10,7 @@ The code is organized as follows:
 - `Data/cs_aarhus`: contains the code to run the semi-synthetic experiments.
 
 ## Software Requirements
-The code is written in Python 3.11. Run 'requirement.txt' file to install all required packages. 
+The code is written in Python 3.11. Run 'requirements.txt' file to install all required packages. 
 
 ## Running the Experiments
 - The script `Simulations/mwg_simulations.py` contains the code to run the fully-synthetic experiments.
