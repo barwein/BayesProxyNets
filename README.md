@@ -1,4 +1,4 @@
-# Estimating Causal Effects Using Proxies of the Interference Network
+# Bayesian Estimation of Causal Effects Using Proxies of a Latent Interference Network
 
 See preprint at (arXiv link here).
 
