@@ -1,6 +1,6 @@
 # Bayesian Estimation of Causal Effects Using Proxies of a Latent Interference Network
 
-See preprint at (arXiv link here).
+See preprint at https://arxiv.org/abs/2505.08395.
 
 ## Code Structure
 
