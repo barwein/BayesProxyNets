@@ -2,22 +2,24 @@
 # This script runs the simulations for the linear model with CAR cov
 ###
 
-# --- Set cores and seed ---
-
-import os
-
-N_CORES = 4  # update accordingly, can use GPU as well
-os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
-
 # --- Import libraries ---
 
 import jax.numpy as jnp
 from jax import random
 from jax.scipy.special import logit
 
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from Simulations.simulation_aux import one_simulation_iter
 import Simulations.data_gen as dg
 
+# --- Set cores and seed ---
+
+N_CORES = 4  # update accordingly, can use GPU as well
+os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={N_CORES}"
 
 # --- Global variables ---
 
@@ -33,7 +35,9 @@ GAMMA_X_NOISES = jnp.arange(2, 4 + 1e-6, 0.5)
 GAMMA_B_NOISE_0 = GAMMA_BASELINE[0] - GAMMA_X_NOISES / 2
 GAMMA_B_NOISE_1 = GAMMA_BASELINE[1] + GAMMA_X_NOISES / 2
 
-ETA = jnp.array([-1, 3, -0.5, 2])
+# ETA = jnp.array([-1, 3, -0.5, 2])
+# ETA = jnp.array([-1, 3, -0.5, 0.25])
+ETA = jnp.array([-1, 3, -0.5, 1])
 SIG_INV = 1.0
 RHO = 0.5
 PZ = 0.5
@@ -46,7 +50,9 @@ PARAM = {
 }
 FILEPATH = "Simulations/results"
 
-N_ITER = 300
+#
+N_ITER = 1
+# N_ITER = 300
 N_GAMMAS = GAMMA_X_NOISES.shape[0]
 
 

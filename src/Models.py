@@ -87,6 +87,62 @@ def networks_marginalized_model(data):
     numpyro.deterministic("triu_star_probs", numerator / denominator)
 
 
+def networks_marginalized_model_misspec(data):
+    """
+    Model for network only models with marginalized A*
+    Used in cut-posterior sampling
+
+    We embed it as mixture model of A edges
+
+    Misspecified model: ignores x_diff in proxy model
+
+    Args:
+      data: an object with attributes:
+           - x_diff: a 1D array (one per edge) of differences in covariates,
+           - x2_or: a 1D array of indicators (one per edge) for whether x2_i + x2_j = 1,
+           - triu_obs: a 1D array of observed edge indicators (binary; one per edge).
+    """
+    # --- Priors ---
+    theta = numpyro.sample("theta", dist.Normal(0, PRIOR_SCALE).expand([2]))
+    gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE).expand([2]))
+
+    # P(A*_ij=1)
+    star_probs = jax.nn.sigmoid(theta[0] + theta[1] * data.x2_or)
+    star_probs = jnp.clip(star_probs, 1e-6, 1 - 1e-6)
+
+    # P(A_ij = 1 | A*_ij = 0)
+    obs_probs_k0 = jax.nn.sigmoid(gamma[1])
+    obs_probs_k0 = jnp.clip(obs_probs_k0, 1e-6, 1 - 1e-6)
+
+    # P(A_ij = 1 | A*_ij = 1)
+    obs_probs_k1 = jax.nn.sigmoid(gamma[0])
+    obs_probs_k1 = jnp.clip(obs_probs_k1, 1e-6, 1 - 1e-6)
+
+    # marginalized probs P(A_ij=1)
+    mixed_probs = star_probs * obs_probs_k1 + (1 - star_probs) * obs_probs_k0
+
+    with numpyro.plate("edges", data.triu_obs.shape[0]):
+        numpyro.sample("obs", dist.BernoulliProbs(mixed_probs), obs=data.triu_obs)
+
+    # save posterior A_star probs
+    # let  p_1 = P(A*_ij=1)*P(A_ij| A*_ij=1)
+    #      p_0 = P(A*_ij=0 )*P(A_ij| A*_ij=0)
+    # then posterior probs P(A*_ij | A, \theta,\ gamma) = p_1 / (p_1 + p_0)
+
+    # numerator aka p_1
+    numerator = jnp.where(
+        data.triu_obs == 1.0, star_probs * obs_probs_k1, star_probs * (1 - obs_probs_k1)
+    )
+    # denominator aka p_1 + p_0
+    denominator = numerator + jnp.where(
+        data.triu_obs == 1.0,
+        (1 - star_probs) * obs_probs_k0,
+        (1 - star_probs) * (1 - obs_probs_k0),
+    )
+
+    numpyro.deterministic("triu_star_probs", numerator / denominator)
+
+
 def networks_marginalized_model_rep(data):
     """
     Model for network only models with marginalized A*
@@ -106,7 +162,8 @@ def networks_marginalized_model_rep(data):
 
     # priors
     theta = numpyro.sample("theta", dist.Normal(0, PRIOR_SCALE).expand([2]))
-    gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE).expand([7]))
+    # gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE).expand([7]))
+    gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE).expand([3]))
 
     # P(A*_ij=1)
     star_probs = jax.nn.sigmoid(theta[0] + theta[1] * data.x2_or)
@@ -121,11 +178,121 @@ def networks_marginalized_model_rep(data):
     obs_probs_k0 = jnp.clip(obs_probs_k0, 1e-6, 1 - 1e-6)
 
     # P(A^r_ij=1 | A*_ij=1, A_ij)
-    obs_rep_probs_k1 = jax.nn.sigmoid(gamma[3] + gamma[4] * data.triu_obs)
+    # obs_rep_probs_k1 = jax.nn.sigmoid(gamma[3] + gamma[4] * data.triu_obs)
+    obs_rep_probs_k1 = jax.nn.sigmoid(gamma[0])
     obs_rep_probs_k1 = jnp.clip(obs_rep_probs_k1, 1e-6, 1 - 1e-6)
 
     # P(A^r_ij=1 | A*_ij=0, A_ij)
-    obs_rep_probs_k0 = jax.nn.sigmoid(gamma[5] + gamma[6] * data.triu_obs)
+    # obs_rep_probs_k0 = jax.nn.sigmoid(gamma[5] + gamma[6] * data.triu_obs)
+    obs_rep_probs_k0 = jax.nn.sigmoid(gamma[1] + gamma[2] * data.x_diff)
+    obs_rep_probs_k0 = jnp.clip(obs_rep_probs_k0, 1e-6, 1 - 1e-6)
+
+    # compute marginalize probs of (A^_ij=r, A_ij=a), a,r \in {0,1}
+    # represent as categorical $C_ij = 2 A_ij + A^r_ij \in {0,1,2,3}
+    # Given A*_ij=1
+    # p(A_ij=r, A^r_ij=a | A*_ij=1)*P(A*_ij=1)
+    pj_star1_cat0 = star_probs * (1 - obs_probs_k1) * (1 - obs_rep_probs_k1)
+    pj_star1_cat1 = star_probs * (1 - obs_probs_k1) * obs_rep_probs_k1
+    pj_star1_cat2 = star_probs * obs_probs_k1 * (1 - obs_rep_probs_k1)
+    pj_star1_cat3 = star_probs * obs_probs_k1 * obs_rep_probs_k1
+
+    # Given A*_ij=0
+    # p(A_ij=r, A^r_ij=a | A*_ij=0)*P(A*_ij=0)
+    pj_star0_cat0 = (1 - star_probs) * (1 - obs_probs_k0) * (1 - obs_rep_probs_k0)
+    pj_star0_cat1 = (1 - star_probs) * (1 - obs_probs_k0) * obs_rep_probs_k0
+    pj_star0_cat2 = (1 - star_probs) * obs_probs_k0 * (1 - obs_rep_probs_k0)
+    pj_star0_cat3 = (1 - star_probs) * obs_probs_k0 * obs_rep_probs_k0
+
+    # marginalized probs P(C_ij=c) = \sum_{0,1} p(A_ij=r, A^r_ij=a | A*_ij=k)*P(A*_ij=k)
+    p_cat0 = pj_star1_cat0 + pj_star0_cat0
+    p_cat1 = pj_star1_cat1 + pj_star0_cat1
+    p_cat2 = pj_star1_cat2 + pj_star0_cat2
+    p_cat3 = pj_star1_cat3 + pj_star0_cat3
+
+    probs = jnp.stack([p_cat0, p_cat1, p_cat2, p_cat3], axis=-1)
+    probs = probs / jnp.sum(probs, axis=-1, keepdims=True)
+
+    # observed categorical data
+    obs_cat = jnp.astype(2 * data.triu_obs + data.triu_obs_rep, jnp.int32)
+
+    with numpyro.plate("edges", data.triu_obs.shape[0]):
+        numpyro.sample("obs_joint", dist.Categorical(probs=probs), obs=obs_cat)
+
+    # --- Compute the posterior probability of A*_ij=1 given the joint observation ---
+    # Select the appropriate terms based on the observed category
+    # p_1 = p(C_ij = c | A*_ij = 1)p(A*_ij = 1)
+    numerator = jnp.where(
+        obs_cat == 0,
+        pj_star1_cat0,
+        jnp.where(
+            obs_cat == 1,
+            pj_star1_cat1,
+            jnp.where(obs_cat == 2, pj_star1_cat2, pj_star1_cat3),
+        ),
+    )
+
+    # p_0 = p(C_ij = c | A*_ij = 0)p(A*_ij = 0)
+    # denom is p_0 + p_1
+    denominator = numerator + jnp.where(
+        obs_cat == 0,
+        pj_star0_cat0,
+        jnp.where(
+            obs_cat == 1,
+            pj_star0_cat1,
+            jnp.where(obs_cat == 2, pj_star0_cat2, pj_star0_cat3),
+        ),
+    )
+    # p_1 / (p_0 + p_1)
+    posterior_star = numerator / denominator
+
+    # Save the posterior probabilities for A* (for example, on the upper triangle of the network)
+    numpyro.deterministic("triu_star_probs", posterior_star)
+
+
+def networks_marginalized_model_rep_misspec(data):
+    """
+    Model for network only models with marginalized A*
+    Used in cut-posterior sampling
+
+    We have repeated proxy measures A^r, A
+
+    We embed it as mixture model of (A^r, A) edges (4 categories)
+
+    Misspecified model: ignores x_diff in proxy model
+
+    Args:
+      data: an object with attributes:
+           - x_diff: a 1D array (one per edge) of differences in covariates,
+           - x2_or: a 1D array of indicators (one per edge) for whether x2_i + x2_j = 1,
+           - triu_obs: a 1D array of observed edge indicators (binary; one per edge).
+           - triu_obs_rep: a 1D array of repeated observed edge indicators (binary; one per edge).
+    """
+
+    # priors
+    theta = numpyro.sample("theta", dist.Normal(0, PRIOR_SCALE).expand([2]))
+    # gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE).expand([7]))
+    gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE).expand([2]))
+
+    # P(A*_ij=1)
+    star_probs = jax.nn.sigmoid(theta[0] + theta[1] * data.x2_or)
+    star_probs = jnp.clip(star_probs, 1e-6, 1 - 1e-6)
+
+    # P(A_ij = 1 | A*_ij = 1)
+    obs_probs_k1 = jax.nn.sigmoid(gamma[0])
+    obs_probs_k1 = jnp.clip(obs_probs_k1, 1e-6, 1 - 1e-6)
+
+    # P(A_ij = 1 | A*_ij = 0)
+    obs_probs_k0 = jax.nn.sigmoid(gamma[1])
+    obs_probs_k0 = jnp.clip(obs_probs_k0, 1e-6, 1 - 1e-6)
+
+    # P(A^r_ij=1 | A*_ij=1, A_ij)
+    # obs_rep_probs_k1 = jax.nn.sigmoid(gamma[3] + gamma[4] * data.triu_obs)
+    obs_rep_probs_k1 = jax.nn.sigmoid(gamma[0])
+    obs_rep_probs_k1 = jnp.clip(obs_rep_probs_k1, 1e-6, 1 - 1e-6)
+
+    # P(A^r_ij=1 | A*_ij=0, A_ij)
+    # obs_rep_probs_k0 = jax.nn.sigmoid(gamma[5] + gamma[6] * data.triu_obs)
+    obs_rep_probs_k0 = jax.nn.sigmoid(gamma[1])
     obs_rep_probs_k0 = jnp.clip(obs_rep_probs_k0, 1e-6, 1 - 1e-6)
 
     # compute marginalize probs of (A^_ij=r, A_ij=a), a,r \in {0,1}
@@ -206,26 +373,27 @@ def plugin_outcome_model(df_nodes, adj_mat, Y):
     with numpyro.plate("eta_plate", df_nodes.shape[1]):
         eta = numpyro.sample("eta", dist.Normal(0, PRIOR_SCALE))
 
-    rho = numpyro.sample("rho", dist.Beta(2, 2))
+    # rho = numpyro.sample("rho", dist.Beta(2, 2))
 
-    sig_inv = numpyro.sample("sig_inv", dist.Gamma(2, 2))
+    # sig_inv = numpyro.sample("sig_inv", dist.Gamma(1, 1))
+    sig_inv = numpyro.sample("sig_inv", dist.HalfNormal(PRIOR_SCALE))
 
     # likelihood
     mean_y = df_nodes @ eta
 
-    numpyro.sample(
-        "Y",
-        dist.CAR(
-            loc=mean_y,
-            correlation=rho,
-            conditional_precision=sig_inv,
-            adj_matrix=adj_mat,
-        ),
-        obs=Y,
-    )
+    # numpyro.sample(
+    #     "Y",
+    #     dist.CAR(
+    #         loc=mean_y,
+    #         correlation=rho,
+    #         conditional_precision=sig_inv,
+    #         adj_matrix=adj_mat,
+    #     ),
+    #     obs=Y,
+    # )
 
-    # with numpyro.plate("Y plate", Y.shape[0]):
-    #     numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=Y)
+    with numpyro.plate("Y plate", df_nodes.shape[0]):
+        numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=Y)
 
 
 def combined_model(data):
@@ -252,7 +420,7 @@ def combined_model(data):
     star_logits = theta[0] + theta[1] * data.x2_or
     triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
 
-    adj_mat = utils.Triu_to_mat(triu_star)
+    # adj_mat = utils.Triu_to_mat(triu_star)
 
     # Outcome model
     expos = utils.compute_exposures(triu_star, data.Z)
@@ -264,25 +432,26 @@ def combined_model(data):
     with numpyro.plate("eta_plate", df_nodes.shape[1]):
         eta = numpyro.sample("eta", dist.Normal(0, PRIOR_SCALE))
 
-    rho = numpyro.sample("rho", dist.Beta(2, 2))
+    # rho = numpyro.sample("rho", dist.Beta(2, 2))
 
-    sig_inv = numpyro.sample("sig_inv", dist.Gamma(2, 2))
+    # sig_inv = numpyro.sample("sig_inv", dist.Gamma(1, 1))
+    sig_inv = numpyro.sample("sig_inv", dist.HalfNormal(PRIOR_SCALE))
 
     # likelihood
     mean_y = df_nodes @ eta
 
-    numpyro.sample(
-        "Y",
-        dist.CAR(
-            loc=mean_y,
-            correlation=rho,
-            conditional_precision=sig_inv,
-            adj_matrix=adj_mat,
-        ),
-        obs=data.Y,
-    )
-    # with numpyro.plate("Y plate", data.Y.shape[0]):
-    #     numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
+    # numpyro.sample(
+    #     "Y",
+    #     dist.CAR(
+    #         loc=mean_y,
+    #         correlation=rho,
+    #         conditional_precision=sig_inv,
+    #         adj_matrix=adj_mat,
+    #     ),
+    #     obs=data.Y,
+    # )
+    with numpyro.plate("Y plate", df_nodes.shape[0]):
+        numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
 
     # === Proxy network model with single measures ===
     # priors
@@ -293,6 +462,75 @@ def combined_model(data):
     obs_logits = triu_star * gamma[0] + (1 - triu_star) * (
         gamma[1] + gamma[2] * data.x_diff
     )
+
+    with numpyro.plate("edges", data.triu_obs.shape[0]):
+        numpyro.sample("triu_obs", dist.Bernoulli(logits=obs_logits), obs=data.triu_obs)
+
+
+def combined_model_misspec(data):
+    """
+    Combined model for network (true and proxy) and outcome
+    Used in the MWG sampler (for the continuous parameters)
+    'triu_star' will be masked during continuous parameters sampling
+
+    Misspecified model: ignores x and x_diff
+
+    Args:
+    data: DataTuple object with the following attributes:
+        - x_diff: Difference in x covaraiates
+        - x2_or: if x2_i + x2_j = 1
+        - triu_obs: Upper triangular observed adjacency matrix
+        - Z: Treatment vector
+        - X: Node-level covariate
+        - Y: Outcome vector
+    """
+    # True network model
+    # priors
+    with numpyro.plate("theta_plate", 2):
+        theta = numpyro.sample("theta", dist.Normal(0, PRIOR_SCALE))
+
+    # likelihood
+    star_logits = theta[0] + theta[1] * data.x2_or
+    triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+
+    # adj_mat = utils.Triu_to_mat(triu_star)
+
+    # Outcome model
+    expos = utils.compute_exposures(triu_star, data.Z)
+    df_nodes = jnp.transpose(jnp.stack([jnp.ones(data.Z.shape[0]), data.Z, expos]))
+
+    # priors
+    with numpyro.plate("eta_plate", df_nodes.shape[1]):
+        eta = numpyro.sample("eta", dist.Normal(0, PRIOR_SCALE))
+
+    # rho = numpyro.sample("rho", dist.Beta(2, 2))
+
+    # sig_inv = numpyro.sample("sig_inv", dist.Gamma(1, 1))
+    sig_inv = numpyro.sample("sig_inv", dist.HalfNormal(PRIOR_SCALE))
+
+    # likelihood
+    mean_y = df_nodes @ eta
+
+    # numpyro.sample(
+    #     "Y",
+    #     dist.CAR(
+    #         loc=mean_y,
+    #         correlation=rho,
+    #         conditional_precision=sig_inv,
+    #         adj_matrix=adj_mat,
+    #     ),
+    #     obs=data.Y,
+    # )
+    with numpyro.plate("Y plate", df_nodes.shape[0]):
+        numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
+
+    # === Proxy network model with single measures ===
+    # priors
+    with numpyro.plate("gamma_plate", 2):
+        gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE))
+
+    # likelihood
+    obs_logits = triu_star * gamma[0] + (1 - triu_star) * gamma[1]
 
     with numpyro.plate("edges", data.triu_obs.shape[0]):
         numpyro.sample("triu_obs", dist.Bernoulli(logits=obs_logits), obs=data.triu_obs)
@@ -325,7 +563,7 @@ def combined_model_rep(data):
     star_logits = theta[0] + theta[1] * data.x2_or
     triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
 
-    adj_mat = utils.Triu_to_mat(triu_star)
+    # adj_mat = utils.Triu_to_mat(triu_star)
 
     # === Outcome model ===
     expos = utils.compute_exposures(triu_star, data.Z)
@@ -337,41 +575,128 @@ def combined_model_rep(data):
     with numpyro.plate("eta_plate", df_nodes.shape[1]):
         eta = numpyro.sample("eta", dist.Normal(0, PRIOR_SCALE))
 
-    rho = numpyro.sample("rho", dist.Beta(2, 2))
+    # rho = numpyro.sample("rho", dist.Beta(2, 2))
 
-    sig_inv = numpyro.sample("sig_inv", dist.Gamma(2, 2))
+    # sig_inv = numpyro.sample("sig_inv", dist.Gamma(1, 1))
+    sig_inv = numpyro.sample("sig_inv", dist.HalfNormal(PRIOR_SCALE))
 
     # likelihood
     mean_y = df_nodes @ eta
 
-    numpyro.sample(
-        "Y",
-        dist.CAR(
-            loc=mean_y,
-            correlation=rho,
-            conditional_precision=sig_inv,
-            adj_matrix=adj_mat,
-        ),
-        obs=data.Y,
-    )
-
-    # with numpyro.plate("Y plate", data.Y.shape[0]):
-    #     numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
+    # numpyro.sample(
+    #     "Y",
+    #     dist.CAR(
+    #         loc=mean_y,
+    #         correlation=rho,
+    #         conditional_precision=sig_inv,
+    #         adj_matrix=adj_mat,
+    #     ),
+    #     obs=data.Y,
+    # )
+    with numpyro.plate("Y plate", df_nodes.shape[0]):
+        numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
 
     # === Proxy network model with repeated measures ===
     # priors
-    with numpyro.plate("gamma_plate", 7):
+    # with numpyro.plate("gamma_plate", 7):
+    with numpyro.plate("gamma_plate", 3):
         gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE))
 
     # First proxy measurement (A)
     logit_A = jnp.where(triu_star == 1, gamma[0], gamma[1] + gamma[2] * data.x_diff)
 
     # Second proxy measurement (A^r)
-    logit_A_rep = jnp.where(
-        triu_star == 1,
-        gamma[3] + gamma[4] * data.triu_obs,
-        gamma[5] + gamma[6] * data.triu_obs,
-    )
+    logit_A_rep = jnp.where(triu_star == 1, gamma[0], gamma[1] + gamma[2] * data.x_diff)
+    # logit_A_rep = jnp.where(
+    #     triu_star == 1,
+    #     gamma[3] + gamma[4] * data.triu_obs,
+    #     gamma[5] + gamma[6] * data.triu_obs,
+    # )
+
+    # likelihood
+    with numpyro.plate("edges", data.triu_obs.shape[0]):
+        numpyro.sample("triu_obs", dist.Bernoulli(logits=logit_A), obs=data.triu_obs)
+        numpyro.sample(
+            "triu_obs_rep", dist.Bernoulli(logits=logit_A_rep), obs=data.triu_obs_rep
+        )
+
+
+def combined_model_rep_misspec(data):
+    """
+    Combined model for network (true and proxy) and outcome
+    Used in the MWG sampler (for the continuous parameters)
+    'triu_star' will be masked during continuous parameters sampling
+
+    Repeated proxy measurement A^r and A
+
+    Misspecified model: ignores x and x_diff
+
+    Args:
+    data: DataTuple object with the following attributes:
+        - x_diff: Difference in x covaraiates
+        - x2_or: if x2_i + x2_j = 1
+        - triu_obs: Upper triangular observed adjacency matrix
+        - triu_obs_rep: Repeated Upper triangular observed adjacency matrix
+        - Z: Treatment vector
+        - X: Node-level covariate
+        - Y: Outcome vector
+    """
+    # === True network model ===
+    # priors
+    with numpyro.plate("theta_plate", 2):
+        theta = numpyro.sample("theta", dist.Normal(0, PRIOR_SCALE))
+
+    # likelihood
+    star_logits = theta[0] + theta[1] * data.x2_or
+    triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+
+    # adj_mat = utils.Triu_to_mat(triu_star)
+
+    # === Outcome model ===
+    expos = utils.compute_exposures(triu_star, data.Z)
+    df_nodes = jnp.transpose(jnp.stack([jnp.ones(data.Z.shape[0]), data.Z, expos]))
+
+    # priors
+    with numpyro.plate("eta_plate", df_nodes.shape[1]):
+        eta = numpyro.sample("eta", dist.Normal(0, PRIOR_SCALE))
+
+    # rho = numpyro.sample("rho", dist.Beta(2, 2))
+
+    # sig_inv = numpyro.sample("sig_inv", dist.Gamma(1, 1))
+    sig_inv = numpyro.sample("sig_inv", dist.HalfNormal(PRIOR_SCALE))
+
+    # likelihood
+    mean_y = df_nodes @ eta
+
+    # numpyro.sample(
+    #     "Y",
+    #     dist.CAR(
+    #         loc=mean_y,
+    #         correlation=rho,
+    #         conditional_precision=sig_inv,
+    #         adj_matrix=adj_mat,
+    #     ),
+    #     obs=data.Y,
+    # )
+    with numpyro.plate("Y plate", df_nodes.shape[0]):
+        numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
+
+    # === Proxy network model with repeated measures ===
+    # priors
+    # with numpyro.plate("gamma_plate", 7):
+    with numpyro.plate("gamma_plate", 2):
+        gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE))
+
+    # First proxy measurement (A)
+    logit_A = jnp.where(triu_star == 1, gamma[0], gamma[1])
+
+    # Second proxy measurement (A^r)
+    logit_A_rep = jnp.where(triu_star == 1, gamma[0], gamma[1])
+    # logit_A_rep = jnp.where(
+    #     triu_star == 1,
+    #     gamma[3] + gamma[4] * data.triu_obs,
+    #     gamma[5] + gamma[6] * data.triu_obs,
+    # )
 
     # likelihood
     with numpyro.plate("edges", data.triu_obs.shape[0]):
@@ -443,6 +768,26 @@ def iid_logdensity(y, mu, sigma):
 
 
 @jit
+def z_degree_logdensity(z, adj_mat, pz=0.5):
+    """
+    Computes log P(Z | A*) where P(Z_i=1) is proportional to degree.
+    """
+    # 1. Compute degrees
+    degrees = jnp.sum(adj_mat, axis=1)
+    N = z.shape[0]
+
+    # 2. Compute Probabilities: p_z * (d_i / (N-1))
+    # We clip to avoid log(0) errors, keeping probabilities strictly in (0, 1)
+    probs = 6 * pz * (degrees / (N - 1))
+    probs = jnp.clip(probs, 1e-3, 1.0 - 1e-3)
+
+    # 4. Bernoulli Log-Likelihood
+    log_probs = z * jnp.log(probs) + (1 - z) * jnp.log(1 - probs)
+
+    return jnp.sum(log_probs)
+
+
+@jit
 def cond_logpost_a_star(triu_star, data, param):
     """
     Conditional log-posterior for A* given the rest of the parameters and data
@@ -487,17 +832,139 @@ def cond_logpost_a_star(triu_star, data, param):
     )
     mean_y = jnp.dot(df_nodes, param.eta)
 
-    # y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+    y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+    adj_mat = utils.Triu_to_mat(triu_star)
 
-    y_logpdf = car_logdensity(
-        data.Y, mean_y, param.sig_inv, param.rho, utils.Triu_to_mat(triu_star)
+    # y_logpdf = car_logdensity(data.Y, mean_y, param.sig_inv, param.rho, adj_mat)
+
+    # Add treament assignment likelihood
+    z_logpdf = z_degree_logdensity(data.Z, adj_mat)
+
+    return a_star_logpmf.sum() + a_obs_logpmf.sum() + z_logpdf + y_logpdf
+
+
+# Gradient of A* conditional log-posterior
+triu_star_grad_fn = jit(value_and_grad(cond_logpost_a_star))
+
+
+@jit
+def cond_logpost_a_star_no_z(triu_star, data, param):
+    """
+    Conditional log-posterior for A* given the rest of the parameters and data
+
+    Ignore the treatment model likelihood
+
+    Args:
+    triu_star: Upper triangular adjacency matrix
+    data: DataTuple object with the following attributes:
+        - x_diff: Difference in x covaraiates
+        - x2_or: if x2_i + x2_j = 1
+        - triu_obs: Upper triangular observed adjacency matrix
+        - Z: Treatment vector
+        - x: Node-level covariate
+        - Y: Outcome vector
+    param: ParamTuple object with the following attributes:
+        - theta: Parameters for A*
+        - gamma: Parameters for A_ij
+        - eta: Parameters for outcome model
+        - rho: Correlation parameter
+        - sig_inv: Conditional precision parameter
+
+    """
+
+    # p(A*|X,\theta)
+    logits_a_star = param.theta[0] + param.theta[1] * data.x2_or
+    # a_star_logpmf = triu_star * logits_a_star - jnp.log1p(jnp.exp(logits_a_star))
+    a_star_logpmf = triu_star * jax.nn.log_sigmoid(logits_a_star) + (
+        1 - triu_star
+    ) * jax.nn.log_sigmoid(-logits_a_star)
+
+    # p(A|A*,X,\gamma)
+    logits_a_obs = triu_star * param.gamma[0] + (1 - triu_star) * (
+        param.gamma[1] + param.gamma[2] * data.x_diff
     )
+    a_obs_logpmf = data.triu_obs * jax.nn.log_sigmoid(logits_a_obs) + (
+        1 - data.triu_obs
+    ) * jax.nn.log_sigmoid(-logits_a_obs)
+
+    # p(Y|A*,X,Z,\eta,\sig_y)
+    exposures = utils.compute_exposures(triu_star, data.Z)
+    df_nodes = jnp.transpose(
+        jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, data.x, exposures])
+    )
+    mean_y = jnp.dot(df_nodes, param.eta)
+
+    y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+    # adj_mat = utils.Triu_to_mat(triu_star)
+
+    # y_logpdf = car_logdensity(data.Y, mean_y, param.sig_inv, param.rho, adj_mat)
+
+    # Add treament assignment likelihood
+    # z_logpdf = z_degree_logdensity(data.Z, adj_mat)
 
     return a_star_logpmf.sum() + a_obs_logpmf.sum() + y_logpdf
 
 
 # Gradient of A* conditional log-posterior
-triu_star_grad_fn = jit(value_and_grad(cond_logpost_a_star))
+triu_star_grad_fn_no_z = jit(value_and_grad(cond_logpost_a_star_no_z))
+
+
+@jit
+def cond_logpost_a_star_misspec(triu_star, data, param):
+    """
+    Conditional log-posterior for A* given the rest of the parameters and data
+
+    Misspecified model: ignores x and x_diff
+
+    Args:
+    triu_star: Upper triangular adjacency matrix
+    data: DataTuple object with the following attributes:
+        - x_diff: Difference in x covaraiates
+        - x2_or: if x2_i + x2_j = 1
+        - triu_obs: Upper triangular observed adjacency matrix
+        - Z: Treatment vector
+        - x: Node-level covariate
+        - Y: Outcome vector
+    param: ParamTuple object with the following attributes:
+        - theta: Parameters for A*
+        - gamma: Parameters for A_ij
+        - eta: Parameters for outcome model
+        - rho: Correlation parameter
+        - sig_inv: Conditional precision parameter
+
+    """
+
+    # p(A*|X,\theta)
+    logits_a_star = param.theta[0] + param.theta[1] * data.x2_or
+    # a_star_logpmf = triu_star * logits_a_star - jnp.log1p(jnp.exp(logits_a_star))
+    a_star_logpmf = triu_star * jax.nn.log_sigmoid(logits_a_star) + (
+        1 - triu_star
+    ) * jax.nn.log_sigmoid(-logits_a_star)
+
+    # p(A|A*,X,\gamma)
+    logits_a_obs = triu_star * param.gamma[0] + (1 - triu_star) * (param.gamma[1])
+    a_obs_logpmf = data.triu_obs * jax.nn.log_sigmoid(logits_a_obs) + (
+        1 - data.triu_obs
+    ) * jax.nn.log_sigmoid(-logits_a_obs)
+
+    # p(Y|A*,X,Z,\eta,\sig_y)
+    exposures = utils.compute_exposures(triu_star, data.Z)
+    df_nodes = jnp.transpose(jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, exposures]))
+    mean_y = jnp.dot(df_nodes, param.eta)
+
+    y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+    adj_mat = utils.Triu_to_mat(triu_star)
+
+    # y_logpdf = car_logdensity(data.Y, mean_y, param.sig_inv, param.rho, adj_mat)
+
+    # Add treament assignment likelihood
+    z_logpdf = z_degree_logdensity(data.Z, adj_mat)
+
+    return a_star_logpmf.sum() + a_obs_logpmf.sum() + z_logpdf + y_logpdf
+
+
+# Gradient of A* conditional log-posterior
+triu_star_grad_fn_misspec = jit(value_and_grad(cond_logpost_a_star_misspec))
 
 
 @jit
@@ -540,11 +1007,14 @@ def cond_logpost_a_star_rep(triu_star, data, param):
     ) * jax.nn.log_sigmoid(-logits_a_obs)
 
     # p(A^r | A, A*, gamma) for the repeated measurement.
-    logit_a_obs_rep = jnp.where(
-        triu_star == 1,
-        param.gamma[3] + param.gamma[4] * data.triu_obs,  # when A* == 1
-        param.gamma[5] + param.gamma[6] * data.triu_obs,  # when A* == 0
+    logit_a_obs_rep = triu_star * param.gamma[0] + (1 - triu_star) * (
+        param.gamma[1] + param.gamma[2] * data.x_diff
     )
+    # logit_a_obs_rep = jnp.where(
+    #     triu_star == 1,
+    #     param.gamma[3] + param.gamma[4] * data.triu_obs,  # when A* == 1
+    #     param.gamma[5] + param.gamma[6] * data.triu_obs,  # when A* == 0
+    # )
 
     a_obs_rep_logpmf = data.triu_obs_rep * jax.nn.log_sigmoid(logit_a_obs_rep) + (
         1 - data.triu_obs_rep
@@ -558,16 +1028,196 @@ def cond_logpost_a_star_rep(triu_star, data, param):
     mean_y = jnp.dot(df_nodes, param.eta)
 
     # y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+    adj_mat = utils.Triu_to_mat(triu_star)
 
-    y_logpdf = car_logdensity(
-        data.Y, mean_y, param.sig_inv, param.rho, utils.Triu_to_mat(triu_star)
+    mean_y = jnp.dot(df_nodes, param.eta)
+
+    y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+
+    # y_logpdf = car_logdensity(data.Y, mean_y, param.sig_inv, param.rho, adj_mat)
+
+    # Add treament assignment likelihood
+    z_logpdf = z_degree_logdensity(data.Z, adj_mat)
+
+    return (
+        a_star_logpmf.sum()
+        + a_obs_logpmf.sum()
+        + a_obs_rep_logpmf.sum()
+        + z_logpdf
+        + y_logpdf
     )
-
-    return a_star_logpmf.sum() + a_obs_logpmf.sum() + a_obs_rep_logpmf.sum() + y_logpdf
 
 
 # Gradient of A* conditional log-posterior
 triu_star_grad_fn_rep = jit(value_and_grad(cond_logpost_a_star_rep))
+
+
+@jit
+def cond_logpost_a_star_rep_no_z(triu_star, data, param):
+    """
+    Conditional log-posterior for A* given the rest of the parameters and data,
+    Including repeated proxy measures A^r and A
+
+    Ignore the treatment model likelihood
+
+    Args:
+    triu_star: Upper triangular adjacency matrix
+    data: DataTuple object with the following attributes:
+        - x_diff: Difference in x covaraiates
+        - x2_or: if x2_i + x2_j = 1
+        - triu_obs: Upper triangular observed adjacency matrix
+        - triu_obs_rep: Repeated Upper triangular observed adjacency matrix
+        - Z: Treatment vector
+        - x: Node-level covariate
+        - Y: Outcome vector
+    param: ParamTuple object with the following attributes:
+        - theta: Parameters for A*
+        - gamma: Parameters for A_ij
+        - eta: Parameters for outcome model
+        - rho: Correlation parameter
+        - sig_inv: Conditional precision parameter
+
+    """
+    # p(A*|X,\theta)
+    logits_a_star = param.theta[0] + param.theta[1] * data.x2_or
+    # a_star_logpmf = triu_star * logits_a_star - jnp.log1p(jnp.exp(logits_a_star))
+    a_star_logpmf = triu_star * jax.nn.log_sigmoid(logits_a_star) + (
+        1 - triu_star
+    ) * jax.nn.log_sigmoid(-logits_a_star)
+
+    # p(A|A*,X,\gamma)
+    logits_a_obs = triu_star * param.gamma[0] + (1 - triu_star) * (
+        param.gamma[1] + param.gamma[2] * data.x_diff
+    )
+    a_obs_logpmf = data.triu_obs * jax.nn.log_sigmoid(logits_a_obs) + (
+        1 - data.triu_obs
+    ) * jax.nn.log_sigmoid(-logits_a_obs)
+
+    # p(A^r | A, A*, gamma) for the repeated measurement.
+    logit_a_obs_rep = triu_star * param.gamma[0] + (1 - triu_star) * (
+        param.gamma[1] + param.gamma[2] * data.x_diff
+    )
+    # logit_a_obs_rep = jnp.where(
+    #     triu_star == 1,
+    #     param.gamma[3] + param.gamma[4] * data.triu_obs,  # when A* == 1
+    #     param.gamma[5] + param.gamma[6] * data.triu_obs,  # when A* == 0
+    # )
+
+    a_obs_rep_logpmf = data.triu_obs_rep * jax.nn.log_sigmoid(logit_a_obs_rep) + (
+        1 - data.triu_obs_rep
+    ) * jax.nn.log_sigmoid(-logit_a_obs_rep)
+
+    # p(Y|A*,X,Z,\eta,\sig_y)
+    exposures = utils.compute_exposures(triu_star, data.Z)
+    df_nodes = jnp.transpose(
+        jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, data.x, exposures])
+    )
+    mean_y = jnp.dot(df_nodes, param.eta)
+
+    # y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+    adj_mat = utils.Triu_to_mat(triu_star)
+
+    mean_y = jnp.dot(df_nodes, param.eta)
+
+    y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+
+    # y_logpdf = car_logdensity(data.Y, mean_y, param.sig_inv, param.rho, adj_mat)
+
+    # Add treament assignment likelihood
+    # z_logpdf = z_degree_logdensity(data.Z, adj_mat)
+
+    return (
+        a_star_logpmf.sum()
+        + a_obs_logpmf.sum()
+        + a_obs_rep_logpmf.sum()
+        # + z_logpdf
+        + y_logpdf
+    )
+
+
+# Gradient of A* conditional log-posterior
+triu_star_grad_fn_rep_no_z = jit(value_and_grad(cond_logpost_a_star_rep_no_z))
+
+
+@jit
+def cond_logpost_a_star_rep_misspec(triu_star, data, param):
+    """
+    Conditional log-posterior for A* given the rest of the parameters and data,
+    Including repeated proxy measures A^r and A
+
+    Misspecified model: ignores x and x_diff
+
+    Args:
+    triu_star: Upper triangular adjacency matrix
+    data: DataTuple object with the following attributes:
+        - x_diff: Difference in x covaraiates
+        - x2_or: if x2_i + x2_j = 1
+        - triu_obs: Upper triangular observed adjacency matrix
+        - triu_obs_rep: Repeated Upper triangular observed adjacency matrix
+        - Z: Treatment vector
+        - x: Node-level covariate
+        - Y: Outcome vector
+    param: ParamTuple object with the following attributes:
+        - theta: Parameters for A*
+        - gamma: Parameters for A_ij
+        - eta: Parameters for outcome model
+        - rho: Correlation parameter
+        - sig_inv: Conditional precision parameter
+
+    """
+    # p(A*|X,\theta)
+    logits_a_star = param.theta[0] + param.theta[1] * data.x2_or
+    # a_star_logpmf = triu_star * logits_a_star - jnp.log1p(jnp.exp(logits_a_star))
+    a_star_logpmf = triu_star * jax.nn.log_sigmoid(logits_a_star) + (
+        1 - triu_star
+    ) * jax.nn.log_sigmoid(-logits_a_star)
+
+    # p(A|A*,X,\gamma)
+    logits_a_obs = triu_star * param.gamma[0] + (1 - triu_star) * (param.gamma[1])
+    a_obs_logpmf = data.triu_obs * jax.nn.log_sigmoid(logits_a_obs) + (
+        1 - data.triu_obs
+    ) * jax.nn.log_sigmoid(-logits_a_obs)
+
+    # p(A^r | A, A*, gamma) for the repeated measurement.
+    logit_a_obs_rep = triu_star * param.gamma[0] + (1 - triu_star) * (param.gamma[1])
+    # logit_a_obs_rep = jnp.where(
+    #     triu_star == 1,
+    #     param.gamma[3] + param.gamma[4] * data.triu_obs,  # when A* == 1
+    #     param.gamma[5] + param.gamma[6] * data.triu_obs,  # when A* == 0
+    # )
+
+    a_obs_rep_logpmf = data.triu_obs_rep * jax.nn.log_sigmoid(logit_a_obs_rep) + (
+        1 - data.triu_obs_rep
+    ) * jax.nn.log_sigmoid(-logit_a_obs_rep)
+
+    # p(Y|A*,X,Z,\eta,\sig_y)
+    exposures = utils.compute_exposures(triu_star, data.Z)
+    df_nodes = jnp.transpose(jnp.stack([jnp.ones(data.Y.shape[0]), data.Z, exposures]))
+    mean_y = jnp.dot(df_nodes, param.eta)
+
+    # y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+    adj_mat = utils.Triu_to_mat(triu_star)
+
+    mean_y = jnp.dot(df_nodes, param.eta)
+
+    y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
+
+    # y_logpdf = car_logdensity(data.Y, mean_y, param.sig_inv, param.rho, adj_mat)
+
+    # Add treament assignment likelihood
+    z_logpdf = z_degree_logdensity(data.Z, adj_mat)
+
+    return (
+        a_star_logpmf.sum()
+        + a_obs_logpmf.sum()
+        + a_obs_rep_logpmf.sum()
+        + z_logpdf
+        + y_logpdf
+    )
+
+
+# Gradient of A* conditional log-posterior
+triu_star_grad_fn_rep_misspec = jit(value_and_grad(cond_logpost_a_star_rep_misspec))
 
 
 def compute_log_cut_posterior(astar_sample, theta, gamma, data):
@@ -606,6 +1256,42 @@ compute_log_posterior_vmap = vmap(
 )
 
 
+def compute_log_cut_posterior_misspec(astar_sample, theta, gamma, data):
+    """
+    Compute log cut-posterior of $A*|theta,gamma$ in network module (true and proxy)
+    for a single astar configuration
+
+    single proxy network
+
+    Misspecified model: ignores x_diff
+
+    Args:
+    astar_sample: A* sample
+    theta: Parameters for A*
+    gamma: Parameters for A_ij
+    data: DataTuple object
+    """
+    # Prior term (log p(A*|theta))
+    star_logits = theta[0] + theta[1] * data.x2_or
+    log_prior = astar_sample * jax.nn.log_sigmoid(star_logits) + (
+        1 - astar_sample
+    ) * jax.nn.log_sigmoid(-star_logits)
+
+    # Likelihood term (log p(A|A*,gamma))
+    obs_logits = astar_sample * gamma[0] + (1 - astar_sample) * (gamma[1])
+    log_lik = data.triu_obs * jax.nn.log_sigmoid(obs_logits) + (
+        1 - data.triu_obs
+    ) * jax.nn.log_sigmoid(-obs_logits)
+
+    return jnp.sum(log_prior + log_lik)
+
+
+# Vectorize over samples
+compute_log_posterior_vmap_misspec = vmap(
+    compute_log_cut_posterior_misspec, in_axes=(0, None, None, None)
+)
+
+
 def compute_log_cut_posterior_rep(astar_sample, theta, gamma, data):
     """
     Compute log cut-posterior of $A*|theta,gamma$ in network module (true and proxy)
@@ -634,11 +1320,15 @@ def compute_log_cut_posterior_rep(astar_sample, theta, gamma, data):
     ) * jax.nn.log_sigmoid(-obs_logits)
 
     # Likelihood term (log p(A^r|A,A*,gamma))
-    logit_A_rep = jnp.where(
-        astar_sample == 1,
-        gamma[3] + gamma[4] * data.triu_obs,
-        gamma[5] + gamma[6] * data.triu_obs,
+    logit_A_rep = astar_sample * gamma[0] + (1 - astar_sample) * (
+        gamma[1] + gamma[2] * data.x_diff
     )
+    # logit_A_rep = jnp.where(
+    #     astar_sample == 1,
+    #     gamma[3] + gamma[4] * data.triu_obs,
+    #     gamma[5] + gamma[6] * data.triu_obs,
+    # )
+
     log_lik_rep = data.triu_obs_rep * jax.nn.log_sigmoid(logit_A_rep) + (
         1 - data.triu_obs_rep
     ) * jax.nn.log_sigmoid(-logit_A_rep)
@@ -649,4 +1339,52 @@ def compute_log_cut_posterior_rep(astar_sample, theta, gamma, data):
 # Vectorize over samples
 compute_log_posterior_vmap_rep = vmap(
     compute_log_cut_posterior_rep, in_axes=(0, None, None, None)
+)
+
+
+def compute_log_cut_posterior_rep_misspec(astar_sample, theta, gamma, data):
+    """
+    Compute log cut-posterior of $A*|theta,gamma$ in network module (true and proxy)
+    for a single astar configuration
+
+    repeated proxy networks measures
+
+    Misspecified model: ignores x_diff
+
+    Args:
+    astar_sample: A* sample
+    theta: Parameters for A*
+    gamma: Parameters for A_ij
+    data: DataTuple object
+    """
+    # Prior term (log p(A*|theta))
+    star_logits = theta[0] + theta[1] * data.x2_or
+    log_prior = astar_sample * jax.nn.log_sigmoid(star_logits) + (
+        1 - astar_sample
+    ) * jax.nn.log_sigmoid(-star_logits)
+
+    # Likelihood term (log p(A|A*,gamma))
+    obs_logits = astar_sample * gamma[0] + (1 - astar_sample) * (gamma[1])
+    log_lik = data.triu_obs * jax.nn.log_sigmoid(obs_logits) + (
+        1 - data.triu_obs
+    ) * jax.nn.log_sigmoid(-obs_logits)
+
+    # Likelihood term (log p(A^r|A,A*,gamma))
+    logit_A_rep = astar_sample * gamma[0] + (1 - astar_sample) * (gamma[1])
+    # logit_A_rep = jnp.where(
+    #     astar_sample == 1,
+    #     gamma[3] + gamma[4] * data.triu_obs,
+    #     gamma[5] + gamma[6] * data.triu_obs,
+    # )
+
+    log_lik_rep = data.triu_obs_rep * jax.nn.log_sigmoid(logit_A_rep) + (
+        1 - data.triu_obs_rep
+    ) * jax.nn.log_sigmoid(-logit_A_rep)
+
+    return jnp.sum(log_prior + log_lik + log_lik_rep)
+
+
+# Vectorize over samples
+compute_log_posterior_vmap_rep_misspec = vmap(
+    compute_log_cut_posterior_rep_misspec, in_axes=(0, None, None, None)
 )

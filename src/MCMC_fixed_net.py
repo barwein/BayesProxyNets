@@ -14,8 +14,8 @@ class mcmc_fixed_net:
         rng_key,
         data,
         net_type,
-        n_warmup=2000,
-        n_samples=2500,
+        n_warmup=3000,
+        n_samples=3000,
         num_chains=4,
         progress_bar=False,
     ):
@@ -83,7 +83,7 @@ class mcmc_fixed_net:
         post_samps["triu_star"] = jnp.repeat(
             jnp.array([self.triu]), self.n_samples * self.num_chains, axis=0
         )
-        post_samps["rho"] = post_samps["rho"][:, None]
+        # post_samps["rho"] = post_samps["rho"][:, None]
         post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
 
         return utils.compute_1w_distance(post_samps, true_vals)

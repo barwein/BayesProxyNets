@@ -36,6 +36,15 @@ def generate_treatments(rng, n, pz=0.5):
     return jnp.astype(random.bernoulli(key=rng, p=pz, shape=(n,)), jnp.float32)
 
 
+def generate_treatments_prop_to_degree(rng, n, triu_star, p_z=0.5):
+    # Probs proportional to degree centrality
+    adj_mat = utils.Triu_to_mat(triu_star)
+    deg_cen = utils.degree_centrality(adj_mat)
+    probs = 6 * p_z * deg_cen
+    props = jnp.clip(probs, a_min=0.0, a_max=1.0)
+    return jnp.astype(random.bernoulli(key=rng, p=props, shape=(n,)), jnp.float32)
+
+
 def CAR_cov(triu_vals, sig_inv, rho, n):
     # Cov(Y) = \Sigma = sig_inv * (D - rho*A)^-1
     # So precision = \Sigma^{-1} = (1/sig_inv) * (D - rho*A)
@@ -55,8 +64,8 @@ def generate_outcomes_n_exposures(rng, n, x, z, triu_star, eta, rho, sig_inv):
     df_nodes = jnp.transpose(jnp.stack([jnp.ones(n), z, x, expos]))
     mean_y = df_nodes @ eta
 
-    y_cov = CAR_cov(triu_star, sig_inv, rho, n)
-    # y_cov = jnp.eye(n) * sig_inv
+    # y_cov = CAR_cov(triu_star, sig_inv, rho, n)
+    y_cov = jnp.eye(n) * sig_inv
 
     y = random.multivariate_normal(key=rng, mean=mean_y, cov=y_cov)
 
@@ -75,12 +84,15 @@ def generate_fixed_data(rng, n, param, pz=0.5):
     keys = random.split(rng, 4)
     x, x2 = generate_covariates(keys[0], n)
     x_diff, x2_or = compute_pairwise_diffs(n, x, x2)
-    Z = generate_treatments(keys[1], n, pz)
 
     # triu_star (A*)
     triu_dim = n * (n - 1) // 2
     # triu_star = generate_triu_star(rng, triu_dim, x2_or, param.theta)
     triu_star = generate_triu_star(keys[2], triu_dim, x2_or, param["theta"])
+
+    # treatments
+    # Z = generate_treatments(keys[1], n, pz)
+    Z = generate_treatments_prop_to_degree(keys[1], n, triu_star, pz)
 
     # outcomes + exposures
     Y, true_exposures = generate_outcomes_n_exposures(
@@ -109,9 +121,12 @@ def generate_proxy_networks(rng, triu_dim, triu_star, gamma, x_diff, Z):
     triu_obs = jnp.astype(random.bernoulli(key=keys[0], p=probs_obs), jnp.float32)
     obs_exposures = utils.compute_exposures(triu_obs, Z)
 
-    logits_obs_rep = triu_star * (gamma[3] + gamma[4] * triu_obs) + (
-        1.0 - triu_star
-    ) * (gamma[5] + gamma[6] * triu_obs)
+    logits_obs_rep = triu_star * gamma[0] + (1.0 - triu_star) * (
+        gamma[1] + gamma[2] * x_diff
+    )
+    # logits_obs_rep = triu_star * (gamma[3] + gamma[4] * triu_obs) + (
+    #     1.0 - triu_star
+    # ) * (gamma[5] + gamma[6] * triu_obs)
 
     probs_obs_rep = expit(logits_obs_rep)
 
@@ -149,8 +164,8 @@ def dynamic_intervention(x, thresholds=(0.75, 1.5)):
     return jnp.array([Z_h1, Z_h2], dtype=jnp.float32)
 
 
-# def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
-def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=50):
+def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=1000):
+    # def stochastic_intervention(rng, n, alphas=(0.7, 0.3), n_approx=50):
     # Stochastic intervention by 'alpha' values
     keys = random.split(rng, 2)
     Z_stoch1 = jnp.astype(
@@ -191,13 +206,19 @@ def new_interventions_estimands(rng, n, x, triu_star, eta):
     key, _ = random.split(rng)
     Z_stoch = stochastic_intervention(key, n)
 
+    # GATE
+    Z_gate = jnp.stack([jnp.ones(n), jnp.zeros(n)])
+
     # new estimands
     dynamic_estimands = get_true_estimands(n, Z_h, triu_star, eta)
     stoch_estimands = get_true_estimands(n, Z_stoch, triu_star, eta)
+    gate_estimands = get_true_estimands(n, Z_gate, triu_star, eta)
 
     return utils.NewEstimands(
         Z_h=Z_h,
         Z_stoch=Z_stoch,
+        Z_gate=Z_gate,
         estimand_h=dynamic_estimands,
         estimand_stoch=stoch_estimands,
+        estimand_gate=gate_estimands,
     )

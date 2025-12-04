@@ -9,9 +9,11 @@ import jax.numpy as jnp
 from jax import random, vmap
 from numpyro.infer import MCMC, NUTS, HMC, Predictive, SVI, Trace_ELBO
 from numpyro.infer.autoguide import AutoMultivariateNormal
-from numpyro.optim import ClippedAdam, Adam
+from numpyro.optim import ClippedAdam
 from numpyro.infer.hmc_gibbs import HMCGibbs
+from numpyro.diagnostics import summary, print_summary
 import numpyro.handlers as handlers
+import time
 
 import src.Models as models
 import src.utils as utils
@@ -70,11 +72,12 @@ class MWG_init:
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
         n_iter_networks=20000,
         n_nets_samples=3000,
-        n_warmup_outcome=2000,
-        n_samples_outcome=2500,
+        n_warmup_outcome=3000,
+        n_samples_outcome=3000,
         learning_rate=0.0005,
         num_chains_outcome=4,
         progress_bar=False,
+        misspecified=False,
     ):
         self.rng_key = random.split(rng_key)[0]
         self.data = data
@@ -88,6 +91,7 @@ class MWG_init:
         self.learning_rate = learning_rate
         self.num_chains_outcome = num_chains_outcome
         self.progress_bar = progress_bar
+        self.misspecified = misspecified
 
         # initial parameters
         self.theta = None
@@ -177,16 +181,29 @@ class MWG_init:
         """
         Initialize outcome model parameters from cut-posterior
         """
-        df_nodes = jnp.transpose(
-            jnp.stack(
-                [
-                    jnp.ones(self.data.Y.shape[0]),
-                    self.data.Z,
-                    self.data.x,
-                    self.exposures,
-                ]
+        if self.misspecified:
+            # Misspecified: Intercept, Treatment, Exposures (No X)
+            df_nodes = jnp.transpose(
+                jnp.stack(
+                    [
+                        jnp.ones(self.data.Y.shape[0]),
+                        self.data.Z,
+                        self.exposures,
+                    ]
+                )
             )
-        )
+        else:
+            # Correct Specification: Intercept, Treatment, X, Exposures
+            df_nodes = jnp.transpose(
+                jnp.stack(
+                    [
+                        jnp.ones(self.data.Y.shape[0]),
+                        self.data.Z,
+                        self.data.x,
+                        self.exposures,
+                    ]
+                )
+            )
 
         # Define MCMC kernel and run MCMC
         kernel_plugin = NUTS(self.cut_posterior_outcome_model)
@@ -209,7 +226,7 @@ class MWG_init:
         samples = mcmc_plugin.get_samples()
 
         self.eta = samples["eta"].mean(axis=0)
-        self.rho = samples["rho"].mean()
+        # self.rho = samples["rho"].mean()
         self.sig_inv = samples["sig_inv"].mean()
 
     def get_init_values(self):
@@ -233,7 +250,7 @@ class MWG_init:
             "gamma": self.gamma,
             "triu_star": self.triu_star,
             "eta": self.eta,
-            "rho": self.rho,
+            # "rho": self.rho,
             "sig_inv": self.sig_inv,
         }
 
@@ -275,10 +292,11 @@ class MWG_sampler:
         gwg_fn=make_gwg_gibbs_fn,
         combined_model=models.combined_model,
         n_warmup=3000,
-        n_samples=2500,
+        n_samples=3000,
         num_chains=4,
         continuous_sampler="NUTS",  # one of "NUTS" or "HMC"
         progress_bar=False,
+        misspecified=False,
     ):
         self.rng_key = random.split(rng_key)[0]
         self.data = data
@@ -289,6 +307,9 @@ class MWG_sampler:
         self.n_samples = n_samples
         self.num_chains = num_chains
         self.progress_bar = progress_bar
+        self.misspecified = misspecified
+
+        self.sampling_time = None
 
         #  init function for mwg
         self.gwg_fn = gwg_fn(data)
@@ -302,7 +323,7 @@ class MWG_sampler:
 
     def make_continuous_kernel(self):
         if self.continuous_sampler == "NUTS":
-            return NUTS(self.combined_model)
+            return NUTS(self.combined_model, target_accept_prob=0.9)
         elif self.continuous_sampler == "HMC":
             return HMC(self.combined_model)
         else:
@@ -325,15 +346,65 @@ class MWG_sampler:
 
         self.rng_key, _ = random.split(self.rng_key)
 
+        # --- Timing Block ---
+        start_time = time.time()
         mwg_mcmc.run(self.rng_key, self.data, init_params=self.init_params)
+        end_time = time.time()
+
+        self.sampling_time = end_time - start_time
 
         return mwg_mcmc.get_samples()
+        # return mwg_mcmc.get_samples(group_by_chain=True)
+
+    def print_diagnostics(self):
+        """
+        Prints ESS, R-hat, and Computational Efficiency metrics.
+        Excludes the high-dimensional 'triu_star' to prevent console overflow.
+        """
+        print(f"\n=== MCMC Diagnostics ({self.continuous_sampler}) ===")
+        print(f"Total Sampling Time: {self.sampling_time:.2f} seconds")
+
+        # Filter out the large discrete network parameter
+        cont_samples = {
+            k: v for k, v in self.posterior_samples.items() if k != "triu_star"
+        }
+
+        # NumPyro summary (calculates ESS and R-hat)
+        # We assume group_by_chain=False to get global stats across chains
+        stats = summary(cont_samples, group_by_chain=False)
+        print_summary(cont_samples, group_by_chain=False)
+
+        # --- Compute Efficiency Metric (ESS / Second) ---
+        print("\n--- Efficiency Metrics (ESS / sec) ---")
+
+        min_ess_global = float("inf")
+
+        for param_name, metrics in stats.items():
+            # metrics['n_eff'] can be an array if the parameter is a vector (e.g. eta)
+            n_eff = jnp.array(metrics["n_eff"])
+            min_ess = jnp.min(n_eff)
+            mean_ess = jnp.mean(n_eff)
+
+            # Update global minimum
+            if min_ess < min_ess_global:
+                min_ess_global = min_ess
+
+            ess_per_sec = mean_ess / self.sampling_time
+            print(
+                f"{param_name:<10} | Mean ESS: {mean_ess:.1f} | Efficiency: {ess_per_sec:.2f} samples/sec"
+            )
+
+        print("-" * 50)
+        print(f"Global Min ESS/sec: {min_ess_global / self.sampling_time:.4f}")
+        print(
+            f"This is your 'Speed Limit'. If this is < 1.0, you need longer chains or better mixing."
+        )
 
     def wasserstein_distance(self, true_vals):
-        keys_to_keep = {"eta", "sig_inv", "rho", "triu_star"}
-        # keys_to_keep = {"eta", "sig_inv", "triu_star"}
+        # keys_to_keep = {"eta", "sig_inv", "rho", "triu_star"}
+        keys_to_keep = {"eta", "sig_inv", "triu_star"}
         post_samps = self.posterior_samples.copy()
-        post_samps["rho"] = post_samps["rho"][:, None]
+        # post_samps["rho"] = post_samps["rho"][:, None]
         post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
 
         post_samps_k = {k: post_samps[k] for k in keys_to_keep}
@@ -378,7 +449,10 @@ class MWG_sampler:
         return preds
 
     def new_intervention_error_stats(self, new_z, true_estimands, true_vals):
-        wasser_dist = self.wasserstein_distance(true_vals)
+        if self.misspecified:
+            wasser_dist = 999.0  # misspecified model, skip wasserstein distance
+        else:
+            wasser_dist = self.wasserstein_distance(true_vals)
 
         post_y_preds = self.sample_pred_y(new_z)
         return utils.compute_error_stats(post_y_preds, true_estimands, wasser_dist)
