@@ -12,20 +12,23 @@ import pandas as pd
 import Data.cs_aarhus.util_data as ud
 import Data.cs_aarhus.data_mcmc as dmcmc
 
-
+#
 print(f"Jax devices: {jax.devices()}")
 
 # --- Global parameters ---
 
-ETA = jnp.array([-1, 3, 3])
+# ETA = jnp.array([-1, 3, 3])
+ETA = jnp.array([-1, 3, 4])
 RHO = 0.5
 SIG_INV = 1.0
 
 
-N_ITERATION = 300
+# N_ITERATION = 300
+N_ITERATION = 1
 
 
-FILE_NAME = "Data/cs_aarhus/cs_analysis_results.csv"
+# FILE_NAME = "Data/cs_aarhus/cs_analysis_results.csv"
+FILE_NAME = "Data/cs_aarhus/cs_analysis_results_TEST.csv"
 
 # --- aux function for one iteration ---
 
@@ -53,6 +56,39 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
     # --- Samplers ---
     results = []
 
+    def run_eval(mcmc_obj, model_name):
+        #  Stochastic
+        stoch_stats = mcmc_obj.new_intervention_error_stats(
+            new_z=intervention_estimand["Z_stoch"],
+            true_estimands=intervention_estimand["estimand_stoch"],
+            true_vals=true_vals,
+        )
+        results.append(
+            {
+                "idx": idx,
+                "layer": latent_layer,
+                "model": model_name,
+                "estimand": "stoch",
+                **stoch_stats,
+            }
+        )
+
+        # 3. GATE (Treat All vs None)
+        gate_stats = mcmc_obj.new_intervention_error_stats(
+            new_z=intervention_estimand["Z_gate"],
+            true_estimands=intervention_estimand["estimand_gate"],
+            true_vals=true_vals,
+        )
+        results.append(
+            {
+                "idx": idx,
+                "layer": latent_layer,
+                "model": model_name,
+                "estimand": "gate",
+                **gate_stats,
+            }
+        )
+
     true_vals = {
         "eta": ETA,
         "rho": RHO,
@@ -66,22 +102,7 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
 
     rng_key, _ = random.split(rng_key)
     mcmc_true = dmcmc.mcmc_fixed_net(rng_key=rng_key, data=data, net_type="true")
-
-    true_net_stats = mcmc_true.new_intervention_error_stats(
-        new_z=intervention_estimand["Z_stoch"],
-        true_estimands=intervention_estimand["estimand_stoch"],
-        true_vals=true_vals,
-    )
-
-    results.append(
-        {
-            "idx": idx,
-            "layer": latent_layer,
-            "model": "true_net",
-            "estimand": "stoch",
-            **true_net_stats,
-        }
-    )
+    run_eval(mcmc_true, "true_net")
 
     # aggergate 'OR' network
 
@@ -89,22 +110,7 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
 
     rng_key, _ = random.split(rng_key)
     mcmc_agg_or = dmcmc.mcmc_fixed_net(rng_key=rng_key, data=data, net_type="agg_or")
-
-    agg_or_stats = mcmc_agg_or.new_intervention_error_stats(
-        new_z=intervention_estimand["Z_stoch"],
-        true_estimands=intervention_estimand["estimand_stoch"],
-        true_vals=true_vals,
-    )
-
-    results.append(
-        {
-            "idx": idx,
-            "layer": latent_layer,
-            "model": "agg_or",
-            "estimand": "stoch",
-            **agg_or_stats,
-        }
-    )
+    run_eval(mcmc_agg_or, "agg_or")
 
     # aggregate 'AND' network
 
@@ -112,22 +118,7 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
 
     rng_key, _ = random.split(rng_key)
     mcmc_agg_and = dmcmc.mcmc_fixed_net(rng_key=rng_key, data=data, net_type="agg_and")
-
-    agg_and_stats = mcmc_agg_and.new_intervention_error_stats(
-        new_z=intervention_estimand["Z_stoch"],
-        true_estimands=intervention_estimand["estimand_stoch"],
-        true_vals=true_vals,
-    )
-
-    results.append(
-        {
-            "idx": idx,
-            "layer": latent_layer,
-            "model": "agg_and",
-            "estimand": "stoch",
-            **agg_and_stats,
-        }
-    )
+    run_eval(mcmc_agg_and, "agg_and")
 
     # MWG sampelr aka Block Gibbs
 
@@ -150,22 +141,22 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
         # num_chains=4,
         progress_bar=True,
     )
+    run_eval(mwg_sampler, "MWG")
 
-    mwg_stats = mwg_sampler.new_intervention_error_stats(
-        new_z=intervention_estimand["Z_stoch"],
-        true_estimands=intervention_estimand["estimand_stoch"],
-        true_vals=true_vals,
-    )
+    # Twostage sample
+    print("--- Running TwoStage sampler ---")
+    esti_triu_star = mwg_init["triu_star"][0, :]
+    esti_exposures = ud.compute_exposures(esti_triu_star, data["Z"])
 
-    results.append(
-        {
-            "idx": idx,
-            "layer": latent_layer,
-            "model": "MWG",
-            "estimand": "stoch",
-            **mwg_stats,
-        }
+    data_ts = data.copy()
+    data_ts["true_exposures"] = esti_exposures
+    data_ts["triu_star"] = esti_triu_star
+
+    rng_key, _ = random.split(rng_key)
+    mcmc_ts = dmcmc.mcmc_fixed_net(
+        rng_key=rng_key, data=data_ts, net_type="true", progress_bar=True
     )
+    run_eval(mcmc_ts, "two_stage")
 
     results_df = pd.DataFrame(results)
     results_df.to_csv(FILE_NAME, index=False, mode="a", header=with_header)

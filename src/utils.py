@@ -99,10 +99,10 @@ def weighted_exposures(Z, node_weights, adj_mat):
 @jit
 def compute_exposures(triu_star, Z):
     mat_star = Triu_to_mat(triu_star)
+    deg_cen = degree_centrality(mat_star)
+    return weighted_exposures(Z, deg_cen, mat_star)
     # deg_cen = degree_centrality(mat_star)
-    # return weighted_exposures(Z, deg_cen, mat_star)
-    # deg_cen = degree_centrality(mat_star)
-    return weighted_exposures(Z, jnp.ones(N), mat_star)
+    # return weighted_exposures(Z, jnp.ones(N), mat_star)
 
 
 vmap_compute_exposures = vmap(compute_exposures, in_axes=(0, None))

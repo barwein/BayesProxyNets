@@ -129,7 +129,7 @@ def make_gwg_gibbs_fn(data):
         # Get current values of continuous parameters
         cur_param = {
             "eta": hmc_sites["eta"],
-            "rho": hmc_sites["rho"],
+            # "rho": hmc_sites["rho"],
             "sig_inv": hmc_sites["sig_inv"],
             "logits_star": hmc_sites["logits_star"],
         }
@@ -280,9 +280,10 @@ class MWG_init:
         Initialize outcome model parameters from cut-posterior
         """
         df_nodes = ud.get_df_nodes(self.data["Z"], self.exposures)
-        adj_mat = ud.triu_to_mat(self.triu_star) + jnp.eye(
-            ud.N_NODES
-        )  # add self-loops for stability
+        adj_mat = ud.triu_to_mat(self.triu_star)
+        # adj_mat = ud.triu_to_mat(self.triu_star) + jnp.eye(
+        #     ud.N_NODES
+        # )  # add self-loops for stability
 
         # Define MCMC kernel and run MCMC
         kernel_plugin = NUTS(self.cut_posterior_outcome_model)
@@ -330,9 +331,9 @@ class MWG_init:
             "eta:",
             self.outcome_params["eta"],
             "\n",
-            "rho:",
-            self.outcome_params["rho"],
-            "\n",
+            # "rho:",
+            # self.outcome_params["rho"],
+            # "\n",
             "sig_inv:",
             self.outcome_params["sig_inv"],
         )
@@ -381,7 +382,7 @@ class MWG_sampler:
 
     def make_continuous_kernel(self):
         if self.continuous_sampler == "NUTS":
-            return NUTS(self.combined_model)
+            return NUTS(self.combined_model, target_accept_prob=0.9)
         elif self.continuous_sampler == "HMC":
             return HMC(self.combined_model)
         else:
@@ -409,9 +410,10 @@ class MWG_sampler:
         return mwg_mcmc.get_samples()
 
     def wasserstein_distance(self, true_vals):
-        keys_to_keep = {"eta", "sig_inv", "rho", "triu_star"}
+        # keys_to_keep = {"eta", "sig_inv", "rho", "triu_star"}
+        keys_to_keep = {"eta", "sig_inv", "triu_star"}
         post_samps = self.posterior_samples.copy()
-        post_samps["rho"] = post_samps["rho"][:, None]
+        # post_samps["rho"] = post_samps["rho"][:, None]
         post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
 
         post_samps_k = {k: post_samps[k] for k in keys_to_keep}
@@ -495,19 +497,22 @@ class mcmc_fixed_net:
 
     def df_nodes_and_adj_mat(self):
         if self.net_type == "true":
-            self.adj_mat = ud.triu_to_mat(self.data["triu_star"]) + jnp.eye(
-                ud.N_NODES
-            )  # add self-loops for stability
+            self.adj_mat = ud.triu_to_mat(self.data["triu_star"])
+            # self.adj_mat = ud.triu_to_mat(self.data["triu_star"]) + jnp.eye(
+            #     ud.N_NODES
+            # )  # add self-loops for stability
             self.triu = self.data["triu_star"]
         elif self.net_type == "agg_or":
-            self.adj_mat = ud.triu_to_mat(self.data["agg_or_triu"]) + jnp.eye(
-                ud.N_NODES
-            )
+            self.adj_mat = ud.triu_to_mat(self.data["agg_or_triu"])
+            # self.adj_mat = ud.triu_to_mat(self.data["agg_or_triu"]) + jnp.eye(
+            #     ud.N_NODES
+            # )
             self.triu = self.data["agg_or_triu"]
         elif self.net_type == "agg_and":
-            self.adj_mat = ud.triu_to_mat(self.data["agg_and_triu"]) + jnp.eye(
-                ud.N_NODES
-            )
+            # self.adj_mat = ud.triu_to_mat(self.data["agg_and_triu"]) + jnp.eye(
+            #     ud.N_NODES
+            # )
+            self.adj_mat = ud.triu_to_mat(self.data["agg_and_triu"])
             self.triu = self.data["agg_and_triu"]
 
         exposures = ud.compute_exposures(self.triu, self.data["Z"])
@@ -533,7 +538,7 @@ class mcmc_fixed_net:
         post_samps["triu_star"] = jnp.repeat(
             jnp.array([self.triu]), self.n_samples * self.num_chains, axis=0
         )
-        post_samps["rho"] = post_samps["rho"][:, None]
+        # post_samps["rho"] = post_samps["rho"][:, None]
         post_samps["sig_inv"] = post_samps["sig_inv"][:, None]
 
         return utils.compute_1w_distance(post_samps, true_vals)

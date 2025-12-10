@@ -239,24 +239,35 @@ def CAR_cov(triu_vals, sig_inv, rho):
     return jnp.linalg.inv(precis_)
 
 
+def generate_treatments_prop_to_degree(rng, triu_star, p_z=0.5):
+    # Probs proportional to degree centrality
+    adj_mat = triu_to_mat(triu_star)
+    deg_cen = degree_centrality(adj_mat)
+    probs = 6 * p_z * deg_cen
+    props = jnp.clip(probs, a_min=0.0, a_max=1.0)
+    return jnp.astype(random.bernoulli(key=rng, p=props, shape=(N_NODES,)), jnp.float32)
+
+
 def generate_data(key, triu_star, eta, rho, sig_inv):
     """
     Generate synthetic data for treatments and outcomes
     """
     z_key, y_key = random.split(key)
-    Z = dg.generate_treatments(rng=z_key, n=N_NODES)
+
+    # Z = dg.generate_treatments(rng=z_key, n=N_NODES)
+    Z = generate_treatments_prop_to_degree(rng=z_key, triu_star=triu_star, p_z=0.5)
     expos = compute_exposures(triu_star, Z)
     df_nodes = get_df_nodes(Z, expos)
     mean_y = df_nodes @ eta
-    y_cov = CAR_cov(triu_star, sig_inv, rho)
-    # y_cov = random.normal(y_key, shape=(n,))*sig_inv
+    # y_cov = CAR_cov(triu_star, sig_inv, rho)
+    y_cov = random.normal(y_key, shape=(N_NODES,)) * sig_inv
     # print("y_cov is positive definite?", jnp.all(jnp.linalg.eigvals(y_cov) > 0))
-    assert jnp.all(jnp.linalg.eigvals(y_cov) > 0), (
-        "Covariance matrix is not positive definite"
-    )
+    # assert jnp.all(jnp.linalg.eigvals(y_cov) > 0), (
+    #     "Covariance matrix is not positive definite"
+    # )
 
-    y = random.multivariate_normal(y_key, mean_y, y_cov)
-    # y = mean_y + y_cov
+    # y = random.multivariate_normal(y_key, mean_y, y_cov)
+    y = mean_y + y_cov
 
     return {
         "Z": Z,
@@ -297,9 +308,15 @@ def get_intervention_estimand(key, triu_star, eta, n_approx=100):
     # new estimand
     stoch_estimands = get_true_estimands(N_NODES, Z_stoch, triu_star, eta)
 
+    # Gate estimand
+    Z_gate = jnp.stack([jnp.ones(N_NODES), jnp.zeros(N_NODES)])
+    gate_estimands = get_true_estimands(N_NODES, Z_gate, triu_star, eta)
+
     return {
         "Z_stoch": Z_stoch,
         "estimand_stoch": stoch_estimands,
+        "Z_gate": Z_gate,
+        "estimand_gate": gate_estimands,
     }
 
 

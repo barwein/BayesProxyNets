@@ -105,6 +105,7 @@ def networks_marginalized_model_misspec(data):
     # --- Priors ---
     theta = numpyro.sample("theta", dist.Normal(0, PRIOR_SCALE).expand([2]))
     gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE).expand([2]))
+    # gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE).expand([3]))
 
     # P(A*_ij=1)
     star_probs = jax.nn.sigmoid(theta[0] + theta[1] * data.x2_or)
@@ -112,6 +113,7 @@ def networks_marginalized_model_misspec(data):
 
     # P(A_ij = 1 | A*_ij = 0)
     obs_probs_k0 = jax.nn.sigmoid(gamma[1])
+    # obs_probs_k0 = jax.nn.sigmoid(gamma[1] + gamma[2] * data.x_diff)
     obs_probs_k0 = jnp.clip(obs_probs_k0, 1e-6, 1 - 1e-6)
 
     # P(A_ij = 1 | A*_ij = 1)
@@ -526,11 +528,25 @@ def combined_model_misspec(data):
 
     # === Proxy network model with single measures ===
     # priors
+    # with numpyro.plate("gamma_plate", 2):
+    #     gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE))
+
+    # # likelihood
+    # obs_logits = triu_star * gamma[0] + (1 - triu_star) * gamma[1]
+
+    # with numpyro.plate("gamma_plate", 3):
     with numpyro.plate("gamma_plate", 2):
         gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE))
 
     # likelihood
-    obs_logits = triu_star * gamma[0] + (1 - triu_star) * gamma[1]
+    obs_logits = (
+        triu_star * gamma[0]
+        + (1 - triu_star)
+        * (
+            gamma[1]
+            # + gamma[2] * data.x_diff
+        )
+    )
 
     with numpyro.plate("edges", data.triu_obs.shape[0]):
         numpyro.sample("triu_obs", dist.Bernoulli(logits=obs_logits), obs=data.triu_obs)
@@ -943,6 +959,9 @@ def cond_logpost_a_star_misspec(triu_star, data, param):
 
     # p(A|A*,X,\gamma)
     logits_a_obs = triu_star * param.gamma[0] + (1 - triu_star) * (param.gamma[1])
+    # logits_a_obs = triu_star * param.gamma[0] + (1 - triu_star) * (
+    #     param.gamma[1] + param.gamma[2] * data.x_diff
+    # )
     a_obs_logpmf = data.triu_obs * jax.nn.log_sigmoid(logits_a_obs) + (
         1 - data.triu_obs
     ) * jax.nn.log_sigmoid(-logits_a_obs)
@@ -1115,7 +1134,7 @@ def cond_logpost_a_star_rep_no_z(triu_star, data, param):
     mean_y = jnp.dot(df_nodes, param.eta)
 
     # y_logpdf = iid_logdensity(data.Y, mean_y, param.sig_inv)
-    adj_mat = utils.Triu_to_mat(triu_star)
+    # adj_mat = utils.Triu_to_mat(triu_star)
 
     mean_y = jnp.dot(df_nodes, param.eta)
 
@@ -1279,6 +1298,9 @@ def compute_log_cut_posterior_misspec(astar_sample, theta, gamma, data):
 
     # Likelihood term (log p(A|A*,gamma))
     obs_logits = astar_sample * gamma[0] + (1 - astar_sample) * (gamma[1])
+    # obs_logits = astar_sample * gamma[0] + (1 - astar_sample) * (
+    #     gamma[1] + gamma[2] * data.x_diff
+    # )
     log_lik = data.triu_obs * jax.nn.log_sigmoid(obs_logits) + (
         1 - data.triu_obs
     ) * jax.nn.log_sigmoid(-obs_logits)
@@ -1388,3 +1410,88 @@ def compute_log_cut_posterior_rep_misspec(astar_sample, theta, gamma, data):
 compute_log_posterior_vmap_rep_misspec = vmap(
     compute_log_cut_posterior_rep_misspec, in_axes=(0, None, None, None)
 )
+
+
+# --- Continous relaxation model using CONCRETE --- #
+# Continuous relaxation
+
+
+def continuous_relaxation_model(data, temperature=0.5):
+    """
+    Joint model using RelaxedBernoulli (Concrete) for continuous relaxation of A*.
+
+    Args:
+        data: DataTuple object.
+        temperature: Temperature for RelaxedBernoulli.
+                     Lower values (e.g., 0.1) make samples closer to discrete 0/1.
+                     Higher values (e.g., 1.0) make them smoother/softer.
+    """
+
+    # --- 1. Latent Network Model (Relaxed A*) ---
+    # Priors for structural parameters
+    with numpyro.plate("theta_plate", 2):
+        theta = numpyro.sample("theta", dist.Normal(0, PRIOR_SCALE))
+
+    # Structural prediction (logits)
+    structural_logits = theta[0] + theta[1] * data.x2_or
+
+    # RELAXATION: Sample from RelaxedBernoulli
+    # This replaces the manual Normal + Sigmoid logic.
+    # The temperature controls how binary-like the samples are.
+    # Note: We do not observe this site; it is a latent soft mask.
+    triu_star_soft = numpyro.sample(
+        "triu_star_soft",
+        dist.RelaxedBernoulli(temperature=temperature, logits=structural_logits),
+    )
+
+    # Helper: Soft Adjacency Matrix
+    adj_mat_soft = utils.Triu_to_mat(triu_star_soft)
+
+    # --- 2. Treatment Model (Observational) ---
+    # Calculates degree centrality using the soft adjacency matrix
+    degrees = jnp.sum(adj_mat_soft, axis=1)
+    N = data.Z.shape[0]
+    pz = 0.5
+    probs_z = 6 * pz * (degrees / (N - 1))
+    probs_z = jnp.clip(probs_z, 1e-6, 1.0 - 1e-6)
+
+    numpyro.sample("Z_obs", dist.Bernoulli(probs=probs_z), obs=data.Z)
+
+    # --- 3. Outcome Model ---
+    # Compute exposures using soft edges (weighted sum)
+    expos = utils.compute_exposures(triu_star_soft, data.Z)
+
+    df_nodes = jnp.transpose(
+        jnp.stack([jnp.ones(data.Z.shape[0]), data.Z, data.x, expos])
+    )
+
+    # Outcome Priors
+    with numpyro.plate("eta_plate", df_nodes.shape[1]):
+        eta = numpyro.sample("eta", dist.Normal(0, PRIOR_SCALE))
+
+    # Add CAR COV
+
+    sig_inv = numpyro.sample("sig_inv", dist.HalfNormal(PRIOR_SCALE))
+
+    # Likelihood
+    mean_y = df_nodes @ eta
+
+    with numpyro.plate("Y_plate", N):
+        numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data.Y)
+
+    # --- 4. Proxy Network Model (Measurement Error) ---
+    # Priors
+    with numpyro.plate("gamma_plate", 3):
+        gamma = numpyro.sample("gamma", dist.Normal(0, PRIOR_SCALE))
+
+    # Interpolated Probabilities for Proxy
+    # P(Obs=1) = P(Obs=1|Star=1)*A* + P(Obs=1|Star=0)*(1-A*)
+    p_given_1 = jax.nn.sigmoid(gamma[0])
+    p_given_0 = jax.nn.sigmoid(gamma[1] + gamma[2] * data.x_diff)
+
+    # Mixture using soft A*
+    prob_obs = triu_star_soft * p_given_1 + (1 - triu_star_soft) * p_given_0
+    prob_obs = jnp.clip(prob_obs, 1e-6, 1 - 1e-6)
+
+    with numpyro.plate("edges", data.triu_obs.shape[0]):
+        numpyro.sample("triu_obs", dist.Bernoulli(probs=prob_obs), obs=data.triu_obs)

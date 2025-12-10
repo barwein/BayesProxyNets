@@ -32,8 +32,10 @@ def cutposterior_multilayer(triu_vals, K=2):
     mu0 = numpyro.sample("mu0", dist.Normal(0.0, PRIOR_SCALE))
     mu1 = numpyro.sample("mu1", dist.Normal(0.0, PRIOR_SCALE))
 
-    sigma0 = numpyro.sample("sigma0", dist.Gamma(2.0, 2.0))  # scale for theta0
-    sigma1 = numpyro.sample("sigma1", dist.Gamma(2.0, 2.0))  # scale for theta1
+    # sigma0 = numpyro.sample("sigma0", dist.Gamma(2.0, 2.0))  # scale for theta0
+    # sigma1 = numpyro.sample("sigma1", dist.Gamma(2.0, 2.0))  # scale for theta1
+    sigma0 = numpyro.sample("sigma0", dist.HalfNormal(PRIOR_SCALE))  # scale for theta0
+    sigma1 = numpyro.sample("sigma1", dist.HalfNormal(PRIOR_SCALE))  # scale for theta1
 
     # We have n_layers+1 sets of (theta0_k, theta1_k):
     #   k=0,...,n_layers-1 for the observed networks
@@ -144,8 +146,10 @@ def combined_model(data, K=2):
     mu0 = numpyro.sample("mu0", dist.Normal(0.0, PRIOR_SCALE))
     mu1 = numpyro.sample("mu1", dist.Normal(0.0, PRIOR_SCALE))
 
-    sigma0 = numpyro.sample("sigma0", dist.Gamma(2.0, 2.0))  # scale for theta0
-    sigma1 = numpyro.sample("sigma1", dist.Gamma(2.0, 2.0))  # scale for theta1
+    # sigma0 = numpyro.sample("sigma0", dist.Gamma(2.0, 2.0))  # scale for theta0
+    # sigma1 = numpyro.sample("sigma1", dist.Gamma(2.0, 2.0))  # scale for theta1
+    sigma0 = numpyro.sample("sigma0", dist.HalfNormal(PRIOR_SCALE))  # scale for theta0
+    sigma1 = numpyro.sample("sigma1", dist.HalfNormal(PRIOR_SCALE))  # scale for theta1
 
     # We have n_layers+1 sets of (theta0_k, theta1_k):
     #   k=0,...,n_layers-1 for the observed networks
@@ -248,32 +252,37 @@ def combined_model(data, K=2):
     expos = ud.compute_exposures(triu_star, data["Z"])
     df_nodes = ud.get_df_nodes(data["Z"], expos)
 
-    adj_mat = ud.triu_to_mat(triu_star) + jnp.eye(
-        N_NODES
-    )  # add self-loops for stability
+    # adj_mat = ud.triu_to_mat(triu_star) + jnp.eye(
+    #     N_NODES
+    # )  # add self-loops for stability
+    # adj_mat = ud.triu_to_mat(triu_star)
 
     # priors
 
     with numpyro.plate("eta_plate", df_nodes.shape[1]):
         eta = numpyro.sample("eta", dist.Normal(0.0, PRIOR_SCALE))
 
-    rho = numpyro.sample("rho", dist.Beta(2.0, 2.0))
+    # rho = numpyro.sample("rho", dist.Beta(2.0, 2.0))
 
-    sig_inv = numpyro.sample("sig_inv", dist.Gamma(2.0, 2.0))
+    # sig_inv = numpyro.sample("sig_inv", dist.Gamma(2.0, 2.0))
+    sig_inv = numpyro.sample("sig_inv", dist.HalfNormal(PRIOR_SCALE))
 
     # likelihood
     mean_y = df_nodes @ eta
 
-    numpyro.sample(
-        "Y",
-        dist.CAR(
-            loc=mean_y,
-            correlation=rho,
-            conditional_precision=sig_inv,
-            adj_matrix=adj_mat,
-        ),
-        obs=data["Y"],
-    )
+    # numpyro.sample(
+    #     "Y",
+    #     dist.CAR(
+    #         loc=mean_y,
+    #         correlation=rho,
+    #         conditional_precision=sig_inv,
+    #         adj_matrix=adj_mat,
+    #     ),
+    #     obs=data["Y"],
+    # )
+
+    with numpyro.plate("Y plate", df_nodes.shape[0]):
+        numpyro.sample("Y", dist.Normal(mean_y, sig_inv), obs=data["Y"])
 
 
 #  --- model for GWG ---
@@ -310,21 +319,25 @@ def cond_logpost_triu_star(triu_star, data, param):
 
     mean_y = df_nodes @ param["eta"]
 
-    adj_mat = ud.triu_to_mat(triu_star) + jnp.eye(
-        N_NODES
-    )  # add self-loops for stability
+    adj_mat = ud.triu_to_mat(triu_star)
+    # adj_mat = ud.triu_to_mat(triu_star) + jnp.eye(
+    #     N_NODES
+    # )  # add self-loops for stability
 
     # CAR logdensity
 
-    y_logpdf = models.car_logdensity(
-        y=data["Y"],
-        mu=mean_y,
-        sigma=param["sig_inv"],
-        rho=param["rho"],
-        adj_matrix=adj_mat,
-    )
+    # y_logpdf = models.car_logdensity(
+    #     y=data["Y"],
+    #     mu=mean_y,
+    #     sigma=param["sig_inv"],
+    #     rho=param["rho"],
+    #     adj_matrix=adj_mat,
+    # )
+    y_logpdf = models.iid_logdensity(y=data["Y"], mu=mean_y, sigma=param["sig_inv"])
 
-    return a_star_logpmf.sum() + y_logpdf
+    z_logpdf = models.z_degree_logdensity(z=data["Z"], adj_mat=adj_mat, pz=0.5)
+
+    return a_star_logpmf.sum() + y_logpdf + z_logpdf
 
 
 # Gradient of A* conditional log-posterior

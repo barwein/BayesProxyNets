@@ -37,7 +37,7 @@ GAMMA_B_NOISE_1 = GAMMA_BASELINE[1] + GAMMA_X_NOISES / 2
 
 # ETA = jnp.array([-1, 3, -0.5, 2])
 # ETA = jnp.array([-1, 3, -0.5, 0.25])
-ETA = jnp.array([-1, 3, -0.5, 1])
+ETA = jnp.array([-1, 3, -0.5, 2])
 SIG_INV = 1.0
 RHO = 0.5
 PZ = 0.5
@@ -90,7 +90,7 @@ if __name__ == "__main__":
                     jnp.array([GAMMA_B_NOISE_0[j]]),
                     jnp.array([GAMMA_B_NOISE_1[j]]),
                     jnp.array([GAMMA_X_NOISES[j]]),
-                    GAMMA_REP,
+                    # GAMMA_REP,
                 ]
             )
 
