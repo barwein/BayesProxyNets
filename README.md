@@ -21,10 +21,10 @@ It also contains all necessary components to reproduce the results presented in 
 
 ## Repository Structure
 
-The code is organized to separate core logic, probabilistic models, and simulation execution:
+The code is organized as follows:
 
 ```bash
-.
+
 ├── Data/
 │   └── cs_aarhus/           # Scripts for semi-synthetic experiments (Aarhus data)
 │       └── combined_analysis.py # Run the full analysis 
@@ -54,3 +54,38 @@ The code is organized to separate core logic, probabilistic models, and simulati
 └── README.md
 
 ```
+
+## Installation & Requirements
+
+The codebase is written in **Python 3.13**. 
+
+To install the required dependencies, run:
+
+```bash 
+pip install -r requirements.txt
+```
+
+## Usage
+*Note:* The experiments ran on a powercluster with multiple cores. Adjust the number of iterations and cores as needed.
+### Fully Synthetic Experiments
+To reproduce the fully synthetic experiments described in the paper:
+
+1.  Navigate to the project root.
+2.  Adjust configuration variables (e.g., `N_CORES`) in `Simulations/mwg_simulations.py` if necessary.
+3.  Run the module:
+
+```bash
+python -m Simulations.mwg_simulations
+```
+
+
+### Semi-Synthetic Experiments
+To reproduce the semi-synthetic experiments using the Aarhus dataset:
+1.  Navigate to the project root.
+2.  Run the combined analysis script:
+
+```bash
+python Data/cs_aarhus/combined_analysis.py
+```
+
+
