@@ -20,27 +20,6 @@ This repository includes scripts for both **fully synthetic experiments** and **
 It also contains all necessary components to reproduce the results presented in the manuscript.
 
 
-
-```mermaid
-graph LR;
-    subgraph "Latent Layer"
-    A_star((Latent Network A*))
-    end
-    
-    subgraph "Observed Layer"
-    Z[Treatment Z]
-    Y[Outcome Y]
-    P1[Proxy A1]
-    P2[Proxy A2]
-    end
-
-    A_star -->|Interference| Y
-    A_star -.->|Measurement| P1
-    A_star -.->|Measurement| P2
-    Z --> Y
-    Z -.->|Spillover| Y
-```
-
 ## Repository Structure
 
 The code is organized as follows:
@@ -111,3 +90,15 @@ python Data/cs_aarhus/combined_analysis.py
 ```
 The data used in the semi-synthetic experiments is available at: https://manliodedomenico.com/data.php
 
+
+## Citation
+If you use this code for your research, please cite the following preprint:
+
+```
+@article{weinstein2025bayesian,
+  title={Bayesian Estimation of Causal Effects Using Proxies of a Latent Interference Network},
+  author={Weinstein, Bar and Nevo, Daniel},
+  journal={arXiv preprint arXiv:2505.08395},
+  year={2025}
+}
+```
