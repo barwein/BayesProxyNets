@@ -87,5 +87,5 @@ To reproduce the semi-synthetic experiments using the Aarhus dataset:
 ```bash
 python Data/cs_aarhus/combined_analysis.py
 ```
-
+The data used in the semi-synthetic experiments is available at: https://manliodedomenico.com/data.php
 
