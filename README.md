@@ -27,17 +27,29 @@ The code is organized to separate core logic, probabilistic models, and simulati
 .
 ├── Data/
 │   └── cs_aarhus/           # Scripts for semi-synthetic experiments (Aarhus data)
-│       └── combined_analysis.py
+│       └── combined_analysis.py # Run the full analysis 
+│       └── data_mcmc.py # MCMC samplers used
+│       └── data_models.py # Probabilistic models used
+│       └── util_data.py # Utility functions 
+│       └── results_analysis.ipynb # summary and plots for the results
+│       └── cs_analysis_results.csv # Results data file
+│       └── figs/ # Figures of the results
 ├── Simulations/             # Scripts for fully synthetic experiments
-│   ├── mwg_simulations.py   # Main entry point for synthetic simulations
-│   ├── data_gen.py          # Synthetic data generation (DGP)
+│   ├── mwg_simulations.py   # Main script that runs the simulations
+│   ├── data_gen.py          # Data generation functions
 │   └── simulation_aux.py    # Helper loops for simulation iterations
+│   └── plot_results.ipynb   # Plotting and summarizing simulation results
+│   └── additional_figure.ipynb   # Additional figure for the supplement
+│   └── combined_sim_results.csv   # Combined simulation results data file
+│   └── mwg_scaling_results.csv   # scaling analysis results data file
+│   └── figs/ # Figures of the results
 ├── src/                     # Core methodology implementation
 │   ├── GWG.py               # Locally Informed Proposals (GWG) implementation
-│   ├── MWG_sampler.py       # The Block Gibbs Sampler logic
-│   ├── Models.py            # NumPyro probabilistic models (Outcome, Proxy, Priors)
-│   └── utils.py             # Utility functions (exposures, error metrics)
-├── main.pdf                 # The manuscript
+│   ├── MWG_sampler.py       # The Block Gibbs Sampler (init and main sampler)
+│   ├── MCMC_conti_relax.py  # MCMC with continuous relaxation of A*
+│   ├── MCMC_fixed_net.py    # MCMC with fixed network 
+│   ├── Models.py            # probabilistic models
+│   └── utils.py             # Utility functions
 ├── requirements.txt         # Python dependencies
 └── README.md
 
