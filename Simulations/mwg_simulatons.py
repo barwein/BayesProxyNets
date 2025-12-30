@@ -1,5 +1,5 @@
 ###
-# This script runs the simulations for the linear model with CAR cov
+# This script runs the simulations for fully synthetic data
 ###
 
 # --- Import libraries ---
@@ -35,8 +35,7 @@ GAMMA_X_NOISES = jnp.arange(2, 4 + 1e-6, 0.5)
 GAMMA_B_NOISE_0 = GAMMA_BASELINE[0] - GAMMA_X_NOISES / 2
 GAMMA_B_NOISE_1 = GAMMA_BASELINE[1] + GAMMA_X_NOISES / 2
 
-# ETA = jnp.array([-1, 3, -0.5, 2])
-# ETA = jnp.array([-1, 3, -0.5, 0.25])
+
 ETA = jnp.array([-1, 3, -0.5, 2])
 SIG_INV = 1.0
 RHO = 0.5
@@ -50,9 +49,9 @@ PARAM = {
 }
 FILEPATH = "Simulations/results"
 
-#
-N_ITER = 1
-# N_ITER = 300
+
+# N_ITER = 1
+N_ITER = 300
 N_GAMMAS = GAMMA_X_NOISES.shape[0]
 
 

@@ -1,9 +1,13 @@
 import jax.numpy as jnp
 from jax import random, jit
 import jax
+from jax.scipy.special import logit
 
-from numpyro.infer import MCMC, NUTS, HMC, Predictive
+from numpyro.infer import MCMC, NUTS, HMC, Predictive, SVI, Trace_ELBO
+from numpyro.infer.autoguide import AutoMultivariateNormal
+from numpyro.optim import ClippedAdam
 from numpyro.infer.hmc_gibbs import HMCGibbs
+from functools import partial  # Required for jit with arguments
 
 
 from src.GWG import IPState, IPInfo, propsal_logprobs
@@ -14,6 +18,7 @@ import src.utils as utils
 import Data.cs_aarhus.data_models as dm
 import Data.cs_aarhus.util_data as ud
 
+import time
 
 # Global hyper-parameters
 BATCH_LEN = 1
@@ -24,8 +29,8 @@ N_STEPS = 1
 
 
 # Aux function for edge flip proposals
-@jit
-def weighted_sample_and_logprobs(key, scores):
+@partial(jit, static_argnames=("batch_len",))
+def weighted_sample_and_logprobs(key, scores, batch_len=BATCH_LEN):
     """
     Weighted sample with replacement of BATCH_LEN indices using Gumbel-max trick
 
@@ -37,7 +42,7 @@ def weighted_sample_and_logprobs(key, scores):
     # Get samples using Gumbel-max trick
     gumbel_noise = random.gumbel(key, shape=scores.shape)
     perturbed = scores + gumbel_noise
-    _, selected_indices = jax.lax.top_k(perturbed, BATCH_LEN)
+    _, selected_indices = jax.lax.top_k(perturbed, batch_len)
     # Compute log soft-max probs of scores
     log_probs = jax.nn.log_softmax(scores)
     selected_log_probs = log_probs[selected_indices]
@@ -45,8 +50,8 @@ def weighted_sample_and_logprobs(key, scores):
     return selected_indices, selected_log_probs.sum()
 
 
-@jit
-def GWG_step(rng_key, state, data, param):
+@partial(jit, static_argnames=("batch_len",))
+def GWG_step(rng_key, state, data, param, batch_len=BATCH_LEN):
     """
     One step of GWG sampler for A* parameter
 
@@ -62,7 +67,9 @@ def GWG_step(rng_key, state, data, param):
     """
     key1, key2 = random.split(rng_key, 2)
     # sample idx to propose edge flip
-    idx, forward_logprob = weighted_sample_and_logprobs(key1, state.scores)
+    idx, forward_logprob = weighted_sample_and_logprobs(
+        key1, state.scores, batch_len=batch_len
+    )
 
     # proposed new state
     new_triu_star = state.positions.at[idx].set(1 - state.positions[idx])
@@ -90,8 +97,8 @@ def GWG_step(rng_key, state, data, param):
     return state, info
 
 
-@jit
-def GWG_kernel(rng_key, state, data, param):
+@partial(jit, static_argnames=("n_steps", "batch_len"))
+def GWG_kernel(rng_key, state, data, param, n_steps=N_STEPS, batch_len=BATCH_LEN):
     """
     Run N_STEPS of GWG sampler given the current param (continuous) values
     """
@@ -99,12 +106,14 @@ def GWG_kernel(rng_key, state, data, param):
     def body_fun(carry, _):
         rng_key, cur_state = carry
         rng_key, step_key = random.split(rng_key)
-        new_state, info = GWG_step(step_key, cur_state, data, param)
+        new_state, info = GWG_step(
+            step_key, cur_state, data, param, batch_len=batch_len
+        )
         return (rng_key, new_state), info
 
     # Run the scan
     (_, final_state), final_info = jax.lax.scan(
-        body_fun, (rng_key, state), jnp.arange(N_STEPS)
+        body_fun, (rng_key, state), jnp.arange(n_steps)
     )
 
     return final_state, final_info
@@ -113,7 +122,7 @@ def GWG_kernel(rng_key, state, data, param):
 # Adapt the GWG sampler for the Metroplis-within-Gibbs (MWG) combined sampler (continuous and discrete parameters)
 
 
-def make_gwg_gibbs_fn(data):
+def make_gwg_gibbs_fn(data, n_steps=N_STEPS, batch_len=BATCH_LEN):
     """
     Will return a function that can be used as a Gibbs step for A* in the MWG sampler;
     The function will be used in the HMCGibbs sampler;
@@ -149,7 +158,12 @@ def make_gwg_gibbs_fn(data):
         # Run GWG (N_STEPS times)
         rng_key, _ = random.split(rng_key)
         new_state, _ = GWG_kernel(
-            rng_key=rng_key, state=state, data=data, param=cur_param
+            rng_key=rng_key,
+            state=state,
+            data=data,
+            param=cur_param,
+            n_steps=n_steps,
+            batch_len=batch_len,
         )
 
         # Return only the new positions as required by HMCGibbs
@@ -206,23 +220,38 @@ class MWG_init:
         data,
         cut_posterior_net_model=dm.cutposterior_multilayer,
         cut_posterior_outcome_model=models.plugin_outcome_model,
-        n_warmup=1000,
-        n_samples=1000,
-        num_chains=4,
-        progress_bar=False,
+        triu_star_grad_fn=dm.triu_star_grad_fn,
+        gwg_kernel_fn=GWG_kernel,
+        n_iter_networks=20000,
         n_nets_samples=3000,
+        n_warmup_outcome=2000,
+        n_samples_outcome=3000,
+        learning_rate=0.0005,
+        num_chains_outcome=4,
+        progress_bar=False,
+        refine_triu_star=True,
+        gwg_init_steps=1000,
+        gwg_init_batch_len=10,
     ):
         self.rng_key = random.split(rng_key)[0]
         self.data = data
+
         self.cut_posterior_net_model = cut_posterior_net_model
         self.cut_posterior_outcome_model = cut_posterior_outcome_model
+        self.triu_star_grad_fn = triu_star_grad_fn
+        self.gwg_kernel_fn = gwg_kernel_fn
 
-        self.n_warmup = n_warmup
-        self.n_samples = n_samples
-        self.num_chains = num_chains
+        self.n_iter_networks = n_iter_networks
+        self.n_nets_samples = n_nets_samples
+        self.n_warmup_outcome = n_warmup_outcome
+        self.n_samples_outcome = n_samples_outcome
+        self.learning_rate = learning_rate
+        self.num_chains_outcome = num_chains_outcome
         self.progress_bar = progress_bar
 
-        self.n_nets_samples = n_nets_samples
+        self.refine_triu_star = refine_triu_star
+        self.gwg_init_steps = gwg_init_steps
+        self.gwg_init_batch_len = gwg_init_batch_len
 
         # initial parameters
         self.triu_star_probs = None
@@ -236,24 +265,51 @@ class MWG_init:
         Initialize network parameters from cut-posterior
         """
 
-        kernel = NUTS(self.cut_posterior_net_model)
-        mcmc = MCMC(
-            kernel,
-            num_warmup=self.n_warmup,
-            num_samples=self.n_samples,
-            num_chains=self.num_chains,
-            progress_bar=self.progress_bar,
+        # kernel = NUTS(self.cut_posterior_net_model)
+        # mcmc = MCMC(
+        #     kernel,
+        #     num_warmup=self.n_warmup,
+        #     num_samples=self.n_samples,
+        #     num_chains=self.num_chains,
+        #     progress_bar=self.progress_bar,
+        # )
+
+        # self.rng_key, _ = random.split(self.rng_key)
+
+        # mcmc.run(self.rng_key, triu_vals=self.data["triu_vals"])
+
+        # samples = mcmc.get_samples()
+
+        # self.triu_star_probs = samples["probs_latent"].mean(axis=0)
+        # self.network_params = {
+        #     k: v.mean(axis=0) for k, v in samples.items() if k != "probs_latent"
+        # }
+        # init with SVI with AutoMultivariateNormal guide
+        guide = AutoMultivariateNormal(self.cut_posterior_net_model)
+
+        optimizer = ClippedAdam(self.learning_rate)
+
+        svi = SVI(
+            model=self.cut_posterior_net_model,
+            guide=guide,
+            optim=optimizer,
+            loss=Trace_ELBO(),
         )
 
         self.rng_key, _ = random.split(self.rng_key)
 
-        mcmc.run(self.rng_key, triu_vals=self.data["triu_vals"])
+        svi_results = svi.run(
+            rng_key=self.rng_key,
+            num_steps=self.n_iter_networks,
+            progress_bar=self.progress_bar,
+            triu_vals=self.data["triu_vals"],
+            # init_params=init_vals,
+        )
 
-        samples = mcmc.get_samples()
-
-        self.triu_star_probs = samples["probs_latent"].mean(axis=0)
+        map_params = guide.median(svi_results.params)
+        self.triu_star_probs = map_params["probs_latent"]
         self.network_params = {
-            k: v.mean(axis=0) for k, v in samples.items() if k != "probs_latent"
+            k: v for k, v in map_params.items() if k != "probs_latent"
         }
 
     def init_triu_star_and_exposures(self):
@@ -289,9 +345,9 @@ class MWG_init:
         kernel_plugin = NUTS(self.cut_posterior_outcome_model)
         mcmc_plugin = MCMC(
             kernel_plugin,
-            num_warmup=self.n_warmup,
-            num_samples=self.n_samples,
-            num_chains=self.num_chains,
+            num_warmup=self.n_warmup_outcome,
+            num_samples=self.n_samples_outcome,
+            num_chains=self.num_chains_outcome,
             progress_bar=self.progress_bar,
         )
 
@@ -305,6 +361,74 @@ class MWG_init:
         samples = mcmc_plugin.get_samples()
 
         self.outcome_params = {k: v.mean(axis=0) for k, v in samples.items()}
+
+    def refine_triu_star_values(self):
+        """
+        Refine the initial triu_star by running a short GWG chain
+        conditioned on the initialized continuous parameters.
+        """
+        if self.progress_bar:
+            print(f"Refining A* with {self.gwg_init_steps} GWG steps...")
+
+        # 1. Package current continuous parameters
+        cur_param = self.outcome_params | self.network_params
+        cur_param["logits_star"] = logit(self.triu_star_probs)
+
+        # 2. Initialize IPState (gradients, scores)
+        cur_triu_star = jnp.astype(self.triu_star, jnp.float32)
+
+        cur_logdensity, cur_grad = self.triu_star_grad_fn(
+            cur_triu_star, self.data, cur_param
+        )
+
+        cur_scores = (-(2 * cur_triu_star - 1) * cur_grad) / 2
+
+        state = IPState(
+            positions=cur_triu_star,
+            logdensity=cur_logdensity,
+            logdensity_grad=cur_grad,
+            scores=cur_scores,
+        )
+
+        # 3. Run GWG Kernel
+        self.rng_key, _ = random.split(self.rng_key)
+
+        start_t = time.time()
+
+        new_state, _ = self.gwg_kernel_fn(
+            rng_key=self.rng_key,
+            state=state,
+            data=self.data,
+            param=cur_param,
+            n_steps=self.gwg_init_steps,
+            batch_len=self.gwg_init_batch_len,
+        )
+
+        new_state.positions.block_until_ready()
+        end_t = time.time()
+
+        new_triu_star_int = jnp.astype(new_state.positions, jnp.int32)
+
+        # Compute Hamming distance (number of flipped edges)
+        n_flips = jnp.sum(
+            jnp.abs(new_triu_star_int - jnp.astype(self.triu_star, jnp.int32))
+        )
+
+        # Compute Log Density improvement
+        # Note: new_state.logdensity is from the last step
+        log_prob_diff = new_state.logdensity - cur_logdensity
+
+        if self.progress_bar:
+            print(f"  > Refinement done in {end_t - start_t:.4f}s")
+            print(f"  > Edges flipped: {n_flips}")
+            print(f"  > Log-prob change: {log_prob_diff:.4f}")
+
+        # 4. Update self.triu_star
+        self.triu_star = jnp.astype(new_state.positions, jnp.int32)
+
+        # Optional: Update exposures based on new network
+        # This keeps the object state consistent, though strictly optional for just init
+        self.exposures = ud.compute_exposures(self.triu_star, self.data["Z"])
 
     def get_init_values(self):
         """
@@ -320,6 +444,9 @@ class MWG_init:
         self.init_network_params()
         self.init_triu_star_and_exposures()
         self.init_outcome_model()
+
+        if self.refine_triu_star:
+            self.refine_triu_star_values()
 
         init_params = (
             self.network_params | self.outcome_params | {"triu_star": self.triu_star}
@@ -338,8 +465,8 @@ class MWG_init:
             self.outcome_params["sig_inv"],
         )
 
-        if self.num_chains > 1:
-            return replicate_params(init_params, self.num_chains)
+        if self.num_chains_outcome > 1:
+            return replicate_params(init_params, self.num_chains_outcome)
         else:
             return init_params
 
@@ -353,10 +480,12 @@ class MWG_sampler:
         gwg_fn=make_gwg_gibbs_fn,
         combined_model=dm.combined_model,
         n_warmup=1000,
-        n_samples=1000,
+        n_samples=3000,
         num_chains=4,
         continuous_sampler="NUTS",  # one of "NUTS" or "HMC"
         progress_bar=False,
+        gwg_n_steps=1,
+        gwg_batch_len=1,
     ):
         self.rng_key = random.split(rng_key)[0]
         self.data = data
@@ -369,7 +498,7 @@ class MWG_sampler:
         self.progress_bar = progress_bar
 
         #  init function for mwg
-        self.gwg_fn = gwg_fn(data)
+        self.gwg_fn = gwg_fn(data, n_steps=gwg_n_steps, batch_len=gwg_batch_len)
         self.continuous_kernel = self.make_continuous_kernel()
         #  get posterior samples
         self.posterior_samples = self.get_samples()
@@ -472,7 +601,7 @@ class mcmc_fixed_net:
         data,
         net_type,
         n_warmup=1000,
-        n_samples=1000,
+        n_samples=3000,
         num_chains=4,
         progress_bar=False,
     ):

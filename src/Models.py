@@ -12,20 +12,15 @@ import src.utils as utils
 
 # True network: p(A*|X,\theta) \propto expit(theta_0 + theta_1 * x2_or)
 # Proxy network: p(A_ij|A*_{ij},X,\gamma) \propto expit(gamma_0 * A*_{ij} + (1-A*_{ij}) * (gamma_1 + gamma_2 * x_diff))
-# Proxy network (rep): P(A^r_ij|A*_{ij}, A_{ij}, X, \gamma)
 # Outcome: p(Y|A*,X,Z,\eta,\rho,\sig_inv) \propto N(Y|mu; Sigma)
 # where mu = df @ eta, with df = [1, Z, X, exposures] and exposures = compute_exposures(A*, Z) (weighted sum of Z by deg cen)
-# and Sigma = [sig_inv(D - rho * A*]^{-1}, with D=diag(degrees(A*)) --> CAR model
 
 # priors are:
 # theta ~ N(0, 3^2)
 # gamma ~ N(0, 3^2)
 # eta ~ N(0, 3^2)
-# rho ~ Beta(2, 2)
-# sig_inv ~ Gamma(2, 2)
+# sig_inv ~ HalfNormal(0, 3^2)
 
-# PRIOR_SCALE = jnp.sqrt(3).item()
-# PRIOR_SCALE = jnp.sqrt(5).item()
 PRIOR_SCALE = 3
 
 ### --- NumPyro models --- ###
@@ -420,7 +415,10 @@ def combined_model(data):
 
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
-    triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+
+    # triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+    with numpyro.plate("edges_ast", data.triu_obs.shape[0]):
+        triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
 
     # adj_mat = utils.Triu_to_mat(triu_star)
 
@@ -493,7 +491,9 @@ def combined_model_misspec(data):
 
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
-    triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+    # triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+    with numpyro.plate("edges_ast", data.triu_obs.shape[0]):
+        triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
 
     # adj_mat = utils.Triu_to_mat(triu_star)
 
@@ -577,7 +577,9 @@ def combined_model_rep(data):
 
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
-    triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+    # triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+    with numpyro.plate("edges_ast", data.triu_obs.shape[0]):
+        triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
 
     # adj_mat = utils.Triu_to_mat(triu_star)
 
@@ -664,7 +666,9 @@ def combined_model_rep_misspec(data):
 
     # likelihood
     star_logits = theta[0] + theta[1] * data.x2_or
-    triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+    # triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
+    with numpyro.plate("edges_ast", data.triu_obs.shape[0]):
+        triu_star = numpyro.sample("triu_star", dist.Bernoulli(logits=star_logits))
 
     # adj_mat = utils.Triu_to_mat(triu_star)
 
@@ -1439,10 +1443,15 @@ def continuous_relaxation_model(data, temperature=0.5):
     # This replaces the manual Normal + Sigmoid logic.
     # The temperature controls how binary-like the samples are.
     # Note: We do not observe this site; it is a latent soft mask.
-    triu_star_soft = numpyro.sample(
-        "triu_star_soft",
-        dist.RelaxedBernoulli(temperature=temperature, logits=structural_logits),
-    )
+    # triu_star_soft = numpyro.sample(
+    #     "triu_star_soft",
+    #     dist.RelaxedBernoulli(temperature=temperature, logits=structural_logits),
+    # )
+    with numpyro.plate("edges_relax", data.triu_obs.shape[0]):
+        triu_star_soft = numpyro.sample(
+            "triu_star_soft",
+            dist.RelaxedBernoulli(temperature=temperature, logits=structural_logits),
+        )
 
     # Helper: Soft Adjacency Matrix
     adj_mat_soft = utils.Triu_to_mat(triu_star_soft)

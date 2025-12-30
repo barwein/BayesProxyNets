@@ -14,7 +14,7 @@ class mcmc_fixed_net:
         rng_key,
         data,
         net_type,
-        n_warmup=3000,
+        n_warmup=2000,
         n_samples=3000,
         num_chains=4,
         progress_bar=False,
@@ -146,27 +146,3 @@ class mcmc_fixed_net:
 
         post_y_preds = self.sample_pred_y(new_z)
         return utils.compute_error_stats(post_y_preds, true_estimands, wasser_dist)
-
-    # def new_intervention_error_stats(self, new_z, true_estimands, true_vals):
-    #     wasser_dist = self.wasserstein_distance(true_vals)
-
-    #     if new_z.ndim == 3:  # stoch intervention
-    #         # compute exposures for new interventions
-    #         expos_1 = utils.compute_exposures(self.triu, new_z[0, :, :])
-    #         expos_2 = utils.compute_exposures(self.triu, new_z[1, :, :])
-    #         expos_diff = expos_1 - expos_2
-    #         z_diff = new_z[0, :, :] - new_z[1, :, :]
-    #         estimates = utils.get_estimates_vmap(
-    #             z_diff, expos_diff, self.samples["eta"]
-    #         ).mean(axis=0)
-    #         # estimates should have shape (M,n) where M is number of posterior samples
-    #         return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
-    #     elif new_z.ndim == 2:  # dynamic intervention
-    #         expos_1 = utils.compute_exposures(self.triu, new_z[0, :])
-    #         expos_2 = utils.compute_exposures(self.triu, new_z[1, :])
-    #         expos_diff = expos_1 - expos_2
-    #         z_diff = new_z[0, :] - new_z[1, :]
-    #         estimates = utils.get_estimates(z_diff, expos_diff, self.samples["eta"])
-    #         return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
-    #     else:
-    #         raise ValueError("Invalid dimension for new interventions")

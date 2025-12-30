@@ -7,7 +7,14 @@
 import jax
 import jax.numpy as jnp
 from jax import random, vmap
-from numpyro.infer import MCMC, NUTS, HMC, Predictive, SVI, Trace_ELBO
+from numpyro.infer import (
+    MCMC,
+    NUTS,
+    HMC,
+    Predictive,
+    SVI,
+    Trace_ELBO,
+)
 from numpyro.infer.autoguide import AutoMultivariateNormal
 from numpyro.optim import ClippedAdam
 from numpyro.infer.hmc_gibbs import HMCGibbs
@@ -17,7 +24,13 @@ import time
 
 import src.Models as models
 import src.utils as utils
-from src.GWG import make_gwg_gibbs_fn, make_gwg_gibbs_fn_rep
+from src.GWG import (
+    make_gwg_gibbs_fn,
+    make_gwg_gibbs_fn_rep,
+    GWG_kernel,
+    IPState,
+    ParamTuple,
+)
 
 
 # Init values from the cut-posterior
@@ -70,20 +83,29 @@ class MWG_init:
         cut_posterior_net_model=models.networks_marginalized_model,
         cut_posterior_outcome_model=models.plugin_outcome_model,
         triu_star_log_posterior_fn=models.compute_log_posterior_vmap,
+        triu_star_grad_fn=models.triu_star_grad_fn,
+        gwg_kernel_fn=GWG_kernel,
         n_iter_networks=20000,
         n_nets_samples=3000,
-        n_warmup_outcome=3000,
+        n_warmup_outcome=2000,
         n_samples_outcome=3000,
         learning_rate=0.0005,
         num_chains_outcome=4,
         progress_bar=False,
         misspecified=False,
+        refine_triu_star=True,
+        gwg_init_steps=1000,
+        gwg_init_batch_len=10,
     ):
         self.rng_key = random.split(rng_key)[0]
         self.data = data
+
         self.cut_posterior_net_model = cut_posterior_net_model
         self.cut_posterior_outcome_model = cut_posterior_outcome_model
         self.triu_star_log_posterior_fn = triu_star_log_posterior_fn
+        self.triu_star_grad_fn = triu_star_grad_fn
+        self.gwg_kernel_fn = gwg_kernel_fn
+
         self.n_iter_networks = n_iter_networks
         self.n_nets_samples = n_nets_samples
         self.n_warmup_outcome = n_warmup_outcome
@@ -92,6 +114,10 @@ class MWG_init:
         self.num_chains_outcome = num_chains_outcome
         self.progress_bar = progress_bar
         self.misspecified = misspecified
+
+        self.refine_triu_star = refine_triu_star
+        self.gwg_init_steps = gwg_init_steps
+        self.gwg_init_batch_len = gwg_init_batch_len
 
         # initial parameters
         self.theta = None
@@ -229,22 +255,100 @@ class MWG_init:
         # self.rho = samples["rho"].mean()
         self.sig_inv = samples["sig_inv"].mean()
 
+    def refine_triu_star_values(self):
+        """
+        Refine the initial triu_star by running a short GWG chain
+        conditioned on the initialized continuous parameters.
+        """
+        if self.progress_bar:
+            print(f"Refining A* with {self.gwg_init_steps} GWG steps...")
+
+        # 1. Package current continuous parameters
+        cur_param = ParamTuple(
+            theta=self.theta,
+            gamma=self.gamma,
+            eta=self.eta,
+            # rho=self.rho,
+            sig_inv=self.sig_inv,
+        )
+
+        # 2. Initialize IPState (gradients, scores)
+        # We assume self.triu_star_grad_fn is set correctly (single vs repeated)
+        cur_triu_star = jnp.astype(self.triu_star, jnp.float32)
+
+        cur_logdensity, cur_grad = self.triu_star_grad_fn(
+            cur_triu_star, self.data, cur_param
+        )
+
+        cur_scores = (-(2 * cur_triu_star - 1) * cur_grad) / 2
+
+        state = IPState(
+            positions=cur_triu_star,
+            logdensity=cur_logdensity,
+            logdensity_grad=cur_grad,
+            scores=cur_scores,
+        )
+
+        # 3. Run GWG Kernel
+        self.rng_key, _ = random.split(self.rng_key)
+
+        start_t = time.time()
+
+        new_state, _ = self.gwg_kernel_fn(
+            rng_key=self.rng_key,
+            state=state,
+            data=self.data,
+            param=cur_param,
+            n_steps=self.gwg_init_steps,
+            batch_len=self.gwg_init_batch_len,
+        )
+
+        new_state.positions.block_until_ready()
+        end_t = time.time()
+
+        new_triu_star_int = jnp.astype(new_state.positions, jnp.int32)
+
+        # Compute Hamming distance (number of flipped edges)
+        n_flips = jnp.sum(
+            jnp.abs(new_triu_star_int - jnp.astype(self.triu_star, jnp.int32))
+        )
+
+        # Compute Log Density improvement
+        # Note: new_state.logdensity is from the last step
+        log_prob_diff = new_state.logdensity - cur_logdensity
+
+        if self.progress_bar:
+            print(f"  > Refinement done in {end_t - start_t:.4f}s")
+            print(f"  > Edges flipped: {n_flips}")
+            print(f"  > Log-prob change: {log_prob_diff:.4f}")
+
+        # 4. Update self.triu_star
+        self.triu_star = jnp.astype(new_state.positions, jnp.int32)
+
+        # Optional: Update exposures based on new network
+        # This keeps the object state consistent, though strictly optional for just init
+        self.exposures = utils.compute_exposures(self.triu_star, self.data.Z)
+
     def get_init_values(self):
         """
-        Get initial values for the MWG sampler
+        Get initial values for the MWG sampler.
 
         Args:
-            num_chains: int, number of chains
-
-        Returns:
-            dict with initial values for the MWG sampler
+            compute_outcome_mcmc (bool):
+                If True, runs MCMC to estimate 'eta', 'sig_inv'.
+                If False, uses NumPyro's init_to_uniform for continuous params.
         """
 
-        print("Initializing parameters for MWG sampler...")
+        if self.progress_bar:
+            print("Initializing parameters for MWG sampler...")
 
         self.init_network_params()
         self.init_triu_star_and_exposures()
         self.init_outcome_model()
+
+        if self.refine_triu_star:
+            self.refine_triu_star_values()
+
         init_params = {
             "theta": self.theta,
             "gamma": self.gamma,
@@ -253,26 +357,6 @@ class MWG_init:
             # "rho": self.rho,
             "sig_inv": self.sig_inv,
         }
-
-        # print(
-        #     "MWG init params:",
-        #     "\n",
-        #     "theta:",
-        #     self.theta,
-        #     "\n",
-        #     "gamma:",
-        #     self.gamma,
-        #     "\n",
-        #     #   "triu_star:", self.triu_star, "\n",
-        #     "eta:",
-        #     self.eta,
-        #     "\n",
-        #     "rho:",
-        #     self.rho,
-        #     "\n",
-        #     "sig_inv:",
-        #     self.sig_inv,
-        # )
 
         if self.num_chains_outcome > 1:
             return replicate_params(init_params, self.num_chains_outcome)
@@ -291,12 +375,14 @@ class MWG_sampler:
         init_params,
         gwg_fn=make_gwg_gibbs_fn,
         combined_model=models.combined_model,
-        n_warmup=3000,
+        n_warmup=2000,
         n_samples=3000,
         num_chains=4,
         continuous_sampler="NUTS",  # one of "NUTS" or "HMC"
         progress_bar=False,
         misspecified=False,
+        gwg_n_steps=1,
+        gwg_batch_len=1,
     ):
         self.rng_key = random.split(rng_key)[0]
         self.data = data
@@ -312,7 +398,8 @@ class MWG_sampler:
         self.sampling_time = None
 
         #  init function for mwg
-        self.gwg_fn = gwg_fn(data)
+        # self.gwg_fn = gwg_fn(data)
+        self.gwg_fn = gwg_fn(data, n_steps=gwg_n_steps, batch_len=gwg_batch_len)
         self.continuous_kernel = self.make_continuous_kernel()
         #  get posterior samples
         self.posterior_samples = self.get_samples()
@@ -348,21 +435,35 @@ class MWG_sampler:
 
         # --- Timing Block ---
         start_time = time.time()
-        mwg_mcmc.run(self.rng_key, self.data, init_params=self.init_params)
+        # mwg_mcmc.run(self.rng_key, self.data, init_params=self.init_params)
+        mwg_mcmc.run(
+            self.rng_key,
+            self.data,
+            init_params=self.init_params,
+        )
+
+        samples = mwg_mcmc.get_samples()
+
+        jax.tree_util.tree_leaves(samples)[
+            0
+        ].block_until_ready()  # Ensure all computations are done
+
         end_time = time.time()
 
         self.sampling_time = end_time - start_time
 
-        return mwg_mcmc.get_samples()
+        return samples
+
+        # return mwg_mcmc.get_samples()
         # return mwg_mcmc.get_samples(group_by_chain=True)
 
-    def print_diagnostics(self):
+    def print_diagnostics(self, to_print=True):
         """
         Prints ESS, R-hat, and Computational Efficiency metrics.
         Excludes the high-dimensional 'triu_star' to prevent console overflow.
         """
-        print(f"\n=== MCMC Diagnostics ({self.continuous_sampler}) ===")
-        print(f"Total Sampling Time: {self.sampling_time:.2f} seconds")
+        if to_print:
+            print(f"\n=== MCMC Diagnostics ({self.continuous_sampler}) ===")
 
         # Filter out the large discrete network parameter
         cont_samples = {
@@ -372,12 +473,15 @@ class MWG_sampler:
         # NumPyro summary (calculates ESS and R-hat)
         # We assume group_by_chain=False to get global stats across chains
         stats = summary(cont_samples, group_by_chain=False)
-        print_summary(cont_samples, group_by_chain=False)
+        if to_print:
+            print_summary(cont_samples, group_by_chain=False)
 
         # --- Compute Efficiency Metric (ESS / Second) ---
-        print("\n--- Efficiency Metrics (ESS / sec) ---")
+        if to_print:
+            print("\n--- Efficiency Metrics (ESS / sec) ---")
 
         min_ess_global = float("inf")
+        mean_ess_eta = float("inf")
 
         for param_name, metrics in stats.items():
             # metrics['n_eff'] can be an array if the parameter is a vector (e.g. eta)
@@ -385,20 +489,24 @@ class MWG_sampler:
             min_ess = jnp.min(n_eff)
             mean_ess = jnp.mean(n_eff)
 
+            if param_name == "eta":
+                mean_ess_eta = mean_ess
+
             # Update global minimum
             if min_ess < min_ess_global:
                 min_ess_global = min_ess
 
             ess_per_sec = mean_ess / self.sampling_time
-            print(
-                f"{param_name:<10} | Mean ESS: {mean_ess:.1f} | Efficiency: {ess_per_sec:.2f} samples/sec"
-            )
-
-        print("-" * 50)
-        print(f"Global Min ESS/sec: {min_ess_global / self.sampling_time:.4f}")
-        print(
-            f"This is your 'Speed Limit'. If this is < 1.0, you need longer chains or better mixing."
-        )
+            if to_print:
+                print(
+                    f"{param_name:<10} | Mean ESS: {mean_ess:.1f} | Efficiency: {ess_per_sec:.2f} samples/sec"
+                )
+        min_ess_per_sec = min_ess_global / self.sampling_time
+        if to_print:
+            print("-" * 50)
+            print(f"Global Min ESS/sec: {min_ess_per_sec:.4f}")
+            print(f"Mean ESS for 'eta': {mean_ess_eta:.1f}")
+        return min_ess_per_sec, mean_ess_eta, mean_ess_eta / self.sampling_time
 
     def wasserstein_distance(self, true_vals):
         # keys_to_keep = {"eta", "sig_inv", "rho", "triu_star"}
@@ -456,42 +564,3 @@ class MWG_sampler:
 
         post_y_preds = self.sample_pred_y(new_z)
         return utils.compute_error_stats(post_y_preds, true_estimands, wasser_dist)
-
-    # def new_intervention_error_stats(self, new_z, true_estimands, true_vals):
-    #     wasser_dist = self.wasserstein_distance(true_vals)
-
-    #     if new_z.ndim == 3:  # stoch intervention
-    #         # compute exposures for new interventions
-    #         expos_1 = utils.vmap_compute_exposures(
-    #             self.posterior_samples["triu_star"], new_z[0, :, :]
-    #         )
-    #         expos_2 = utils.vmap_compute_exposures(
-    #             self.posterior_samples["triu_star"], new_z[1, :, :]
-    #         )
-    #         expos_diff = expos_1 - expos_2
-    #         # reshape expos_diff to have shape (n_stoch, M, N) where n_stoch is number of stoch treatments approx
-    #         diff_shapes = expos_diff.shape
-    #         expos_diff = expos_diff.reshape(
-    #             diff_shapes[1], diff_shapes[0], diff_shapes[2]
-    #         )
-    #         z_diff = new_z[0, :, :] - new_z[1, :, :]
-    #         estimates = utils.get_estimates_vmap(
-    #             z_diff, expos_diff, self.posterior_samples["eta"]
-    #         ).mean(axis=0)
-    #         # estimates should have shape (M,n) where M is number of posterior samples
-    #         return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
-    #     elif new_z.ndim == 2:  # dynamic intervention
-    #         expos_1 = utils.vmap_compute_exposures(
-    #             self.posterior_samples["triu_star"], new_z[0, :]
-    #         )
-    #         expos_2 = utils.vmap_compute_exposures(
-    #             self.posterior_samples["triu_star"], new_z[1, :]
-    #         )
-    #         expos_diff = expos_1 - expos_2
-    #         z_diff = new_z[0, :] - new_z[1, :]
-    #         estimates = utils.get_estimates(
-    #             z_diff, expos_diff, self.posterior_samples["eta"]
-    #         )
-    #         return utils.compute_error_stats(estimates, true_estimands, wasser_dist)
-    #     else:
-    #         raise ValueError("Invalid dimension for new interventions")

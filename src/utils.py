@@ -12,7 +12,7 @@ from typing import NamedTuple, Any
 
 # --- Global variables ---
 
-N = 500  # Number of nodes
+# N = 500  # Number of nodes
 
 # --- Data and Param namedtuples classes ---
 
@@ -56,11 +56,26 @@ class NewEstimands(NamedTuple):
 #     return jnp.int32((1 + jnp.sqrt(1 + 8 * M)) / 2)
 
 
+# @jit
+def get_n_from_triu(triu_vals: jnp.ndarray) -> int:
+    """
+    Calculate number of nodes N from the size of the upper triangular vector.
+    M = N(N-1)/2  =>  N^2 - N - 2M = 0
+    N = (1 + sqrt(1 + 8M)) / 2
+    """
+    M = triu_vals.shape[0]
+    # We use np.sqrt to ensure this is computed at trace time (static shape)
+    # This avoids dynamic shape errors within JIT
+    return int((1 + np.sqrt(1 + 8 * M)) // 2)
+
+
 @jit
 def Triu_to_mat(triu_v):
     """
     Convert upper triangular vector to symmetric matrix
     """
+    N = get_n_from_triu(triu_v)
+
     adj_mat = jnp.zeros((N, N))
     adj_mat = adj_mat.at[np.triu_indices(n=N, k=1)].set(triu_v)
     return adj_mat + adj_mat.T
@@ -77,6 +92,9 @@ def degree_centrality(adj_matrix):
     Returns:
     jnp.ndarray: Vector of normalized degree centralities
     """
+
+    N = adj_matrix.shape[0]
+
     # Compute degrees (sum of rows for undirected graph)
     degrees = jnp.sum(adj_matrix, axis=1)
 
@@ -198,16 +216,16 @@ def compute_error_stats(post_estimates, true_estimand, wasserstein_dist):
     median_all = jnp.nanmedian(post_estimates)  # scalar
 
     # raw errors
-    units_error = mean_of_units - mean_estimand
+    # units_error = mean_of_units - mean_estimand
     units_rel_error = (mean_of_units - mean_estimand) / mean_estimand
-    unit_level_error = mean_of_samples - true_estimand
+    # unit_level_error = mean_of_samples - true_estimand
     unit_level_rel_error = (mean_of_samples - true_estimand) / (true_estimand + 1e-6)
 
     # error metrics
-    rmse = jnp.round(jnp.sqrt(jnp.nanmean(jnp.square(units_error))), 5)
+    # rmse = jnp.round(jnp.sqrt(jnp.nanmean(jnp.square(units_error))), 5)
     rmse_rel = jnp.round(jnp.sqrt(jnp.nanmean(jnp.square(units_rel_error))), 5)
     # mae = jnp.round(jnp.mean(jnp.abs(units_error)), 5)
-    mae = jnp.round(jnp.nanmean(jnp.abs(unit_level_error)), 5)
+    # mae = jnp.round(jnp.nanmean(jnp.abs(unit_level_error)), 5)
     # mape = jnp.round(jnp.mean(jnp.abs(units_rel_error)), 5)
     mape = jnp.round(jnp.nanmean(jnp.abs(unit_level_rel_error)), 5)
 
@@ -230,12 +248,12 @@ def compute_error_stats(post_estimates, true_estimand, wasserstein_dist):
         "true": jnp.round(mean_estimand, 5),
         "bias": bias,
         "std": std,
-        "RMSE": rmse,
+        # "RMSE": rmse,
         "RMSE_rel": rmse_rel,
-        "MAE": mae,
+        # "MAE": mae,
         "MAPE": mape,
-        "q025": q025,
-        "q975": q975,
+        # "q025": q025,
+        # "q975": q975,
         "covering": coverage,
         "mean_ind_cover": mean_cover_ind,
         "w_dist": wasserstein_dist,

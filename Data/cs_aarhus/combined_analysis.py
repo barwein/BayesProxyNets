@@ -23,12 +23,12 @@ RHO = 0.5
 SIG_INV = 1.0
 
 
-# N_ITERATION = 300
-N_ITERATION = 1
+N_ITERATION = 300
+# N_ITERATION = 1
 
 
-# FILE_NAME = "Data/cs_aarhus/cs_analysis_results.csv"
-FILE_NAME = "Data/cs_aarhus/cs_analysis_results_TEST.csv"
+FILE_NAME = "Data/cs_aarhus/cs_analysis_results.csv"
+# FILE_NAME = "Data/cs_aarhus/cs_analysis_results_TEST.csv"
 
 # --- aux function for one iteration ---
 
@@ -47,7 +47,7 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
     # full data dict
     data = data_z_y | network_data
 
-    # stochastic intervention and estimand
+    # Estimands
     rng_key, _ = random.split(rng_key)
     intervention_estimand = ud.get_intervention_estimand(
         key=rng_key, triu_star=network_data["triu_star"], eta=ETA
@@ -73,7 +73,7 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
             }
         )
 
-        # 3. GATE (Treat All vs None)
+        # 3. GATE aka TTE (Treat All vs None)
         gate_stats = mcmc_obj.new_intervention_error_stats(
             new_z=intervention_estimand["Z_gate"],
             true_estimands=intervention_estimand["estimand_gate"],
@@ -120,28 +120,16 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
     mcmc_agg_and = dmcmc.mcmc_fixed_net(rng_key=rng_key, data=data, net_type="agg_and")
     run_eval(mcmc_agg_and, "agg_and")
 
-    # MWG sampelr aka Block Gibbs
-
+    # MWG init
     print("--- Init MWG values ---")
 
     rng_key, _ = random.split(rng_key)
     mwg_init = dmcmc.MWG_init(
-        rng_key=rng_key, data=data, progress_bar=True
-    ).get_init_values()
-
-    print("--- Running MWG sampler ---")
-
-    rng_key, _ = random.split(rng_key)
-    mwg_sampler = dmcmc.MWG_sampler(
         rng_key=rng_key,
         data=data,
-        init_params=mwg_init,
-        # n_warmup=2000,
-        # n_samples=2500,
-        # num_chains=4,
-        progress_bar=True,
-    )
-    run_eval(mwg_sampler, "MWG")
+        gwg_init_batch_len=int(1e4),
+        gwg_init_steps=1,
+    ).get_init_values()
 
     # Twostage sample
     print("--- Running TwoStage sampler ---")
@@ -154,9 +142,25 @@ def one_iteration(rng_key, network_data, latent_layer, idx, with_header=False):
 
     rng_key, _ = random.split(rng_key)
     mcmc_ts = dmcmc.mcmc_fixed_net(
-        rng_key=rng_key, data=data_ts, net_type="true", progress_bar=True
+        rng_key=rng_key,
+        data=data_ts,
+        net_type="true",
     )
     run_eval(mcmc_ts, "two_stage")
+
+    # MWG sampelr aka Block Gibbs
+    print("--- Running MWG sampler ---")
+
+    rng_key, _ = random.split(rng_key)
+    mwg_sampler = dmcmc.MWG_sampler(
+        rng_key=rng_key,
+        data=data,
+        init_params=mwg_init,
+        progress_bar=False,
+        gwg_batch_len=1,
+        gwg_n_steps=1,
+    )
+    run_eval(mwg_sampler, "MWG")
 
     results_df = pd.DataFrame(results)
     results_df.to_csv(FILE_NAME, index=False, mode="a", header=with_header)
