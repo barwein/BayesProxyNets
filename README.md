@@ -19,6 +19,28 @@ The latent network is updated using **Locally Informed Proposals (LIP)**.
 This repository includes scripts for both **fully synthetic experiments** and **semi-synthetic experiments**.
 It also contains all necessary components to reproduce the results presented in the manuscript.
 
+
+
+```mermaid
+graph LR;
+    subgraph "Latent Layer"
+    A_star((Latent Network A*))
+    end
+    
+    subgraph "Observed Layer"
+    Z[Treatment Z]
+    Y[Outcome Y]
+    P1[Proxy A1]
+    P2[Proxy A2]
+    end
+
+    A_star -->|Interference| Y
+    A_star -.->|Measurement| P1
+    A_star -.->|Measurement| P2
+    Z --> Y
+    Z -.->|Spillover| Y
+```
+
 ## Repository Structure
 
 The code is organized as follows:
