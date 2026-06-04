@@ -297,6 +297,24 @@ def one_simulation_iter(
     cont_relax_sampler.run()
     run_eval(cont_relax_sampler, "cont_relax")
 
+    # --- MWG with HMC kernel for continuous params ---
+    print("--- MWG with HMC kernel for continuous params ---")
+
+    rng_key = random.split(rng_key)[1]
+
+    mwg_sampler_hmc = MWG_sampler(
+        rng_key=rng_key,
+        data=data,
+        init_params=mwg_init,
+        progress_bar=False,
+        continuous_sampler="HMC",
+        # n_warmup=100,
+        # n_samples=100,
+        gwg_n_steps=1,
+        gwg_batch_len=1,
+    )
+    run_eval(mwg_sampler_hmc, "MWG_HMC")
+
     # --- save results and write to csv ---
     results_df = pd.DataFrame(results)
     file_name = f"{file_path}/sim_results_{iter}.csv"
